@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="EV Charge"/>
+  <title>EV Charge Manager ⚡</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f8faff; font-family: 'Segoe UI', Arial, sans-serif; }
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React + Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useMemo } = React;
+
+
+const INFLATION = 1.21;
+const RATE_PREMIUM = 1.9;
+const RATE_REGULAR = 1.4;
+const OWNER_COST = 0.9;
+const PREMIUM_START = 16;
+const PREMIUM_END = 23;
+
+function calcSession(kwhRaw, startTime, endTime = null, forceRegular = false, forcePremium = false) {
+  const start = startTime instanceof Date ? startTime : new Date(startTime);
+  const end = endTime ? (endTime instanceof Date ? endTime : new Date(endTime)) : start;
+  const kwhInflated = Math.round(kwhRaw * INFLATION);
+  let rate, premiumRatio = 0, isMixed = false;
+
+  if (forceRegular) { rate = RATE_REGULAR; }
+  else if (forcePremium) { rate = RATE_PREMIUM; premiumRatio = 1; }
+  else {
+    const sh = start.getHours() + start.getMinutes() / 60;
+    const eh = end.getHours() + end.getMinutes() / 60;
+    const totalMin = Math.max((end - start) / 60000, 1);
+    let premH = 0;
+    if (sh < eh) {
+      const os = Math.max(sh, PREMIUM_START), oe = Math.min(eh, PREMIUM_END);
+      premH = Math.max(0, oe - os);
+    }
+    premiumRatio = Math.min(1, (premH * 60) / totalMin);
+    if (premiumRatio > 0 && premiumRatio < 1) {
+      isMixed = true;
+      rate = Math.round((RATE_PREMIUM * premiumRatio + RATE_REGULAR * (1 - premiumRatio)) * 1000) / 1000;
+    } else if (premiumRatio >= 1) { rate = RATE_PREMIUM; }
+    else {
+      const h = start.getHours();
+      if (h >= PREMIUM_START && h < PREMIUM_END) { rate = RATE_PREMIUM; premiumRatio = 1; }
+      else { rate = RATE_REGULAR; }
+    }
+  }
+  const amountBilled = Math.round(kwhInflated * rate * 100) / 100;
+  const costToOwner = Math.round(kwhRaw * OWNER_COST * 100) / 100;
+  const profit = Math.round((amountBilled - costToOwner) * 100) / 100;
+  const rateLabel = isMixed ? `משולב (${Math.round(premiumRatio * 100)}% פרימיום)` : premiumRatio >= 1 ? "פרימיום" : "רגיל";
+  return { kwhRaw, kwhInflated, premiumRatio: Math.round(premiumRatio * 100) / 100, isMixed, rate, amountBilled, costToOwner, profit, rateLabel };
+}
+
+// ── Persistent storage via localStorage ──────────────────────────────────────
+const DB = {
+  async get(key) {
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; }
+    catch { return null; }
+  },
+  async set(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); }
+    catch(e) { console.error(e); }
+  },
+};
+
+const CLIENTS0  = [];
+const SESSIONS0 = [];
+const PAYMENTS0 = [];
+
+const ils = n => `₪${Number(n).toFixed(2)}`;
+const fdate = d => new Date(d).toLocaleDateString("he-IL",{day:"2-digit",month:"2-digit",year:"2-digit"});
+const ftime = d => new Date(d).toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"});
+const fdt = d => `${fdate(d)} ${ftime(d)}`;
+const uid = () => Math.random().toString(36).slice(2)+Date.now().toString(36);
+
+const METHODS = { bit:"ביט", cash:"מזומן", paybox:"פייבוקס", transfer:"העברה" };
+const MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+
+// ── STYLES ──
+const S = {
+  app:{ minHeight:"100vh", background:"#f8faff", fontFamily:"'Segoe UI',Arial,sans-serif", direction:"rtl", maxWidth:500, margin:"0 auto" },
+  header:{ background:"#fff", borderBottom:"1px solid #e5e7eb", position:"sticky", top:0, zIndex:100, boxShadow:"0 2px 8px rgba(99,102,241,0.08)" },
+  hInner:{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 18px" },
+  hTitle:{ fontSize:18, fontWeight:800, color:"#1e1b4b", letterSpacing:-0.3 },
+  backBtn:{ background:"none", border:"none", color:"#6366f1", fontWeight:700, fontSize:14, cursor:"pointer", padding:"4px 10px", borderRadius:8 },
+  main:{ padding:"16px 16px 40px" },
+  sumRow:{ display:"flex", gap:8, marginBottom:16 },
+  sumCard:{ flex:1, background:"#fff", borderRadius:14, padding:"12px 10px", display:"flex", alignItems:"center", gap:8, boxShadow:"0 1px 6px rgba(0,0,0,0.06)" },
+  sumIcon:{ fontSize:20 },
+  sumVal:{ fontSize:16, fontWeight:800, letterSpacing:-0.5 },
+  sumLbl:{ fontSize:10, color:"#9ca3af", marginTop:1 },
+  actRow:{ display:"flex", gap:8, marginBottom:20 },
+  actBtn:{ flex:1, border:"none", borderRadius:10, color:"#fff", fontWeight:700, fontSize:13, padding:"12px 6px", cursor:"pointer", boxShadow:"0 2px 8px rgba(0,0,0,0.12)" },
+  secTitle:{ fontSize:14, fontWeight:700, color:"#374151", marginBottom:10 },
+  cGrid:{ display:"flex", flexDirection:"column", gap:10 },
+  cCard:{ background:"#fff", borderRadius:14, padding:"14px", boxShadow:"0 1px 6px rgba(0,0,0,0.07)", cursor:"pointer" },
+  cTop:{ display:"flex", alignItems:"center", gap:10, marginBottom:10 },
+  ava(sz=38,fs=16){ return { width:sz, height:sz, borderRadius:"50%", background:"linear-gradient(135deg,#6366f1,#8b5cf6)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:fs, flexShrink:0 }; },
+  cName:{ fontWeight:700, fontSize:15 },
+  cMeta:{ fontSize:11, color:"#9ca3af" },
+  balBadge(debt){ return { fontSize:11, fontWeight:700, borderRadius:8, padding:"3px 8px", background:debt?"#fef3c7":"#d1fae5", color:debt?"#b45309":"#065f46" }; },
+  miniStats:{ display:"flex" },
+  mStat:{ flex:1, textAlign:"center", padding:"3px 0" },
+  mLbl:{ display:"block", fontSize:9, color:"#9ca3af", marginBottom:1 },
+  mVal:{ fontSize:12, fontWeight:700, color:"#374151" },
+  cHeader:{ display:"flex", alignItems:"center", gap:12, marginBottom:20 },
+  cNameLg:{ fontSize:20, fontWeight:800, margin:0 },
+  cPhone:{ fontSize:12, color:"#9ca3af" },
+  tabs:{ display:"flex", marginBottom:12, borderBottom:"2px solid #e5e7eb" },
+  tab(a){ return { flex:1, background:"none", border:"none", padding:"10px 0", fontSize:13, color:a?"#6366f1":"#9ca3af", cursor:"pointer", fontWeight:a?700:500, borderBottom:a?"2px solid #6366f1":"none", marginBottom:a?-2:0 }; },
+  row:{ background:"#fff", borderRadius:10, padding:"12px 14px", marginBottom:8, display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:"0 1px 4px rgba(0,0,0,0.05)" },
+  rDate:{ fontSize:13, fontWeight:600, color:"#374151" },
+  rMeta:{ fontSize:11, color:"#9ca3af" },
+  rAmt:{ fontSize:16, fontWeight:800 },
+  rPft:{ fontSize:11, fontWeight:600, color:"#10b981" },
+  rbadge(color){ return { fontSize:10, fontWeight:700, padding:"2px 6px", borderRadius:6, background:color+"22", color }; },
+  ocrB:{ fontSize:10, background:"#dbeafe", color:"#1d4ed8", padding:"2px 5px", borderRadius:5, fontWeight:700 },
+  mBadge:{ fontSize:11, background:"#f3f4f6", color:"#6b7280", padding:"2px 7px", borderRadius:6, marginTop:3, display:"inline-block" },
+  empty:{ textAlign:"center", color:"#9ca3af", padding:32, fontSize:14 },
+  form:{ background:"#fff", borderRadius:16, padding:16, boxShadow:"0 1px 8px rgba(0,0,0,0.06)", marginBottom:16 },
+  fg:{ marginBottom:14 },
+  lbl:{ display:"block", fontSize:12, fontWeight:600, color:"#374151", marginBottom:5 },
+  inp:{ width:"100%", boxSizing:"border-box", border:"1.5px solid #e5e7eb", borderRadius:8, padding:"9px 12px", fontSize:14, color:"#111827", background:"#fafafa", outline:"none" },
+  rg:{ display:"flex", gap:14, flexWrap:"wrap" },
+  rlbl:{ fontSize:13, display:"flex", alignItems:"center", gap:4, cursor:"pointer" },
+  upload:{ border:"2px dashed #c7d2fe", borderRadius:10, padding:14, textAlign:"center", background:"#f5f3ff" },
+  ulbl:{ color:"#6366f1", fontWeight:600, cursor:"pointer", fontSize:13 },
+  ocrImg:{ width:"100%", maxWidth:220, borderRadius:8, marginTop:8 },
+  errMsg:{ color:"#ef4444", fontSize:12, marginTop:6 },
+  prev:{ background:"#f9fafb", border:"1.5px solid #e5e7eb", borderRadius:10, padding:"12px 14px", marginBottom:14 },
+  prevTitle:{ fontWeight:700, fontSize:13, color:"#374151", marginBottom:8 },
+  pRow:{ display:"flex", justifyContent:"space-between", padding:"4px 0", borderBottom:"1px solid #f3f4f6" },
+  acts:{ display:"flex", gap:10, marginTop:4 },
+  btnP:{ flex:1, background:"#6366f1", color:"#fff", border:"none", borderRadius:10, padding:"13px", fontWeight:700, fontSize:15, cursor:"pointer" },
+  btnS:{ flex:1, background:"#f3f4f6", color:"#374151", border:"none", borderRadius:10, padding:"13px", fontWeight:600, fontSize:15, cursor:"pointer" },
+  toast(t){ return { position:"fixed", bottom:20, left:"50%", transform:"translateX(-50%)", color:"#fff", fontWeight:700, fontSize:14, padding:"12px 24px", borderRadius:12, background:t==="ok"?"#10b981":"#ef4444", boxShadow:"0 4px 20px rgba(0,0,0,0.2)", zIndex:9999, whiteSpace:"nowrap" }; },
+  ocrBanner:{ background:"#d1fae5", border:"1px solid #6ee7b7", borderRadius:8, padding:"8px 12px", marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:13, fontWeight:600, color:"#065f46" },
+  rep:{ background:"#fff", borderRadius:14, padding:16, boxShadow:"0 1px 6px rgba(0,0,0,0.07)", marginBottom:16 },
+  repH:{ display:"flex", justifyContent:"space-between", fontWeight:700, fontSize:13, color:"#374151", borderBottom:"1px solid #e5e7eb", paddingBottom:10, marginBottom:10 },
+  repRow:{ display:"flex", justifyContent:"space-between", fontSize:12, padding:"6px 0", borderBottom:"1px solid #f3f4f6" },
+};
+
+// ── APP ──
+export default function App() {
+  const [clients,  setClients]  = useState(CLIENTS0);
+  const [sessions, setSessions] = useState(SESSIONS0);
+  const [payments, setPayments] = useState(PAYMENTS0);
+  const [view, setView] = useState("dash");
+  const [cid, setCid] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [dbError, setDbError] = useState(null);
+
+  // Load all data from window.storage on mount
+  useEffect(() => {
+    async function loadAll() {
+      try {
+        const [c, s, p] = await Promise.all([
+          DB.get("ev_clients"),
+          DB.get("ev_sessions"),
+          DB.get("ev_payments"),
+        ]);
+        if (c) setClients(c);
+        if (s) setSessions(s);
+        if (p) setPayments(p);
+        setDbError(null);
+      } catch(e) {
+        setDbError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadAll();
+  }, []);
+
+  const showToast = (msg, t="ok") => { setToast({msg,t}); setTimeout(()=>setToast(null),3000); };
+  const go = (v, id=null) => { setView(v); if(id!==undefined) setCid(id); };
+
+  // Save session to window.storage
+  const saveSession = async (s) => {
+    const next = [s, ...sessions];
+    setSessions(next);
+    await DB.set("ev_sessions", next);
+    showToast("טעינה נשמרה ✓");
+  };
+
+  // Save payment to window.storage
+  const savePayment = async (p) => {
+    const next = [p, ...payments];
+    setPayments(next);
+    await DB.set("ev_payments", next);
+    showToast("תשלום נרשם ✓");
+  };
+
+  // Save client to window.storage
+  const saveClient = async (c) => {
+    const next = [...clients, c];
+    setClients(next);
+    await DB.set("ev_clients", next);
+    showToast("לקוח נוסף ✓");
+  };
+
+  const stats = useMemo(() => {
+    const now = new Date(); const mo = now.getMonth(); const yr = now.getFullYear();
+    return clients.map(c => {
+      const ss = sessions.filter(s=>s.clientId===c.id);
+      const ps = payments.filter(p=>p.clientId===c.id);
+      const balance = ss.reduce((a,s)=>a+s.amountBilled,0) - ps.reduce((a,p)=>a+p.amount,0);
+      const monthP = ss.filter(s=>{ const d=new Date(s.date); return d.getMonth()===mo&&d.getFullYear()===yr; }).reduce((a,s)=>a+s.profit,0);
+      const totalP = ss.reduce((a,s)=>a+s.profit,0);
+      const last = ss.sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+      return {...c, balance, monthP, totalP, count:ss.length, last};
+    });
+  }, [clients,sessions,payments]);
+
+  if (loading) return (
+    <div style={{...S.app, display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh"}}>
+      <div style={{textAlign:"center", color:"#6366f1"}}>
+        <div style={{fontSize:40, marginBottom:12}}>⚡</div>
+        <div style={{fontWeight:700, fontSize:16}}>טוען נתונים...</div>
+      </div>
+    </div>
+  );
+
+  if (dbError) return (
+    <div style={{...S.app, display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", padding:24}}>
+      <div style={{textAlign:"center", background:"#fff", borderRadius:16, padding:24, boxShadow:"0 4px 20px rgba(0,0,0,0.1)"}}>
+        <div style={{fontSize:36, marginBottom:12}}>❌</div>
+        <div style={{fontWeight:700, fontSize:16, color:"#ef4444", marginBottom:8}}>שגיאת חיבור</div>
+        <div style={{fontSize:13, color:"#6b7280", marginBottom:16}}>{dbError}</div>
+        <button style={{...S.btnP, padding:"10px 24px"}} onClick={()=>window.location.reload()}>נסה שוב</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={S.app}>
+      <header style={S.header}>
+        <div style={S.hInner}>
+          <span style={S.hTitle}>⚡ EV Charge Manager</span>
+          {view !== "dash" && <button style={S.backBtn} onClick={()=>go("dash",null)}>← דשבורד</button>}
+        </div>
+      </header>
+
+      {toast && <div style={S.toast(toast.t)}>{toast.msg}</div>}
+
+      {view==="dash"   && <Dashboard stats={stats} go={go} />}
+      {view==="client" && <ClientView cid={cid} clients={clients} stats={stats} sessions={sessions} payments={payments} go={go} />}
+      {view==="add-s"  && <AddSession clients={clients} defaultCid={cid} onSave={async s=>{await saveSession(s);go(cid?"client":"dash",cid);}} onCancel={()=>go(cid?"client":"dash",cid)} />}
+      {view==="add-p"  && <AddPayment cid={cid} clients={clients} stats={stats} onSave={async p=>{await savePayment(p);go("client",cid);}} onCancel={()=>go("client",cid)} />}
+      {view==="add-c"  && <AddClient onSave={async c=>{await saveClient(c);go("dash");}} onCancel={()=>go("dash")} />}
+      {view==="report" && <Report cid={cid} clients={clients} sessions={sessions} onBack={()=>go("client",cid)} />}
+    </div>
+  );
+}
+
+function Dashboard({ stats, go }) {
+  const totBal  = stats.reduce((a,c)=>a+c.balance,0);
+  const totMoP  = stats.reduce((a,c)=>a+c.monthP,0);
+  const totAllP = stats.reduce((a,c)=>a+c.totalP,0);
+  return (
+    <main style={S.main}>
+      <div style={S.sumRow}>
+        <SumCard lbl="חובות פתוחים" val={ils(totBal)}  color="#f59e0b" icon="💰" />
+        <SumCard lbl="רווח החודש"   val={ils(totMoP)}  color="#10b981" icon="📈" />
+        <SumCard lbl="רווח כולל"    val={ils(totAllP)} color="#6366f1" icon="⚡" />
+      </div>
+      <div style={S.actRow}>
+        <button style={{...S.actBtn,background:"#10b981"}} onClick={()=>go("add-s",null)}>⚡ טעינה חדשה</button>
+        <button style={{...S.actBtn,background:"#6366f1"}} onClick={()=>go("add-c")}>👤 לקוח חדש</button>
+      </div>
+      <p style={S.secTitle}>לקוחות</p>
+      <div style={S.cGrid}>
+        {stats.map(c=>(
+          <div key={c.id} style={S.cCard} onClick={()=>go("client",c.id)}>
+            <div style={S.cTop}>
+              <div style={S.ava(40,17)}>{c.name[0]}</div>
+              <div>
+                <div style={S.cName}>{c.name}</div>
+                <div style={S.cMeta}>{c.count} טעינות</div>
+              </div>
+              <div style={{marginRight:"auto"}}>
+                <div style={S.balBadge(c.balance>0)}>{c.balance>0?`חוב: ${ils(c.balance)}`:"מסולק ✓"}</div>
+              </div>
+            </div>
+            <div style={S.miniStats}>
+              <div style={S.mStat}><span style={S.mLbl}>רווח החודש</span><span style={{...S.mVal,color:"#10b981"}}>{ils(c.monthP)}</span></div>
+              <div style={S.mStat}><span style={S.mLbl}>רווח כולל</span><span style={S.mVal}>{ils(c.totalP)}</span></div>
+              <div style={S.mStat}><span style={S.mLbl}>טעינה אחרונה</span><span style={S.mVal}>{c.last?fdate(c.last.date):"—"}</span></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </main>
+  );
+}
+
+function SumCard({ lbl, val, color, icon }) {
+  return (
+    <div style={{...S.sumCard, borderTop:`3px solid ${color}`}}>
+      <span style={S.sumIcon}>{icon}</span>
+      <div>
+        <div style={{...S.sumVal, color}}>{val}</div>
+        <div style={S.sumLbl}>{lbl}</div>
+      </div>
+    </div>
+  );
+}
+
+function ClientView({ cid, clients, stats, sessions, payments, go }) {
+  const [tab, setTab] = useState("s");
+  const c = clients.find(x=>x.id===cid);
+  const st = stats.find(x=>x.id===cid);
+  if(!c) return null;
+  const ss = [...sessions.filter(s=>s.clientId===cid)].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const ps = [...payments.filter(p=>p.clientId===cid)].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  return (
+    <main style={S.main}>
+      <div style={S.cHeader}>
+        <div style={S.ava(52,22)}>{c.name[0]}</div>
+        <div><h2 style={S.cNameLg}>{c.name}</h2><div style={S.cPhone}>{c.phone}</div></div>
+      </div>
+      <div style={S.sumRow}>
+        <SumCard lbl="יתרת חוב"    val={ils(st.balance)} color={st.balance>0?"#f59e0b":"#10b981"} icon="💳" />
+        <SumCard lbl="רווח החודש"  val={ils(st.monthP)}  color="#10b981" icon="📈" />
+        <SumCard lbl="רווח כולל"   val={ils(st.totalP)}  color="#6366f1" icon="⚡" />
+      </div>
+      <div style={S.actRow}>
+        <button style={{...S.actBtn,background:"#10b981"}} onClick={()=>go("add-s",cid)}>⚡ טעינה</button>
+        <button style={{...S.actBtn,background:"#f59e0b"}} onClick={()=>go("add-p",cid)}>💰 תשלום</button>
+        <button style={{...S.actBtn,background:"#6366f1"}} onClick={()=>go("report",cid)}>📄 דוח</button>
+      </div>
+      <div style={S.tabs}>
+        <button style={S.tab(tab==="s")} onClick={()=>setTab("s")}>טעינות ({ss.length})</button>
+        <button style={S.tab(tab==="p")} onClick={()=>setTab("p")}>תשלומים ({ps.length})</button>
+      </div>
+      {tab==="s" && (ss.length ? ss.map(s=><SRow key={s.id} s={s}/>) : <div style={S.empty}>אין טעינות</div>)}
+      {tab==="p" && (ps.length ? ps.map(p=><PRow key={p.id} p={p}/>) : <div style={S.empty}>אין תשלומים</div>)}
+    </main>
+  );
+}
+
+function SRow({s}) {
+  const rc = s.premiumRatio>=1?"#f59e0b":s.isMixed?"#8b5cf6":"#6b7280";
+  return (
+    <div style={S.row}>
+      <div style={{flex:1}}>
+        <div style={S.rDate}>{fdt(s.date)}</div>
+        <div style={{display:"flex",gap:5,alignItems:"center",marginTop:3}}>
+          <span style={S.rbadge(rc)}>{s.isMixed?"משולב":s.premiumRatio>=1?"פרימיום":"רגיל"}</span>
+          <span style={S.rMeta}>{s.kwhInflated} קוט"ש</span>
+          {s.source==="ocr"&&<span style={S.ocrB}>OCR</span>}
+        </div>
+      </div>
+      <div style={{textAlign:"left"}}>
+        <div style={S.rAmt}>{ils(s.amountBilled)}</div>
+        <div style={S.rPft}>רווח: {ils(s.profit)}</div>
+      </div>
+    </div>
+  );
+}
+
+function PRow({p}) {
+  return (
+    <div style={S.row}>
+      <div style={{flex:1}}>
+        <div style={S.rDate}>{fdt(p.date)}</div>
+        <span style={S.mBadge}>{METHODS[p.method]??p.method}</span>
+      </div>
+      <div style={{...S.rAmt,color:"#10b981"}}>+{ils(p.amount)}</div>
+    </div>
+  );
+}
+
+// Helper: add minutes to "YYYY-MM-DDTHH:MM" string — pure arithmetic, no UTC timezone bugs
+function addMinutes(dtStr, minutes) {
+  if (!dtStr || !minutes) return dtStr;
+  const [datePart, timePart] = dtStr.split("T");
+  const [yyyy, mm, dd] = datePart.split("-").map(Number);
+  const [hh, min] = timePart.split(":").map(Number);
+  const totalMin = hh * 60 + min + Number(minutes);
+  const extraDays = Math.floor(totalMin / 1440);
+  const remMin = totalMin % 1440;
+  const newH = Math.floor(remMin / 60);
+  const newM = remMin % 60;
+  const date = new Date(yyyy, mm - 1, dd + extraDays);
+  const Y = date.getFullYear();
+  const M = String(date.getMonth()+1).padStart(2,"0");
+  const D = String(date.getDate()).padStart(2,"0");
+  return `${Y}-${M}-${D}T${String(newH).padStart(2,"0")}:${String(newM).padStart(2,"0")}`;
+}
+
+function AddSession({ clients, defaultCid, onSave, onCancel }) {
+  const [mode, setMode]       = useState("manual");
+  const [cid,  setCid]        = useState(defaultCid ?? clients[0]?.id ?? "");
+  const [dt,   setDt]         = useState(new Date().toISOString().slice(0,16));
+  const [durInput, setDurInput] = useState("");
+  const [kwh,  setKwh]        = useState("");
+  const [fr,   setFr]         = useState("auto");
+  const [notes,setNotes]      = useState("");
+  const [prev, setPrev]       = useState(null);
+
+  // OCR state
+  const [ocrText,    setOcrText]    = useState(""); // user pastes raw text from app
+  const [ocrParsed,  setOcrParsed]  = useState(null);
+  const [ocrErr,     setOcrErr]     = useState("");
+
+  // Parse duration string → minutes
+  function parseDuration(s) {
+    if (!s) return 0;
+    s = s.trim();
+    if (/^\d+:\d+$/.test(s))   { const [h,m]=s.split(":").map(Number); return h*60+m; }
+    const hm = s.match(/(\d+)h\s*(\d+)m?/i);
+    if (hm) return parseInt(hm[1])*60+parseInt(hm[2]);
+    const h = s.match(/^(\d+)h$/i);
+    if (h)  return parseInt(h[1])*60;
+    if (/^\d+$/.test(s)) return parseInt(s);
+    return 0;
+  }
+
+  const durMinutes = parseDuration(durInput);
+  const edt = (dt && durMinutes > 0) ? addMinutes(dt, durMinutes) : "";
+
+  useEffect(() => {
+    if (!kwh || isNaN(parseFloat(kwh))) { setPrev(null); return; }
+    setPrev(calcSession(parseFloat(kwh), new Date(dt), edt ? new Date(edt) : null, fr==="regular", fr==="premium"));
+  }, [kwh, dt, edt, fr]);
+
+  // ── OCR: parse pasted text from the charging app ──────────────────────────
+  // User copies the text from the EV app and pastes it here.
+  // Example paste: "אתמול 5:52 אחה״צ  35.41 קוט״ש  3h 24m  ₪30.47"
+  function parseOcrText(raw) {
+    if (!raw.trim()) { setOcrParsed(null); setOcrErr(""); return; }
+    try {
+      let s = raw;
+
+      // 1. Duration — extract from same line as שעות/h, remove so it won't confuse kwh
+      let durMin = 0;
+      const durHM = s.match(/(\d+)\s*(?:h|שעות?)\s*(\d+)\s*(?:m|דק)?/i);
+      const durH  = !durHM && s.match(/(\d+\.?\d*)\s*(?:h|שעות?)/i);
+      if (durHM) { durMin = parseInt(durHM[1])*60+parseInt(durHM[2]); s = s.replace(durHM[0]," "); }
+      else if (durH) { durMin = Math.round(parseFloat(durH[1])*60); s = s.replace(durH[0]," "); }
+
+      // 2. kWh — find number on same line as קוט/kwh
+      let kwhVal = null;
+      for (const line of s.split(/[\n\r]+/)) {
+        if (/קו[טו]|kwh/i.test(line)) {
+          const m = line.match(/(\d+\.?\d*)/);
+          if (m) { kwhVal = parseFloat(m[1]); break; }
+        }
+      }
+      if (kwhVal === null) {
+        setOcrErr('לא נמצאה כמות קוט"ש — וודא שהטקסט מכיל מספר + קוטש');
+        setOcrParsed(null); return;
+      }
+
+      // 3. Time — HH:MM with optional PM/אחהצ
+      const timeMatch = s.match(/(\d{1,2}):(\d{2})\s*(אחה|אח|pm)/i) || s.match(/(\d{1,2}):(\d{2})/);
+      let timeStr = "00:00";
+      if (timeMatch) {
+        let h = parseInt(timeMatch[1]), m2 = parseInt(timeMatch[2]);
+        if (timeMatch[3] && /אח|pm/i.test(timeMatch[3]) && h < 12) h += 12;
+        timeStr = `${String(h).padStart(2,"0")}:${String(m2).padStart(2,"0")}`;
+      }
+
+      // 4. Date
+      const base = new Date();
+      if (/אתמול|yesterday/i.test(raw)) base.setDate(base.getDate()-1);
+      const dateStr = `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,"0")}-${String(base.getDate()).padStart(2,"0")}`;
+
+      // 5. Amount
+      const amtM = raw.match(/[₪]\s*(\d+\.?\d*)/) || raw.match(/(\d+\.\d+)\s*[₪]/);
+      const appAmt = amtM ? parseFloat(amtM[1]) : null;
+
+      setOcrParsed({ kwh: kwhVal, startDt: `${dateStr}T${timeStr}`, durMin, appAmt });
+      setOcrErr("");
+    } catch(e) {
+      setOcrErr("שגיאה: " + e.message);
+      setOcrParsed(null);
+    }
+  }
+
+  function applyOcrParsed() {
+    if (!ocrParsed) return;
+    setKwh(String(ocrParsed.kwh));
+    setDt(ocrParsed.startDt);
+    if (ocrParsed.durMin) setDurInput(String(ocrParsed.durMin));
+    setMode("manual");
+    setOcrText("");
+    setOcrParsed(null);
+  }
+
+  const fromOCR = false; // no OCR image mode anymore
+
+  return (
+    <main style={S.main}>
+      <div style={S.tabs}>
+        <button style={S.tab(mode==="manual")} onClick={()=>setMode("manual")}>✍️ ידנית</button>
+        <button style={S.tab(mode==="paste")}  onClick={()=>setMode("paste")}>📋 הדבק טקסט</button>
+      </div>
+
+      <div style={S.form}>
+        <FG lbl="לקוח">
+          <select style={S.inp} value={cid} onChange={e=>setCid(e.target.value)}>
+            {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </FG>
+
+        {/* ── Paste text mode ── */}
+        {mode==="paste" && (
+          <>
+            <FG lbl="הדבק טקסט מאפליקציית הטעינה">
+              <textarea
+                style={{...S.inp, height:90, resize:"vertical", fontFamily:"monospace", fontSize:13}}
+                placeholder={"לדוגמה:\nאתמול 5:52 אחה\"צ\n35.41 קוט\"ש  3h 24m\n₪30.47"}
+                value={ocrText}
+                onChange={e=>{ setOcrText(e.target.value); parseOcrText(e.target.value); }}
+              />
+            </FG>
+            {ocrErr && <div style={{...S.errMsg, marginBottom:10}}>{ocrErr}</div>}
+            {ocrParsed && (
+              <div style={{...S.prev, marginBottom:10}}>
+                <div style={S.prevTitle}>✅ זוהה אוטומטית</div>
+                <div style={S.pRow}><span style={{color:"#6b7280",fontSize:13}}>שעת התחלה</span><span style={{fontSize:13}}>{ocrParsed.startDt.replace("T"," ")}</span></div>
+                <div style={S.pRow}><span style={{color:"#6b7280",fontSize:13}}>משך</span><span style={{fontSize:13}}>{ocrParsed.durMin ? `${Math.floor(ocrParsed.durMin/60)}h ${ocrParsed.durMin%60}m` : "לא זוהה"}</span></div>
+                <div style={S.pRow}><span style={{color:"#6b7280",fontSize:13}}>קוט"ש</span><span style={{fontWeight:700,fontSize:13}}>{ocrParsed.kwh}</span></div>
+                {ocrParsed.appAmt && <div style={S.pRow}><span style={{color:"#6b7280",fontSize:13}}>סכום באפליקציה</span><span style={{fontSize:13}}>₪{ocrParsed.appAmt}</span></div>}
+                <button style={{...S.btnP, marginTop:8, padding:"10px"}} onClick={applyOcrParsed}>
+                  ✓ אשר ועבור להזנה ידנית
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+
+        {/* ── Manual fields ── */}
+        {mode==="manual" && (
+          <>
+            <FG lbl="תאריך ושעת תחילת טעינה">
+              <input style={S.inp} type="datetime-local" value={dt} onChange={e=>setDt(e.target.value)}/>
+            </FG>
+
+            <FG lbl='משך טעינה (אופציונלי — לטעינות משולבות)'>
+              <input
+                style={S.inp} type="text"
+                placeholder='למשל: 3:24 או 3h 24m או 204'
+                value={durInput} onChange={e=>setDurInput(e.target.value)}
+              />
+              {durMinutes > 0 && (
+                <div style={{fontSize:11,color:"#6b7280",marginTop:3}}>
+                  = {Math.floor(durMinutes/60)}h {durMinutes%60}m
+                  {edt && ` | סיום: ${edt.slice(11,16)}`}
+                </div>
+              )}
+            </FG>
+
+            <FG lbl='קוט"ש גולמי'>
+              <input
+                style={S.inp} type="number" step="0.01"
+                placeholder="35.41" inputMode="decimal"
+                value={kwh} onChange={e=>setKwh(e.target.value)}
+              />
+            </FG>
+
+            <FG lbl="תעריף">
+              <div style={S.rg}>
+                {[["auto","אוטומטי 🤖"],["regular","רגיל ₪1.4"],["premium","פרימיום ₪1.9"]].map(([v,l])=>(
+                  <label key={v} style={S.rlbl}>
+                    <input type="radio" name="fr" value={v} checked={fr===v} onChange={()=>setFr(v)}/> {l}
+                  </label>
+                ))}
+              </div>
+            </FG>
+
+            <FG lbl="הערות">
+              <input style={S.inp} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="אופציונלי"/>
+            </FG>
+
+            {prev && (
+              <div style={S.prev}>
+                <div style={S.prevTitle}>תצוגה מקדימה</div>
+                {[
+                  [`קוט"ש מנופח (+21%)`, `${prev.kwhRaw} → ${prev.kwhInflated}`],
+                  ["תעריף",              `₪${prev.rate} | ${prev.rateLabel}`],
+                  ["לחיוב",             ils(prev.amountBilled), true, true],
+                  ["עלות בפועל 🔒",     ils(prev.costToOwner), false, false, true],
+                  ["רווח",              ils(prev.profit), true, false, true, true],
+                ].map(([lbl,val,bold,acc,sec,grn])=>(
+                  <div key={lbl} style={S.pRow}>
+                    <span style={{color:"#6b7280",fontSize:13}}>{lbl}</span>
+                    <span style={{fontWeight:bold?700:400,fontSize:bold?15:13,
+                      color:acc?"#6366f1":grn?"#10b981":sec?"#9ca3af":"#111827"}}>{val}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={S.acts}>
+              <button
+                style={{...S.btnP, opacity:prev?1:0.5}} disabled={!prev}
+                onClick={()=>onSave({id:uid(),clientId:cid,date:dt,...prev,source:"manual",notes})}>
+                {prev ? "שמור טעינה" : !kwh ? "⚠️ הכנס קוט\"ש" : "מחשב..."}
+              </button>
+              <button style={S.btnS} onClick={onCancel}>ביטול</button>
+            </div>
+          </>
+        )}
+      </div>
+    </main>
+  );
+}
+
+
+function AddPayment({ cid, clients, stats, onSave, onCancel }) {
+  const c = clients.find(x=>x.id===cid);
+  const st = stats.find(x=>x.id===cid);
+  const bal = st?.balance??0;
+  const [amt, setAmt] = useState(String(Math.ceil(bal)));
+  const [method, setMethod] = useState("bit");
+  const [notes, setNotes] = useState("");
+
+  return (
+    <main style={S.main}>
+      <div style={S.form}>
+        <div style={S.cHeader}>
+          <div style={S.ava(48,20)}>{c?.name[0]}</div>
+          <div><div style={S.cNameLg}>{c?.name}</div><div style={{color:"#f59e0b",fontWeight:700}}>חוב: {ils(bal)}</div></div>
+        </div>
+        <FG lbl="סכום ששולם"><input style={S.inp} type="number" step="1" value={amt} onChange={e=>setAmt(e.target.value)}/></FG>
+        <FG lbl="שיטת תשלום">
+          <div style={S.rg}>
+            {Object.entries(METHODS).map(([v,l])=>(
+              <label key={v} style={S.rlbl}><input type="radio" name="m" value={v} checked={method===v} onChange={()=>setMethod(v)}/> {l}</label>
+            ))}
+          </div>
+        </FG>
+        <FG lbl="הערות"><input style={S.inp} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="אופציונלי"/></FG>
+        {amt && <div style={S.prev}><div style={S.pRow}><span style={{color:"#6b7280",fontSize:13}}>יתרה לאחר תשלום</span><span style={{fontWeight:700,color:"#6366f1",fontSize:15}}>{ils(bal-parseFloat(amt||0))}</span></div></div>}
+        <div style={S.acts}>
+          <button style={S.btnP} onClick={()=>onSave({id:uid(),clientId:cid,amount:parseFloat(amt),method,date:new Date().toISOString(),notes})}>אשר תשלום</button>
+          <button style={S.btnS} onClick={onCancel}>ביטול</button>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function AddClient({ onSave, onCancel }) {
+  const [name, setName] = useState(""); const [phone, setPhone] = useState(""); const [notes, setNotes] = useState("");
+  return (
+    <main style={S.main}>
+      <div style={S.form}>
+        <FG lbl="שם לקוח"><input style={S.inp} value={name} onChange={e=>setName(e.target.value)} placeholder="ישראל ישראלי"/></FG>
+        <FG lbl="טלפון"><input style={S.inp} value={phone} onChange={e=>setPhone(e.target.value)} placeholder="050-0000000"/></FG>
+        <FG lbl="הערות"><input style={S.inp} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="אופציונלי"/></FG>
+        <div style={S.acts}>
+          <button style={{...S.btnP,opacity:name?1:0.5}} disabled={!name} onClick={()=>onSave({id:uid(),name,phone,notes})}>הוסף לקוח</button>
+          <button style={S.btnS} onClick={onCancel}>ביטול</button>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function Report({ cid, clients, sessions, onBack }) {
+  const c = clients.find(x=>x.id===cid);
+  const now = new Date();
+  const [mo, setMo] = useState(now.getMonth());
+  const [yr, setYr] = useState(now.getFullYear());
+  const ss = sessions.filter(s=>{ const d=new Date(s.date); return s.clientId===cid&&d.getMonth()===mo&&d.getFullYear()===yr; }).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const total = ss.reduce((a,s)=>a+s.amountBilled,0);
+
+  const txt = () => [`דוח טעינות – ${c?.name}`,`חודש: ${MONTHS[mo]} ${yr}`,"─────────────────",...ss.map(s=>`${fdate(s.date)} ${ftime(s.date)} | ${s.kwhInflated} קוט"ש | ${ils(s.amountBilled)}`),"─────────────────",`סה"כ לתשלום: ${ils(total)}`].join("\n");
+
+  return (
+    <main style={S.main}>
+      <div style={{display:"flex",gap:8,marginBottom:16}}>
+        <select style={S.inp} value={mo} onChange={e=>setMo(+e.target.value)}>{MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}</select>
+        <select style={S.inp} value={yr} onChange={e=>setYr(+e.target.value)}>{[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}</select>
+      </div>
+      <div style={S.rep}>
+        <div style={S.repH}><span>📄 {c?.name}</span><span>{MONTHS[mo]} {yr}</span></div>
+        {ss.length===0 && <div style={S.empty}>אין טעינות בחודש זה</div>}
+        {ss.map(s=>(
+          <div key={s.id} style={S.repRow}>
+            <span>{fdate(s.date)} {ftime(s.date)}</span>
+            <span>{s.kwhInflated} קוט"ש</span>
+            <span style={{fontWeight:700}}>{ils(s.amountBilled)}</span>
+          </div>
+        ))}
+        {ss.length>0&&<div style={{...S.repRow,borderTop:"2px solid #e5e7eb",fontWeight:700,marginTop:4}}><span>סה"כ</span><span/><span style={{color:"#6366f1",fontSize:17}}>{ils(total)}</span></div>}
+      </div>
+      {ss.length>0&&<div style={S.acts}><button style={S.btnP} onClick={()=>navigator.clipboard.writeText(txt())}>📋 העתק לוואטסאפ</button></div>}
+    </main>
+  );
+}
+
+function FG({ lbl, children }) {
+  return <div style={S.fg}><label style={S.lbl}>{lbl}</label>{children}</div>;
+}
+
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
