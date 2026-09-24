@@ -260,9 +260,10 @@ function timelineHintsFromOpenOrSession(o = {}) {
 function liveChargeEstimate(state, client) {
   const kwh = state && state.totalEnergyKwh != null ? Number(state.totalEnergyKwh) : 0;
   const start = state && state.plugInTime ? new Date(state.plugInTime) : new Date();
-  const fullMs = toMs(state && state.chargingFullTime);
-  const endedHint = state && state.chargeEndedAt ? toMs(state.chargeEndedAt) : null;
-  const isFinishing = state && String(state.state || "") === "Finishing";
+  const still = stationStillCharging(state);
+  const fullMs = still ? null : toMs(state && state.chargingFullTime);
+  const endedHint = still ? null : state && state.chargeEndedAt ? toMs(state.chargeEndedAt) : null;
+  const isFinishing = !still && state && String(state.state || "") === "Finishing";
   const end = fullMs
     ? new Date(fullMs)
     : endedHint
@@ -1298,6 +1299,45 @@ async function wevoApi(action, extra = {}) {
     throw new Error(data.error || `שגיאת שרת (${res.status})`);
   }
   return data;
+}
+
+let _liveStationSnap = null;
+function rememberLiveStation(st) {
+  _liveStationSnap = st && typeof st === "object" ? st : null;
+}
+function readLiveStation() {
+  return _liveStationSnap;
+}
+
+/** חותמת סיום רק כשהעמדה כבר לא בטעינה. chargingFullTime באמצע טעינה אינו סיום. */
+function liveChargeEndStamp(st, existing, plugMs) {
+  if (stationStillCharging(st)) return null;
+  const fullMs = toMs(st && st.chargingFullTime);
+  if (fullMs && (!plugMs || fullMs >= plugMs)) return toLocalDT(fullMs);
+  if (existing && existing.chargeEndedAt && (!plugMs || toMs(existing.chargeEndedAt) >= plugMs)) {
+    return existing.chargeEndedAt;
+  }
+  return null;
+}
+
+function clearFinishedIfStillCharging(payload, st) {
+  if (!stationStillCharging(st)) return payload;
+  return {
+    ...payload,
+    chargeEndedAt: null,
+    endDate: null,
+    plugOutAt: null,
+    readyToComplete: false,
+    wevoEnded: false
+  };
+}
+
+/** אותה עסקה, גם אם סומנה בטעות כמוכנה לאישור בזמן שהעמדה עדיין טוענת. */
+function findLiveTxnOpen(opens, st) {
+  const txn = st && st.transactionId != null && String(st.transactionId) !== "" ? String(st.transactionId) : null;
+  if (!txn) return findActiveWevoOpen(opens, st);
+  const list = (opens || []).filter(o => wevoOpenTxnId(o) === txn);
+  return list.find(o => !o.readyToComplete && !o.wevoEnded) || list[0] || null;
 }
 
 function wevoStateLabel(state) {
@@ -3782,8 +3822,9 @@ function Dashboard({
     const cl = clients.find(c => c.id === o.clientId);
     const est = estimateFromOpen(o, cl);
     const showBill = cl && !isSelfClient(cl) && (o.liveBilled != null || est.calc.amountBilled > 0);
-    const stt = openChargeStatus(o);
-    const endOk = validChargeEndMs(o);
+    const stt = openChargeStatus(o, readLiveStation());
+    const liveNow = stt.kind === "live" || stt.kind === "slow";
+    const endOk = !liveNow && validChargeEndMs(o);
     const liveKw = stt.kind === "live" || stt.kind === "slow" ? o.liveKw != null ? Number(o.liveKw) : null : null;
     const statusLine = stt.text;
     const tone = stt.kind === "unplugged" ? "done" : stt.kind === "cable" ? "cable" : "live";
@@ -3830,9 +3871,9 @@ function Dashboard({
       timeline: resolveChargeTimeline({}, {
         plugInAt: o.plugInAt || o.startDate,
         chargeStartedAt: o.chargeStartedAt,
-        chargeEndedAt: o.chargeEndedAt || o.endDate,
-        plugOutAt: o.plugOutAt,
-        chargingFullTime: o.chargingFullTime,
+        chargeEndedAt: liveNow ? null : o.chargeEndedAt || o.endDate,
+        plugOutAt: liveNow ? null : o.plugOutAt,
+        chargingFullTime: liveNow ? null : o.chargingFullTime,
         netDuration: o.netDuration
       }),
       billStartKey: o.billStartKey || "plugIn",
@@ -4587,12 +4628,8 @@ function WevoOpenLiveSync({
     const est = liveChargeEstimate(st || {}, list.find(c => c.id === clientId));
     const fullMs = toMs(st && st.chargingFullTime);
     const plugMs = toMs(existing && (existing.plugInAt || existing.startDate) || plugIn);
-    const chargeEndedAt = fullMs && (!plugMs || fullMs >= plugMs)
-      ? toLocalDT(fullMs)
-      : existing && existing.chargeEndedAt && (!plugMs || toMs(existing.chargeEndedAt) >= plugMs)
-        ? existing.chargeEndedAt
-        : null;
-    return {
+    const chargeEndedAt = liveChargeEndStamp(st, existing, plugMs);
+    return clearFinishedIfStillCharging({
       id: existing ? existing.id : uid(),
       clientId,
       startDate: existing && existing.startDate ? existing.startDate : plugIn,
@@ -4611,7 +4648,7 @@ function WevoOpenLiveSync({
       liveRate: est.isSelf ? null : est.calc.rate,
       liveRateLabel: est.isSelf ? null : est.calc.rateLabel,
       liveProfit: est.isSelf ? null : est.calc.profit
-    };
+    }, st);
   };
 
   const markEnded = async (existing, snap, txn) => {
@@ -4676,6 +4713,7 @@ function WevoOpenLiveSync({
         const data = await wevoApi("state");
         if (cancelled) return;
         const st = data.state || null;
+        rememberLiveStation(st);
         const prev = prevStateRef.current;
         const hasActive = pendingWevo.some(o => !o.readyToComplete);
         if (st && chargerReportsVehicle(st, sessionsRefLive.current)) {
@@ -4691,8 +4729,9 @@ function WevoOpenLiveSync({
         }
         const opensNow = openRef.current || [];
         if (st && chargerReportsVehicle(st, sessionsRefLive.current) && (isActuallyCharging(st) || isWaitingForAuthorize(st) || hasActive)) {
-          const existing = findActiveWevoOpen(opensNow, st);
-          if (existing && existing.clientId && !existing.readyToComplete) {
+          const existing = isActuallyCharging(st) ? findLiveTxnOpen(opensNow, st) : findActiveWevoOpen(opensNow, st);
+          const stillThisCharge = existing && isActuallyCharging(st) && !shouldDiscardOpen(existing, sessionsRefLive.current);
+          if (existing && existing.clientId && (stillThisCharge || !existing.readyToComplete)) {
             onUpsertOpen(buildPayload(st, existing.clientId, existing), {
               silent: true
             });
@@ -4941,12 +4980,8 @@ function WevoLivePanel({
     const est = liveChargeEstimate(st || {}, list.find(c => c.id === clientId));
     const fullMs = toMs(st && st.chargingFullTime);
     const plugMs = toMs(existing && (existing.plugInAt || existing.startDate) || plugIn);
-    const chargeEndedAt = fullMs && (!plugMs || fullMs >= plugMs)
-      ? toLocalDT(fullMs)
-      : existing && existing.chargeEndedAt && (!plugMs || toMs(existing.chargeEndedAt) >= plugMs)
-        ? existing.chargeEndedAt
-        : null;
-    return {
+    const chargeEndedAt = liveChargeEndStamp(st, existing, plugMs);
+    return clearFinishedIfStillCharging({
       id: existing ? existing.id : uid(),
       clientId,
       startDate: existing && existing.startDate ? existing.startDate : plugIn,
@@ -4975,7 +5010,7 @@ function WevoLivePanel({
         inWindow: st && st.inWindow,
         solarChargingType: st && st.solarChargingType || null
       }
-    };
+    }, st);
   };
 
   const isActuallyCharging = st => {
@@ -5001,6 +5036,7 @@ function WevoLivePanel({
       const data = await wevoApi("state");
       const st = data.state || null;
       const prev = prevStateRef.current;
+      rememberLiveStation(st);
       setState(st);
       setLastAt(new Date());
 
@@ -5071,8 +5107,9 @@ function WevoLivePanel({
       }
 
       if (st && chargerReportsVehicle(st, sessions) && (isActuallyCharging(st) || isWaitingForAuthorize(st))) {
-        const existing = findActiveWevoOpen(openRef.current, st);
-        if (existing && existing.clientId && !existing.readyToComplete) {
+        const existing = isActuallyCharging(st) ? findLiveTxnOpen(openRef.current, st) : findActiveWevoOpen(openRef.current, st);
+        const stillThisCharge = existing && isActuallyCharging(st) && !shouldDiscardOpen(existing, sessions);
+        if (existing && existing.clientId && (stillThisCharge || !existing.readyToComplete)) {
           onUpsertOpen(buildOpenPayload(st, existing.clientId, existing), {
             silent: true
           });
@@ -5779,22 +5816,22 @@ function WevoLivePanel({
   }, "טעינה מלאה")), (st.plugInTime || linkedOpen) && isChargeTimelineRelevant({
     isSelf: isSelfSelected || isSelfClient(clients.find(c => linkedOpen && c.id === linkedOpen.clientId)),
     plugInAt: linkedOpen && linkedOpen.plugInAt || st.plugInTime,
-    chargeEndAt: linkedOpen && linkedOpen.chargeEndedAt || st.chargingFullTime,
-    plugOutAt: linkedOpen && linkedOpen.plugOutAt,
+    chargeEndAt: chargingNow ? null : linkedOpen && linkedOpen.chargeEndedAt || st.chargingFullTime,
+    plugOutAt: chargingNow ? null : linkedOpen && linkedOpen.plugOutAt,
     startDate: st.plugInTime,
-    endDate: st.chargingFullTime
+    endDate: chargingNow ? null : st.chargingFullTime
   }) && /*#__PURE__*/React.createElement(ChargeTimelineBox, {
     compact: true,
     timeline: resolveChargeTimeline({
       plugInTime: st.plugInTime,
       plugOutTime: null,
-      netDuration: st.netDuration,
-      chargingFullTime: st.chargingFullTime
+      netDuration: chargingNow ? null : st.netDuration,
+      chargingFullTime: chargingNow ? null : st.chargingFullTime
     }, {
       plugInAt: linkedOpen && linkedOpen.plugInAt,
       chargeStartedAt: linkedOpen && linkedOpen.chargeStartedAt,
-      chargeEndedAt: linkedOpen && linkedOpen.chargeEndedAt || st.chargingFullTime,
-      plugOutAt: linkedOpen && linkedOpen.plugOutAt
+      chargeEndedAt: chargingNow ? null : linkedOpen && linkedOpen.chargeEndedAt || st.chargingFullTime,
+      plugOutAt: chargingNow ? null : linkedOpen && linkedOpen.plugOutAt
     }),
     billStartKey: linkedOpen && linkedOpen.billStartKey || "plugIn",
     billEndKey: linkedOpen && linkedOpen.billEndKey || "chargeEnd"
@@ -7870,8 +7907,9 @@ function ClientView({
   }, "טעינות פתוחות"), openSess.map(o => {
     const est = estimateFromOpen(o, c);
     const showBill = !isSelfClient(c) && (o.liveBilled != null || est.calc.amountBilled > 0);
-    const stt = openChargeStatus(o);
+    const stt = openChargeStatus(o, readLiveStation());
     const ended = stt.kind === "unplugged" || stt.kind === "cable";
+    const liveNow = !ended;
     const liveKw = ended ? null : o.liveKw != null ? Number(o.liveKw) : null;
     return /*#__PURE__*/React.createElement("div", {
       key: o.id,
@@ -7901,7 +7939,7 @@ function ClientView({
         ...S.rDate,
         marginTop: 4
       }
-    }, "חיבור: ", fdate(o.startDate), " ", ftime(o.startDate), (o.chargeEndedAt || o.endDate) ? ` → סיום: ${fdate(o.chargeEndedAt || o.endDate)} ${ftime(o.chargeEndedAt || o.endDate)}` : ""), isChargeTimelineRelevant({
+    }, "חיבור: ", fdate(o.startDate), " ", ftime(o.startDate), !liveNow && (o.chargeEndedAt || o.endDate) ? ` → סיום: ${fdate(o.chargeEndedAt || o.endDate)} ${ftime(o.chargeEndedAt || o.endDate)}` : ""), isChargeTimelineRelevant({
       isSelf: selfClient,
       ...timelineHintsFromOpenOrSession(o)
     }) && /*#__PURE__*/React.createElement(ChargeTimelineBox, {
@@ -7909,9 +7947,9 @@ function ClientView({
       timeline: resolveChargeTimeline({}, {
         plugInAt: o.plugInAt || o.startDate,
         chargeStartedAt: o.chargeStartedAt,
-        chargeEndedAt: o.chargeEndedAt || o.endDate,
-        plugOutAt: o.plugOutAt,
-        chargingFullTime: o.chargingFullTime,
+        chargeEndedAt: liveNow ? null : o.chargeEndedAt || o.endDate,
+        plugOutAt: liveNow ? null : o.plugOutAt,
+        chargingFullTime: liveNow ? null : o.chargingFullTime,
         netDuration: o.netDuration
       }),
       billStartKey: o.billStartKey || "plugIn",

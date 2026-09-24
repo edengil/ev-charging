@@ -384,6 +384,23 @@ describe("Wevo open session match", () => {
     assert.equal(openChargeStatus({ liveKw: 7, source: "wevo-live" }).kind, "live");
   });
 
+  it("מצב עמדה חי גובר על חותמת סיום באותה עסקה", () => {
+    const open = {
+      wevoTxnId: "42",
+      plugInAt: "2026-09-25T00:10",
+      chargeEndedAt: "2026-09-25T00:40",
+      readyToComplete: true,
+      wevoEnded: true,
+      liveKw: 0
+    };
+    const charging = { state: "Charging", transactionId: "42", rateKw: 7.2 };
+    assert.equal(openChargeStatus(open, charging).kind, "live");
+    assert.equal(openChargeStatus(open, { state: "Charging", transactionId: "99", rateKw: 7.2 }).kind, "cable");
+    assert.equal(openChargeStatus({ wevoTxnId: "42", liveKw: 6 }, { state: "Finishing", transactionId: "42" }).kind, "cable");
+    assert.match(readFileSync(join(root, "app-source.js"), "utf8"), /liveChargeEndStamp/);
+    assert.match(readFileSync(join(root, "app-source.js"), "utf8"), /clearFinishedIfStillCharging/);
+  });
+
   it("טעינה שנשמרה לא חוזרת כממתינה גם כשהשעון שונה", () => {
     const saved = {
       id: "s1",

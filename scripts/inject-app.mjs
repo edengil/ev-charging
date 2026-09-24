@@ -46,6 +46,7 @@ ${body}
     wevoOpenLooksFinished: wevoOpenLooksFinished,
     shouldCloseStaleWevoOpen: shouldCloseStaleWevoOpen,
     repairWevoOpenRecord: repairWevoOpenRecord,
+    stationStillCharging: stationStillCharging,
     openChargeStatus: openChargeStatus,
     chargeTxnId: chargeTxnId,
     savedSessionMatchesCharge: savedSessionMatchesCharge,
@@ -91,6 +92,7 @@ var validChargeEndMs = __EV_MONEY__.validChargeEndMs;
 var wevoOpenLooksFinished = __EV_MONEY__.wevoOpenLooksFinished;
 var shouldCloseStaleWevoOpen = __EV_MONEY__.shouldCloseStaleWevoOpen;
 var repairWevoOpenRecord = __EV_MONEY__.repairWevoOpenRecord;
+var stationStillCharging = __EV_MONEY__.stationStillCharging;
 var openChargeStatus = __EV_MONEY__.openChargeStatus;
 var chargeTxnId = __EV_MONEY__.chargeTxnId;
 var savedSessionMatchesCharge = __EV_MONEY__.savedSessionMatchesCharge;
