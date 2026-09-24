@@ -1,0 +1,4 @@
+﻿node_modules
+.netlify
+icons/ev-charge-app-icon-source.png
+*.md

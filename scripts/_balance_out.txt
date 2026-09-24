@@ -1,0 +1,2 @@
+final depth 1
+ends=': 12,\n      width: "100%"\n    }\n  }, "← חזרה לדשבורד"));\n}\n\n'

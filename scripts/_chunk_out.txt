@@ -1,0 +1,86 @@
+}, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: ready ? "#166534" : "#92400e"
+      }
+    }, cl === null || cl === void 0 ? void 0 : cl.name, " · ", statusLine), /*#__PURE__*/React.createElement("div", {
+      style: S.rDate
+    }, "התחיל: ", fdate(o.startDate), " ", ftime(o.startDate), o.endDate ? ` → הסתיים: ${fdate(o.endDate)} ${ftime(o.endDate)}` : ""), (o.liveKwh != null || o.wevoTxnId || liveKw != null) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: ready ? "#14532d" : "#78350f",
+        marginTop: 4,
+        lineHeight: 1.45
+      }
+    }, o.liveKwh != null && /*#__PURE__*/React.createElement("span", null, Number(o.liveKwh).toFixed(2), ' קוט"ש'), liveKw != null && /*#__PURE__*/React.createElement("span", null, " · ", liveKw.toFixed(1), " kW"), o.liveWevoCost != null && /*#__PURE__*/React.createElement("span", null, " · עלות ₪", Number(o.liveWevoCost).toFixed(2)), showBill && /*#__PURE__*/React.createElement("span", null, " · לחיוב ", ils(o.liveBilled != null ? o.liveBilled : est.calc.amountBilled), " (", o.liveRateLabel || est.calc.rateLabel, ")"), o.wevoTxnId && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#a8a29e"
+      }
+    }, " · txn#", o.wevoTxnId))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        alignItems: "flex-end"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => onComplete(o.id, o.clientId),
+      style: {
+        background: ready ? "#16a34a" : "#f59e0b",
+        color: "#fff",
+        border: "none",
+        borderRadius: 8,
+        padding: "6px 12px",
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: "pointer"
+      }
+    }, ready ? "✓ אשר ושמור" : "✓ השלם"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => onDelOpen(o.id),
+      style: {
+        background: "none",
+        border: "none",
+        color: "#d1d5db",
+        fontSize: 14,
+        cursor: "pointer"
+      }
+    }, "🗑")));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      ...S.secTitle,
+      marginBottom: 0
+    }
+  }, "לקוחות"), /*#__PURE__*/React.createElement("select", {
+    style: {
+      border: "1.5px solid #e5e7eb",
+      borderRadius: 8,
+      padding: "5px 8px",
+      fontSize: 12,
+      background: "#fff",
+      color: "#6b7280"
+    },
+    value: sortBy,
+    onChange: e => setSortBy(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "debt"
+  }, "מיון: חוב"), /*#__PURE__*/React.createElement("option", {
+    value: "profit"
+  }, "מיון: רווח החודש"), /*#__PURE__*/React.createElement("option", {
+    value: "total"
+  }, "מיון: רווח כולל"), /*#__PURE__*/React.createElement("option", {
+    value: "name"
+  }, "מיון: שם"), /*#__PURE__*/React.createElement("option", {
+    value: "last"
+  }, "מיון: טעינה אחרונה"))), /*#__PURE__*/React.createElement("div", {
+    style: S.cGrid
+  }, sorted.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: S.empty
+  }, "אין לקוחות — הוסף לקוח חדש"), 

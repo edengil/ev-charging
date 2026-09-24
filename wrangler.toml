@@ -1,0 +1,8 @@
+name = "eden-ev-charge"
+compatibility_date = "2024-12-01"
+pages_build_output_dir = "dist"
+
+[[kv_namespaces]]
+binding = "EV_BACKUP"
+id = "9d65b872eedd4b39a374ffe7aad81501"
+preview_id = "f229a27876904fff8814f9602b9978fe"

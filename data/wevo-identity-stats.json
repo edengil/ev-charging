@@ -1,0 +1,61 @@
+{
+  "count": 485,
+  "fields": {
+    "rfidString": {
+      "nonNull": 3,
+      "uniqueCount": 1,
+      "samples": [
+        "0135",
+        "0135",
+        "0135"
+      ],
+      "uniques": [
+        "0135"
+      ]
+    },
+    "licensePlate": {
+      "nonNull": 0,
+      "uniqueCount": 0,
+      "samples": [],
+      "uniques": []
+    },
+    "driverId": {
+      "nonNull": 485,
+      "uniqueCount": 1,
+      "samples": [
+        39001,
+        39001,
+        39001,
+        39001,
+        39001
+      ],
+      "uniques": [
+        "39001"
+      ]
+    },
+    "driverName": {
+      "nonNull": 0,
+      "uniqueCount": 0,
+      "samples": [],
+      "uniques": []
+    },
+    "idNumber": {
+      "nonNull": 0,
+      "uniqueCount": 0,
+      "samples": [],
+      "uniques": []
+    },
+    "externalCustomerId": {
+      "nonNull": 0,
+      "uniqueCount": 0,
+      "samples": [],
+      "uniques": []
+    },
+    "internalRoamingId": {
+      "nonNull": 0,
+      "uniqueCount": 0,
+      "samples": [],
+      "uniques": []
+    }
+  }
+}

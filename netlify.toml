@@ -1,0 +1,21 @@
+[build]
+  publish = "."
+  command = "npm install"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["ws", "@netlify/blobs"]
+
+[functions.wevo-sync]
+  timeout = 26
+
+[[redirects]]
+  from = "/api/wevo-sync"
+  to = "/.netlify/functions/wevo-sync"
+  status = 200
+
+[[redirects]]
+  from = "/api/data-sync"
+  to = "/.netlify/functions/data-sync"
+  status = 200

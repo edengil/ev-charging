@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Eden Gil Brand Kit</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;800&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Outfit, system-ui, sans-serif;
+      background: #f8fafc;
+      color: #134e4a;
+      padding: 40px 24px 64px;
+    }
+    h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.04em; }
+    p { color: #64748b; margin: 0 0 28px; }
+    .grid { display: grid; gap: 20px; max-width: 720px; }
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .card.dark { background: #0f172a; border-color: #1e293b; }
+    .card h2 { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #94a3b8; margin: 0 0 16px; }
+    .row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    img, object { display: block; }
+    code {
+      font-size: 12px;
+      background: #f1f5f9;
+      padding: 2px 8px;
+      border-radius: 6px;
+      color: #0f766e;
+    }
+  </style>
+</head>
+<body>
+  <h1>Eden Gil Brand Kit</h1>
+  <p>Copy these files into any app. Mark = icon. Lockup = icon + name.</p>
+  <div class="grid">
+    <div class="card">
+      <h2>Mark · dark (default)</h2>
+      <div class="row">
+        <img src="eden-gil-mark.svg" width="72" height="72" alt="Eden Gil mark" />
+        <img src="eden-gil-mark.svg" width="48" height="48" alt="" />
+        <img src="eden-gil-mark.svg" width="32" height="32" alt="" />
+        <code>eden-gil-mark.svg</code>
+      </div>
+    </div>
+    <div class="card dark">
+      <h2>Mark · light (for dark UIs)</h2>
+      <div class="row">
+        <img src="eden-gil-mark-light.svg" width="72" height="72" alt="Eden Gil light mark" />
+        <img src="eden-gil-mark-light.svg" width="48" height="48" alt="" />
+        <code>eden-gil-mark-light.svg</code>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Lockup</h2>
+      <img src="eden-gil-lockup.svg" width="300" height="72" alt="Eden Gil lockup" />
+      <p style="margin-top:14px"><code>eden-gil-lockup.svg</code></p>
+    </div>
+    <div class="card">
+      <h2>React</h2>
+      <code>EdenGilLogo.jsx</code>
+      <pre style="margin:12px 0 0;font-size:13px;color:#334155;white-space:pre-wrap">{`import { EdenGilLogo, EdenGilMark } from "./EdenGilLogo";
+
+<EdenGilLogo size={40} subtitle="Poker Cloud" />
+<EdenGilMark size={28} />`}</pre>
+    </div>
+  </div>
+</body>
+</html>

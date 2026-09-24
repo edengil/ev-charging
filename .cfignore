@@ -1,0 +1,14 @@
+node_modules
+.netlify
+netlify
+scripts
+*.log
+.env
+.env.*
+.git
+.DS_Store
+icons/ev-charge-app-icon-source.png
+app-source.js
+ev-charge-manager.html
+package-lock.json
+wrangler.toml

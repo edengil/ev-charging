@@ -1,0 +1,1867 @@
+{
+  "generatedAt": "2026-08-16T10:24:17.610Z",
+  "transactionCount": 485,
+  "ongoingCount": 1,
+  "chargerPresent": true,
+  "identityCandidateFields": [
+    {
+      "path": "tx.transactions[].accountId",
+      "count": 5,
+      "samples": [
+        67553,
+        67553,
+        67553
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].buildingId",
+      "count": 5,
+      "samples": [
+        67555,
+        67555,
+        67555
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].chargerIdentifier",
+      "count": 5,
+      "samples": [
+        "TACW2242722G1263",
+        "TACW2242722G1263",
+        "TACW2242722G1263"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].didCompleteFull",
+      "count": 5,
+      "samples": [
+        false,
+        false,
+        true
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].distributorId",
+      "count": 5,
+      "samples": [
+        0,
+        0,
+        0
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].driverId",
+      "count": 5,
+      "samples": [
+        39001,
+        39001,
+        39001
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].driverName",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].externalCustomerId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].idleFee",
+      "count": 5,
+      "samples": [
+        0,
+        0,
+        0
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].idNumber",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].internalRoamingId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].isOngoing",
+      "count": 5,
+      "samples": [
+        true,
+        false,
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].licensePlate",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].paidOn",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].rfidString",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].roamingConnectorId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].roamingPartyId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].roamingTransactionId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].settlingStatementDisplayId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].settlingStatementId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].transactionId",
+      "count": 5,
+      "samples": [
+        5286662,
+        5283377,
+        5263827
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user",
+      "count": 1,
+      "samples": [
+        "{object:userId,cognitoUserId,email,phoneNumber,firstName,lastName,role,chargerIdentifier,chargerAssignmentTimestamp,connector,scope,getsOperationalAlerts,financialAccessEnabled,idNumber,externalCustomerId,creditCard,lastBillDate,parkingSpace,buildingName,nextBalance,overdue,firstLogin,lastLogin,appVersion,buildVersion,device,cardExpiration,homeCharger,inFinancialGroup,cognitoClientId,seOneTcAcceptedVersion,seOneTcAcceptanceRequired,priority,admin,isMobilePublicChargingEnabled,isBlocked}"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.admin",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.appVersion",
+      "count": 1,
+      "samples": [
+        "1.4.89"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.buildingName",
+      "count": 1,
+      "samples": [
+        "בלו ביי מגרש 100"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.buildVersion",
+      "count": 1,
+      "samples": [
+        873
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.cardExpiration",
+      "count": 1,
+      "samples": [
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.chargerAssignmentTimestamp",
+      "count": 1,
+      "samples": [
+        1756988892000
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.chargerIdentifier",
+      "count": 1,
+      "samples": [
+        "TACW2242722G1263"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.cognitoClientId",
+      "count": 1,
+      "samples": [
+        "eu-central-1_YEtpQ1HXw"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.cognitoUserId",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.connector",
+      "count": 1,
+      "samples": [
+        1
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.creditCard",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.creditCard.brand",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.creditCard.expiration",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.creditCard.suffix",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.device",
+      "count": 1,
+      "samples": [
+        "IOS"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.email",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.externalCustomerId",
+      "count": 1,
+      "samples": [
+        ""
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.financialAccessEnabled",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.firstLogin",
+      "count": 1,
+      "samples": [
+        1751997517
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.firstName",
+      "count": 1,
+      "samples": [
+        "עדן חיים"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.getsOperationalAlerts",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.homeCharger",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.idNumber",
+      "count": 1,
+      "samples": [
+        ""
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.inFinancialGroup",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.isBlocked",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.isMobilePublicChargingEnabled",
+      "count": 1,
+      "samples": [
+        true
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.lastBillDate",
+      "count": 1,
+      "samples": [
+        0
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.lastLogin",
+      "count": 1,
+      "samples": [
+        1786875222
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.lastName",
+      "count": 1,
+      "samples": [
+        "גיל"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.nextBalance",
+      "count": 1,
+      "samples": [
+        0
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.overdue",
+      "count": 1,
+      "samples": [
+        0
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.parkingSpace",
+      "count": 1,
+      "samples": [
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.phoneNumber",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.priority",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.role",
+      "count": 1,
+      "samples": [
+        "DRIVER"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.scope",
+      "count": 1,
+      "samples": [
+        "ACCOUNT"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.seOneTcAcceptanceRequired",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.seOneTcAcceptedVersion",
+      "count": 1,
+      "samples": [
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.userId",
+      "count": 1,
+      "samples": [
+        39001
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "ws.stateMessages[].chargerIdentifier",
+      "count": 1,
+      "samples": [
+        "TACW2242722G1263"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.didCompleteFull",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.idleFeeApplied",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.transactionId",
+      "count": 1,
+      "samples": [
+        0
+      ],
+      "identityHint": true
+    }
+  ],
+  "allFields": [
+    {
+      "path": "tx.transactions",
+      "count": 1,
+      "samples": [
+        "[array:30]"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].accountId",
+      "count": 5,
+      "samples": [
+        67553,
+        67553,
+        67553
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].accountName",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].accountTimezone",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].avgRateKW",
+      "count": 5,
+      "samples": [
+        10.848833333333332,
+        0,
+        10.450894495412834
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].boostFee",
+      "count": 5,
+      "samples": [
+        0,
+        0,
+        0
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].buildingId",
+      "count": 5,
+      "samples": [
+        67555,
+        67555,
+        67555
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].buildingName",
+      "count": 5,
+      "samples": [
+        "בלו ביי מגרש 100",
+        "בלו ביי מגרש 100",
+        "בלו ביי מגרש 100"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].chargerAlias",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].chargerIdentifier",
+      "count": 5,
+      "samples": [
+        "TACW2242722G1263",
+        "TACW2242722G1263",
+        "TACW2242722G1263"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].chargingCost",
+      "count": 5,
+      "samples": [
+        0.46795980000000004,
+        0.0121548,
+        16.375120199999973
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].connectionFee",
+      "count": 5,
+      "samples": [
+        0,
+        0,
+        0
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].connectorNumber",
+      "count": 5,
+      "samples": [
+        1,
+        1,
+        1
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].currency",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].didCompleteFull",
+      "count": 5,
+      "samples": [
+        false,
+        false,
+        true
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].distributorId",
+      "count": 5,
+      "samples": [
+        0,
+        0,
+        0
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].distributorName",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].driverId",
+      "count": 5,
+      "samples": [
+        39001,
+        39001,
+        39001
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].driverName",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].electricityCost",
+      "count": 5,
+      "samples": [
+        0.27715380000000006,
+        0.0071988,
+        9.6983262
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].electricityCostTax",
+      "count": 5,
+      "samples": [
+        0,
+        0,
+        0
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].externalCustomerId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].idleFee",
+      "count": 5,
+      "samples": [
+        0,
+        0,
+        0
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].idNumber",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].internalRoamingId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].isBoost",
+      "count": 5,
+      "samples": [
+        false,
+        false,
+        false
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].isOngoing",
+      "count": 5,
+      "samples": [
+        true,
+        false,
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].isShared",
+      "count": 5,
+      "samples": [
+        false,
+        false,
+        false
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].isSingleSocket",
+      "count": 5,
+      "samples": [
+        false,
+        false,
+        false
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].licensePlate",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].maxRateKW",
+      "count": 5,
+      "samples": [
+        10.892,
+        0,
+        10.555
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].meData",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].modification",
+      "count": 5,
+      "samples": [
+        1786875838,
+        1786875158,
+        1786721486
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].netDuration",
+      "count": 5,
+      "samples": [
+        210,
+        390,
+        6540
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].offline",
+      "count": 5,
+      "samples": [
+        false,
+        false,
+        false
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].origin",
+      "count": 5,
+      "samples": [
+        "MOBILE",
+        "MOBILE",
+        "MOBILE"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].originStr",
+      "count": 5,
+      "samples": [
+        "Mobile",
+        "Mobile",
+        "Mobile"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].paidOn",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].parkingSpace",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].plugInTime",
+      "count": 5,
+      "samples": [
+        1786875235000,
+        1786858332000,
+        1786712610000
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].plugOutTime",
+      "count": 5,
+      "samples": [
+        0,
+        1786875148000,
+        1786721478000
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].rateTimePeriodInterval",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].refund",
+      "count": 5,
+      "samples": [
+        0,
+        0,
+        0
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].refundCapHours",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].region",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].rfidString",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].roamingConnectorId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].roamingPartyId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].roamingPartyName",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].roamingTransactionId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].scan2ChargeStatus",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].settlingStatementDisplayId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].settlingStatementId",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].stateOfCharge",
+      "count": 5,
+      "samples": [
+        null,
+        null,
+        null
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].stopReason",
+      "count": 5,
+      "samples": [
+        null,
+        "Remote",
+        "EVDisconnected"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].taxChargeType",
+      "count": 5,
+      "samples": [
+        null,
+        "VAT",
+        "VAT"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].totalCost",
+      "count": 5,
+      "samples": [
+        0.46795980000000004,
+        0.0121548,
+        16.375120199999973
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].totalCostTax",
+      "count": 5,
+      "samples": [
+        0,
+        0.0007559999999999997,
+        1.0184939999999951
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].totalEnergyKwh",
+      "count": 5,
+      "samples": [
+        0.539,
+        0.014,
+        18.861
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "tx.transactions[].transactionId",
+      "count": 5,
+      "samples": [
+        5286662,
+        5283377,
+        5263827
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "tx.transactions[].type",
+      "count": 5,
+      "samples": [
+        "RESIDENTIAL",
+        "RESIDENTIAL",
+        "RESIDENTIAL"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "user.user",
+      "count": 1,
+      "samples": [
+        "{object:userId,cognitoUserId,email,phoneNumber,firstName,lastName,role,chargerIdentifier,chargerAssignmentTimestamp,connector,scope,getsOperationalAlerts,financialAccessEnabled,idNumber,externalCustomerId,creditCard,lastBillDate,parkingSpace,buildingName,nextBalance,overdue,firstLogin,lastLogin,appVersion,buildVersion,device,cardExpiration,homeCharger,inFinancialGroup,cognitoClientId,seOneTcAcceptedVersion,seOneTcAcceptanceRequired,priority,admin,isMobilePublicChargingEnabled,isBlocked}"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.admin",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.appVersion",
+      "count": 1,
+      "samples": [
+        "1.4.89"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.buildingName",
+      "count": 1,
+      "samples": [
+        "בלו ביי מגרש 100"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.buildVersion",
+      "count": 1,
+      "samples": [
+        873
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.cardExpiration",
+      "count": 1,
+      "samples": [
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.chargerAssignmentTimestamp",
+      "count": 1,
+      "samples": [
+        1756988892000
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.chargerIdentifier",
+      "count": 1,
+      "samples": [
+        "TACW2242722G1263"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.cognitoClientId",
+      "count": 1,
+      "samples": [
+        "eu-central-1_YEtpQ1HXw"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.cognitoUserId",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.connector",
+      "count": 1,
+      "samples": [
+        1
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.creditCard",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.creditCard.brand",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.creditCard.expiration",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.creditCard.suffix",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.device",
+      "count": 1,
+      "samples": [
+        "IOS"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.email",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.externalCustomerId",
+      "count": 1,
+      "samples": [
+        ""
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.financialAccessEnabled",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.firstLogin",
+      "count": 1,
+      "samples": [
+        1751997517
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.firstName",
+      "count": 1,
+      "samples": [
+        "עדן חיים"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.getsOperationalAlerts",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.homeCharger",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.idNumber",
+      "count": 1,
+      "samples": [
+        ""
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.inFinancialGroup",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.isBlocked",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.isMobilePublicChargingEnabled",
+      "count": 1,
+      "samples": [
+        true
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.lastBillDate",
+      "count": 1,
+      "samples": [
+        0
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.lastLogin",
+      "count": 1,
+      "samples": [
+        1786875222
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.lastName",
+      "count": 1,
+      "samples": [
+        "גיל"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.nextBalance",
+      "count": 1,
+      "samples": [
+        0
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.overdue",
+      "count": 1,
+      "samples": [
+        0
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.parkingSpace",
+      "count": 1,
+      "samples": [
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.phoneNumber",
+      "count": 1,
+      "samples": [
+        "[redacted]"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.priority",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.role",
+      "count": 1,
+      "samples": [
+        "DRIVER"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.scope",
+      "count": 1,
+      "samples": [
+        "ACCOUNT"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.seOneTcAcceptanceRequired",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.seOneTcAcceptedVersion",
+      "count": 1,
+      "samples": [
+        null
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "user.user.userId",
+      "count": 1,
+      "samples": [
+        39001
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "ws.stateMessages",
+      "count": 1,
+      "samples": [
+        "[array:1]"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].chargerIdentifier",
+      "count": 1,
+      "samples": [
+        "TACW2242722G1263"
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "ws.stateMessages[].connectorType",
+      "count": 1,
+      "samples": [
+        "TYPE2"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].isRoaming",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].isSecure",
+      "count": 1,
+      "samples": [
+        true
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].rawStatus",
+      "count": 1,
+      "samples": [
+        "Charging"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].state",
+      "count": 1,
+      "samples": [
+        "Charging"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].success",
+      "count": 1,
+      "samples": [
+        true
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].timeZone",
+      "count": 1,
+      "samples": [
+        "Asia/Jerusalem"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData",
+      "count": 1,
+      "samples": [
+        "{object:transactionId,totalEnergyKwh,totalCost,rateKw,isBoost,didCompleteFull,chargingFullTime,isWaitingAllocation,offPeakStartTime,offPeakEndTime,delayCharge,manageCharge,maxChargingDelay,idleFeeApplied,solarChargingType,inWindow,stoppedDueToLimit}"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.chargingFullTime",
+      "count": 1,
+      "samples": [
+        1786875505000
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.delayCharge",
+      "count": 1,
+      "samples": [
+        true
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.didCompleteFull",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.idleFeeApplied",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": true
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.inWindow",
+      "count": 1,
+      "samples": [
+        true
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.isBoost",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.isWaitingAllocation",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.manageCharge",
+      "count": 1,
+      "samples": [
+        true
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.maxChargingDelay",
+      "count": 1,
+      "samples": [
+        0
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.offPeakEndTime",
+      "count": 1,
+      "samples": [
+        86400
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.offPeakStartTime",
+      "count": 1,
+      "samples": [
+        82800
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.rateKw",
+      "count": 1,
+      "samples": [
+        0.003
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.solarChargingType",
+      "count": 1,
+      "samples": [
+        "NOT_RESTRICTED"
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.stoppedDueToLimit",
+      "count": 1,
+      "samples": [
+        false
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.totalCost",
+      "count": 1,
+      "samples": [
+        0.46795980000000004
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.totalEnergyKwh",
+      "count": 1,
+      "samples": [
+        0.539
+      ],
+      "identityHint": false
+    },
+    {
+      "path": "ws.stateMessages[].transactionData.transactionId",
+      "count": 1,
+      "samples": [
+        0
+      ],
+      "identityHint": true
+    }
+  ],
+  "sampleFinishedTx": {
+    "chargerIdentifier": "TACW2242722G1263",
+    "connectorNumber": 1,
+    "transactionId": 5283377,
+    "roamingTransactionId": null,
+    "internalRoamingId": null,
+    "plugInTime": 1786858332000,
+    "plugOutTime": 1786875148000,
+    "totalEnergyKwh": 0.014,
+    "meData": null,
+    "totalCost": 0.0121548,
+    "totalCostTax": 0.0007559999999999997,
+    "netDuration": 390,
+    "didCompleteFull": false,
+    "avgRateKW": 0,
+    "maxRateKW": 0,
+    "rfidString": null,
+    "origin": "MOBILE",
+    "originStr": "Mobile",
+    "driverName": null,
+    "driverId": 39001,
+    "externalCustomerId": null,
+    "accountName": null,
+    "accountId": 67553,
+    "distributorName": null,
+    "distributorId": 0,
+    "currency": null,
+    "accountTimezone": null,
+    "region": null,
+    "buildingName": "בלו ביי מגרש 100",
+    "parkingSpace": null,
+    "scan2ChargeStatus": null,
+    "electricityCost": 0.0071988,
+    "electricityCostTax": 0,
+    "chargerAlias": null,
+    "idleFee": 0,
+    "connectionFee": 0,
+    "buildingId": 67555,
+    "roamingPartyId": null,
+    "roamingPartyName": null,
+    "roamingConnectorId": null,
+    "type": "RESIDENTIAL",
+    "boostFee": 0,
+    "refund": 0,
+    "taxChargeType": "VAT",
+    "chargingCost": 0.0121548,
+    "modification": 1786875158,
+    "stopReason": "Remote",
+    "rateTimePeriodInterval": null,
+    "refundCapHours": null,
+    "stateOfCharge": null,
+    "licensePlate": null,
+    "settlingStatementId": null,
+    "paidOn": null,
+    "settlingStatementDisplayId": null,
+    "offline": false,
+    "isBoost": false,
+    "isOngoing": false,
+    "isShared": false,
+    "isSingleSocket": false
+  },
+  "sampleOngoingTx": {
+    "chargerIdentifier": "TACW2242722G1263",
+    "connectorNumber": 1,
+    "transactionId": 5286662,
+    "roamingTransactionId": null,
+    "internalRoamingId": null,
+    "plugInTime": 1786875235000,
+    "plugOutTime": 0,
+    "totalEnergyKwh": 0.539,
+    "meData": null,
+    "totalCost": 0.46795980000000004,
+    "totalCostTax": 0,
+    "netDuration": 210,
+    "didCompleteFull": false,
+    "avgRateKW": 10.848833333333332,
+    "maxRateKW": 10.892,
+    "rfidString": null,
+    "origin": "MOBILE",
+    "originStr": "Mobile",
+    "driverName": null,
+    "driverId": 39001,
+    "externalCustomerId": null,
+    "accountName": null,
+    "accountId": 67553,
+    "distributorName": null,
+    "distributorId": 0,
+    "currency": null,
+    "accountTimezone": null,
+    "region": null,
+    "buildingName": "בלו ביי מגרש 100",
+    "parkingSpace": null,
+    "scan2ChargeStatus": null,
+    "electricityCost": 0.27715380000000006,
+    "electricityCostTax": 0,
+    "chargerAlias": null,
+    "idleFee": 0,
+    "connectionFee": 0,
+    "buildingId": 67555,
+    "roamingPartyId": null,
+    "roamingPartyName": null,
+    "roamingConnectorId": null,
+    "type": "RESIDENTIAL",
+    "boostFee": 0,
+    "refund": 0,
+    "taxChargeType": null,
+    "chargingCost": 0.46795980000000004,
+    "modification": 1786875838,
+    "stopReason": null,
+    "rateTimePeriodInterval": null,
+    "refundCapHours": null,
+    "stateOfCharge": null,
+    "licensePlate": null,
+    "settlingStatementId": null,
+    "paidOn": null,
+    "settlingStatementDisplayId": null,
+    "offline": false,
+    "isBoost": false,
+    "isOngoing": true,
+    "isShared": false,
+    "isSingleSocket": false
+  },
+  "sampleStateMessage": {
+    "chargerIdentifier": "TACW2242722G1263",
+    "state": "Charging",
+    "rawStatus": "Charging",
+    "isSecure": true,
+    "timeZone": "Asia/Jerusalem",
+    "transactionData": {
+      "transactionId": 0,
+      "totalEnergyKwh": 0.539,
+      "totalCost": 0.46795980000000004,
+      "rateKw": 0.003,
+      "isBoost": false,
+      "didCompleteFull": false,
+      "chargingFullTime": 1786875505000,
+      "isWaitingAllocation": false,
+      "offPeakStartTime": 82800,
+      "offPeakEndTime": 86400,
+      "delayCharge": true,
+      "manageCharge": true,
+      "maxChargingDelay": 0,
+      "idleFeeApplied": false,
+      "solarChargingType": "NOT_RESTRICTED",
+      "inWindow": true,
+      "stoppedDueToLimit": false
+    },
+    "connectorType": "TYPE2",
+    "isRoaming": false,
+    "success": true
+  }
+}
