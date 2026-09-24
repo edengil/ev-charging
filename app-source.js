@@ -1340,6 +1340,16 @@ function findLiveTxnOpen(opens, st) {
   return list.find(o => !o.readyToComplete && !o.wevoEnded) || list[0] || null;
 }
 
+/** מי מטעין: אותה עסקה, או הטעינה הפעילה היחידה כשהדגימה בלי מזהה. */
+function openForLiveStation(opens, st) {
+  if (!st) return findActiveWevoOpen(opens, null);
+  const hit = findActiveWevoOpen(opens, st);
+  if (hit) return hit;
+  if (!stationStillCharging(st) && String(st.state || "") !== "Finishing") return null;
+  const active = (opens || []).filter(isActiveWevoOpen);
+  return active.length === 1 ? active[0] : null;
+}
+
 function wevoStateLabel(state) {
   const map = {
     Available: "רכב לא מחובר",
@@ -4712,9 +4722,11 @@ function WevoOpenLiveSync({
       try {
         const data = await wevoApi("state");
         if (cancelled) return;
-        const st = data.state || null;
-        rememberLiveStation(st);
+        const incoming = data.state || null;
         const prev = prevStateRef.current;
+        const st = holdLiveStation(prev, incoming);
+        rememberLiveStation(st);
+        if (!isUsableStationSample(incoming)) return;
         const hasActive = pendingWevo.some(o => !o.readyToComplete);
         if (st && chargerReportsVehicle(st, sessionsRefLive.current)) {
           const sealedIds = sealConflictingWevoOpens(opens, st, onUpsertOpen, clientsRef.current, alertedReadyRef.current, prev);
@@ -4899,9 +4911,7 @@ function WevoLivePanel({
   const lastFailAlertAtRef = useRef(0);
   const wakeLockRef = useRef(null);
 
-  const linkedOpen = state
-    ? findActiveWevoOpen(openSess, state)
-    : findActiveWevoOpen(openSess, null);
+  const linkedOpen = openForLiveStation(openSess, state);
   const selectedClient = clients.find(c => c.id === cid) || null;
   const isSelfSelected = !!(selectedClient && isSelfClient(selectedClient));
   const intentArmed = !!(authIntent && isWevoAuthIntentMode(authIntent.mode) && authIntent.clientId);
@@ -5034,9 +5044,14 @@ function WevoLivePanel({
     setErr("");
     try {
       const data = await wevoApi("state");
-      const st = data.state || null;
+      const incoming = data.state || null;
       const prev = prevStateRef.current;
+      const st = holdLiveStation(prev, incoming);
       rememberLiveStation(st);
+      if (!isUsableStationSample(incoming)) {
+        if (st) setState(st);
+        return;
+      }
       setState(st);
       setLastAt(new Date());
 

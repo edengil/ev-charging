@@ -785,6 +785,24 @@ function stationStillCharging(st) {
   return s === "Charging" || s === "SuspendedEV" || s === "SuspendedEVSE";
 }
 
+const STATION_SAMPLE_STATES = ["Available", "Preparing", "Charging", "SuspendedEV", "SuspendedEVSE", "Finishing", "Occupied", "Reserved", "Unavailable", "Faulted"];
+
+/** הודעת עמדה אמיתית. Unknown, ריק, או אישור בלי state אינם דגימה. */
+function isUsableStationSample(st) {
+  if (!st || typeof st !== "object") return false;
+  return STATION_SAMPLE_STATES.includes(String(st.state || ""));
+}
+
+/**
+ * דגימה חסרה לא מוחקת טעינה שכבר על המסך.
+ * Available, Finishing ושאר מצבי עמדה אמיתיים מחליפים את הקודם.
+ */
+function holdLiveStation(prev, next) {
+  if (isUsableStationSample(next)) return next;
+  if (isUsableStationSample(prev)) return prev;
+  return next || null;
+}
+
 function openTiedToLiveStation(open, liveState) {
   if (!open || !liveState) return false;
   const liveTxn = liveState.transactionId != null && String(liveState.transactionId) !== ""
@@ -1081,6 +1099,8 @@ function buildCloudSnapFromParts(cache = {}, fromHook = null, configFallback = n
     shouldCloseStaleWevoOpen: shouldCloseStaleWevoOpen,
     repairWevoOpenRecord: repairWevoOpenRecord,
     stationStillCharging: stationStillCharging,
+    isUsableStationSample: isUsableStationSample,
+    holdLiveStation: holdLiveStation,
     openChargeStatus: openChargeStatus,
     chargeTxnId: chargeTxnId,
     savedSessionMatchesCharge: savedSessionMatchesCharge,
@@ -1127,6 +1147,8 @@ var wevoOpenLooksFinished = __EV_MONEY__.wevoOpenLooksFinished;
 var shouldCloseStaleWevoOpen = __EV_MONEY__.shouldCloseStaleWevoOpen;
 var repairWevoOpenRecord = __EV_MONEY__.repairWevoOpenRecord;
 var stationStillCharging = __EV_MONEY__.stationStillCharging;
+var isUsableStationSample = __EV_MONEY__.isUsableStationSample;
+var holdLiveStation = __EV_MONEY__.holdLiveStation;
 var openChargeStatus = __EV_MONEY__.openChargeStatus;
 var chargeTxnId = __EV_MONEY__.chargeTxnId;
 var savedSessionMatchesCharge = __EV_MONEY__.savedSessionMatchesCharge;
@@ -2479,6 +2501,16 @@ function findLiveTxnOpen(opens, st) {
   if (!txn) return findActiveWevoOpen(opens, st);
   const list = (opens || []).filter(o => wevoOpenTxnId(o) === txn);
   return list.find(o => !o.readyToComplete && !o.wevoEnded) || list[0] || null;
+}
+
+/** מי מטעין: אותה עסקה, או הטעינה הפעילה היחידה כשהדגימה בלי מזהה. */
+function openForLiveStation(opens, st) {
+  if (!st) return findActiveWevoOpen(opens, null);
+  const hit = findActiveWevoOpen(opens, st);
+  if (hit) return hit;
+  if (!stationStillCharging(st) && String(st.state || "") !== "Finishing") return null;
+  const active = (opens || []).filter(isActiveWevoOpen);
+  return active.length === 1 ? active[0] : null;
 }
 
 function wevoStateLabel(state) {
@@ -5853,9 +5885,11 @@ function WevoOpenLiveSync({
       try {
         const data = await wevoApi("state");
         if (cancelled) return;
-        const st = data.state || null;
-        rememberLiveStation(st);
+        const incoming = data.state || null;
         const prev = prevStateRef.current;
+        const st = holdLiveStation(prev, incoming);
+        rememberLiveStation(st);
+        if (!isUsableStationSample(incoming)) return;
         const hasActive = pendingWevo.some(o => !o.readyToComplete);
         if (st && chargerReportsVehicle(st, sessionsRefLive.current)) {
           const sealedIds = sealConflictingWevoOpens(opens, st, onUpsertOpen, clientsRef.current, alertedReadyRef.current, prev);
@@ -6040,9 +6074,7 @@ function WevoLivePanel({
   const lastFailAlertAtRef = useRef(0);
   const wakeLockRef = useRef(null);
 
-  const linkedOpen = state
-    ? findActiveWevoOpen(openSess, state)
-    : findActiveWevoOpen(openSess, null);
+  const linkedOpen = openForLiveStation(openSess, state);
   const selectedClient = clients.find(c => c.id === cid) || null;
   const isSelfSelected = !!(selectedClient && isSelfClient(selectedClient));
   const intentArmed = !!(authIntent && isWevoAuthIntentMode(authIntent.mode) && authIntent.clientId);
@@ -6175,9 +6207,14 @@ function WevoLivePanel({
     setErr("");
     try {
       const data = await wevoApi("state");
-      const st = data.state || null;
+      const incoming = data.state || null;
       const prev = prevStateRef.current;
+      const st = holdLiveStation(prev, incoming);
       rememberLiveStation(st);
+      if (!isUsableStationSample(incoming)) {
+        if (st) setState(st);
+        return;
+      }
       setState(st);
       setLastAt(new Date());
 

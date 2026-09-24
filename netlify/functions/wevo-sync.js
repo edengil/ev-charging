@@ -99,6 +99,9 @@ function wsCommand(token, payload, { matchCharger, timeoutMs = 10000 } = {}) {
       if (matchCharger && data.chargerIdentifier && String(data.chargerIdentifier) !== String(matchCharger)) {
         return;
       }
+      if (payload && payload.command === "getState" && !(data.state || data.rawStatus)) {
+        return;
+      }
       done(resolve, data);
     });
     ws.on("error", err => done(reject, err));

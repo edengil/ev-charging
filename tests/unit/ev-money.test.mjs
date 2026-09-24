@@ -36,6 +36,9 @@ import {
   wevoOpenLooksFinished,
   shouldCloseStaleWevoOpen,
   openChargeStatus,
+  stationStillCharging,
+  isUsableStationSample,
+  holdLiveStation,
   repairWevoOpenRecord,
   savedSessionMatchesCharge,
   shouldDiscardOpen,
@@ -382,6 +385,23 @@ describe("Wevo open session match", () => {
     const out = { ...cable, plugOutAt: "2026-09-23T15:40" };
     assert.equal(openChargeStatus(out).kind, "unplugged");
     assert.equal(openChargeStatus({ liveKw: 7, source: "wevo-live" }).kind, "live");
+  });
+
+  it("דגימה חסרה לא מוחקת טעינה חיה", () => {
+    const charging = { state: "Charging", transactionId: "42", rateKw: 7.2, connected: true };
+    assert.equal(isUsableStationSample(charging), true);
+    assert.equal(isUsableStationSample({ state: "Unknown", connected: true }), false);
+    assert.equal(isUsableStationSample(null), false);
+    assert.equal(holdLiveStation(charging, { state: "Unknown" }), charging);
+    assert.equal(holdLiveStation(charging, null), charging);
+    assert.equal(holdLiveStation(charging, { state: "Available" }).state, "Available");
+    assert.equal(holdLiveStation(charging, { state: "Finishing" }).state, "Finishing");
+    assert.equal(holdLiveStation(null, { state: "Unknown", connected: true }).state, "Unknown");
+    assert.equal(chargerReportsVehicle(holdLiveStation(null, { state: "Unknown", connected: true }), []), false);
+    assert.equal(stationStillCharging(charging), true);
+    const src = readFileSync(join(root, "app-source.js"), "utf8");
+    assert.match(src, /holdLiveStation/);
+    assert.match(src, /isUsableStationSample\(incoming\)/);
   });
 
   it("מצב עמדה חי גובר על חותמת סיום באותה עסקה", () => {

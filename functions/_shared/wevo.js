@@ -117,6 +117,10 @@ export function wsCommand(token, payload, { matchCharger, timeoutMs = 10000 } = 
         if (matchCharger && data.chargerIdentifier && String(data.chargerIdentifier) !== String(matchCharger)) {
           return;
         }
+        // getState: הודעה בלי state (אישור/פעימה) אינה «אין רכב». מחכים לדגימת עמדה.
+        if (payload && payload.command === "getState" && !(data.state || data.rawStatus)) {
+          return;
+        }
         done(resolve, data);
       });
       ws.addEventListener("error", () => done(reject, new Error("WebSocket error")));

@@ -13,6 +13,12 @@ writeFileSync(dest, src);
 const { normalizeState, pickLiveOngoing } = await import(pathToFileURL(dest).href);
 rmSync(dir, { recursive: true, force: true });
 
+describe("getState sample", () => {
+  it("הודעה בלי מצב עמדה לא נסגרת כדגימה", () => {
+    assert.match(src, /command === "getState" && !\(data\.state \|\| data\.rawStatus\)/);
+  });
+});
+
 describe("normalizeState", () => {
   it("מזהה Charging עם אנרגיה ו-delayCharge בלי לשנות charging", () => {
     const st = normalizeState(
