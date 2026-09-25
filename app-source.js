@@ -1335,6 +1335,9 @@ async function wevoApi(action, extra = {}) {
 let _liveStationSnap = null;
 function rememberLiveStation(st) {
   _liveStationSnap = st && typeof st === "object" ? st : null;
+  try {
+    window.dispatchEvent(new CustomEvent("ev-live-station"));
+  } catch {}
 }
 function readLiveStation() {
   return _liveStationSnap;
@@ -1371,8 +1374,12 @@ function findLiveTxnOpen(opens, st) {
   return list.find(o => !o.readyToComplete && !o.wevoEnded) || list[0] || null;
 }
 
-/** מי מטעין: אותה עסקה, או הטעינה הפעילה היחידה כשהדגימה בלי מזהה. */
-function openForLiveStation(opens, st) {
+/** מי מטעין: אותה עסקה, גם אם סומנה בטעות כמוכנה, או הטעינה הפעילה היחידה. */
+function openForLiveStation(opens, st, sessions) {
+  if (st && stationStillCharging(st)) {
+    const live = findChargeStillOnStation(opens, st, sessions);
+    if (live) return live;
+  }
   if (!st) return findActiveWevoOpen(opens, null);
   const hit = findActiveWevoOpen(opens, st);
   if (hit) return hit;
@@ -1548,26 +1555,7 @@ function asLocalDT(v) {
 
 /** מוצא עסקת Wevo שהסתיימה עבור טעינה פתוחה */
 function matchFinishedWevoTx(transactions, open) {
-  const list = (transactions || []).filter(t => t && !t.isOngoing);
-  if (!list.length) return null;
-  const tid = open && (open.wevoTxnId != null ? String(open.wevoTxnId) : txnIdFromNotes(open.notes));
-  if (tid) {
-    const exact = list.find(t => String(t.transactionId) === tid);
-    if (exact) return exact;
-  }
-  const startMs = open && open.startDate ? new Date(open.startDate).getTime() : NaN;
-  if (!isNaN(startMs)) {
-    const near = list
-      .map(t => ({
-        t,
-        dt: Math.abs((Number(t.plugInTime) || 0) - startMs)
-      }))
-      .filter(x => x.dt <= 30 * 60 * 1000)
-      .sort((a, b) => a.dt - b.dt);
-    if (near.length) return near[0].t;
-  }
-  // בלי txn ובלי חלון זמן — לא לייבא את העסקה האחרונה. היא עלולה להיות טעינה שכבר נשמרה.
-  return null;
+  return pickFinishedWevoTx(transactions, open);
 }
 
 /** שולף מ-Wevo שעת סיום + קוט״ש סופי לטעינה פתוחה */
@@ -2682,7 +2670,7 @@ function App() {
       const payFix = normalizePayments(p || []);
       const deduped = dedupeDuplicatePayments(payFix.payments);
       const localPayments = deduped.payments;
-      const localOpen = dropOpensAlreadySaved((o || []).map(item => repairWevoOpenRecord(item)), localSessions);
+      const localOpen = dropOpensAlreadySaved((o || []).map(item => repairWevoOpenRecord(item, Date.now(), readLiveStation())), localSessions);
       // מקור אמת לענן — לפני כל setState / שמירה (מונע מחיקת תשלומים מ־refs ריקים)
       rememberCloudCache({
         clients: localClients,
@@ -2740,7 +2728,7 @@ function App() {
               const mergedPayments = mergedPayFix.payments;
               const repairedCloud = repairSelfSessions(carFixCloud.clients, mergedSessions);
               const cloudSessions = dedupeSessionsByTxn(repairedCloud.sessions);
-              const mergedOpen = dropOpensAlreadySaved(mergeByIdPreferNewer(localOpen, r.data.openSess || []).map(item => repairWevoOpenRecord(item)), cloudSessions);
+              const mergedOpen = dropOpensAlreadySaved(mergeByIdPreferNewer(localOpen, r.data.openSess || []).map(item => repairWevoOpenRecord(item, Date.now(), readLiveStation())), cloudSessions);
               const recoveredPayments = mergedPayments.length > (r.data.payments || []).length || mergedPayFix.removed > 0;
               setClients(carFixCloud.clients);
               setSessions(cloudSessions);
@@ -2837,7 +2825,7 @@ function App() {
     const mergedPayments = dedupeDuplicatePayments(normalizePayments(mergeByIdPreferNewer(_cloudDataCache.payments || paymentsRef.current || [], data.payments || [])).payments).payments;
     const repaired = repairSelfSessions(carFix.clients, mergedSessions);
     const cloudSessions = dedupeSessionsByTxn(repaired.sessions);
-    const mergedOpen = dropOpensAlreadySaved(mergeByIdPreferNewer(_cloudDataCache.openSess || openSessRef.current || [], data.openSess || []).map(item => repairWevoOpenRecord(item)), cloudSessions);
+    const mergedOpen = dropOpensAlreadySaved(mergeByIdPreferNewer(_cloudDataCache.openSess || openSessRef.current || [], data.openSess || []).map(item => repairWevoOpenRecord(item, Date.now(), readLiveStation())), cloudSessions);
     setClients(carFix.clients);
     setSessions(cloudSessions);
     setPayments(mergedPayments);
@@ -3117,7 +3105,8 @@ function App() {
       }
       let n;
       if (existing) {
-        const sameSession = !txn || !wevoOpenTxnId(existing) || wevoOpenTxnId(existing) === txn || !!o.readyToComplete;
+        const reclaimLive = existing.id === o.id && stationStillCharging(readLiveStation()) && !o.readyToComplete;
+        const sameSession = reclaimLive || !txn || !wevoOpenTxnId(existing) || wevoOpenTxnId(existing) === txn || !!o.readyToComplete;
         if (!sameSession) {
           // txn שונה — פותחים רשומה חדשה במקום לדרוס ישנה
           n = [{
@@ -3286,7 +3275,7 @@ function App() {
         rememberCloudCache({ payments: d.payments });
       }
       if (d.openSess) {
-        const opens = dropOpensAlreadySaved((d.openSess || []).map(item => repairWevoOpenRecord(item)), nextSessions);
+        const opens = dropOpensAlreadySaved((d.openSess || []).map(item => repairWevoOpenRecord(item, Date.now(), readLiveStation())), nextSessions);
         openSessRef.current = opens;
         setOpenSess(opens);
         DB.set("ev_open", opens);
@@ -3600,6 +3589,14 @@ function NotifyEnableButton() {
       setShow(shouldShowNotifyEnable(perm, notifyStoredOn()));
     };
     apply(windowNotifyPermission());
+    const dropGrantedButton = () => {
+      document.querySelectorAll("button").forEach(btn => {
+        if ((btn.textContent || "").replace(/\s+/g, " ").trim() === "התראות פעילות") btn.remove();
+      });
+    };
+    dropGrantedButton();
+    const obs = new MutationObserver(dropGrantedButton);
+    if (document.body) obs.observe(document.body, { childList: true, subtree: true });
     if (navigator.permissions && navigator.permissions.query) {
       navigator.permissions.query({ name: "notifications" }).then(status => {
         if (!status) return;
@@ -3618,6 +3615,7 @@ function NotifyEnableButton() {
     }
     return () => {
       dead = true;
+      obs.disconnect();
       if (navigator.serviceWorker) navigator.serviceWorker.removeEventListener("message", onMsg);
     };
   }, []);
@@ -3721,7 +3719,13 @@ function Dashboard({
   onToggleArchive
 }) {
   const [sortBy, setSortBy] = useState("debt");
+  const [liveStation, setLiveStation] = useState(() => readLiveStation());
   const [preAuthIntent, setPreAuthIntent] = useState(() => getWevoAuthIntent());
+  useEffect(() => {
+    const sync = () => setLiveStation(readLiveStation());
+    window.addEventListener("ev-live-station", sync);
+    return () => window.removeEventListener("ev-live-station", sync);
+  }, []);
   useEffect(() => {
     const sync = ev => {
       setPreAuthIntent(ev && ev.detail !== undefined ? ev.detail : getWevoAuthIntent());
@@ -3730,7 +3734,8 @@ function Dashboard({
     return () => window.removeEventListener(WEVO_AUTH_INTENT_EVENT, sync);
   }, []);
   useEffect(() => {
-    const ready = (openSess || []).filter(o => o.readyToComplete && !o._alertedUnclosed);
+    const liveNow = findChargeStillOnStation(openSess, readLiveStation(), sessions);
+    const ready = (openSess || []).filter(o => o.readyToComplete && !o._alertedUnclosed && (!liveNow || o.id !== liveNow.id));
     if (!ready.length) return;
     const first = ready[0];
     const cl = clients.find(c => c.id === first.clientId);
@@ -3761,6 +3766,8 @@ function Dashboard({
     if (sortBy === "last") arr.sort((a, b) => (b.last ? new Date(b.last.date) : 0) - (a.last ? new Date(a.last.date) : 0));
     return arr;
   }, [stats, sortBy]);
+  const liveOpen = findChargeStillOnStation(openSess, liveStation, sessions);
+  const openCards = dropOpensAlreadySaved(openSess, sessions).filter(o => !liveOpen || o.id !== liveOpen.id);
   return /*#__PURE__*/React.createElement("main", {
     style: S.main
   }, /*#__PURE__*/React.createElement(WevoLivePanel, {
@@ -3872,7 +3879,7 @@ function Dashboard({
     style: S.quietBtn,
     onClick: () => go("debts"),
     "data-testid": "nav-debts"
-  }, "חובות"), /*#__PURE__*/React.createElement(NotifyEnableButton, null)), openSess.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "חובות"), /*#__PURE__*/React.createElement(NotifyEnableButton, null)), openCards.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 16
     }
@@ -3881,11 +3888,11 @@ function Dashboard({
       ...S.secTitle,
       color: "#374151"
     }
-  }, "טעינות פתוחות (", openSess.length, ")"), openSess.map(o => {
+  }, "טעינות פתוחות (", openCards.length, ")"), openCards.map(o => {
     const cl = clients.find(c => c.id === o.clientId);
     const est = estimateFromOpen(o, cl);
     const showBill = cl && !isSelfClient(cl) && (o.liveBilled != null || est.calc.amountBilled > 0);
-    const stt = openChargeStatus(o, readLiveStation());
+    const stt = openChargeStatus(o, liveStation);
     const liveNow = stt.kind === "live" || stt.kind === "slow";
     const endOk = !liveNow && validChargeEndMs(o);
     const liveKw = stt.kind === "live" || stt.kind === "slow" ? o.liveKw != null ? Number(o.liveKw) : null : null;
@@ -4710,11 +4717,13 @@ function WevoOpenLiveSync({
       liveBilled: est.isSelf ? null : est.calc.amountBilled,
       liveRate: est.isSelf ? null : est.calc.rate,
       liveRateLabel: est.isSelf ? null : est.calc.rateLabel,
-      liveProfit: est.isSelf ? null : est.calc.profit
+      liveProfit: est.isSelf ? null : est.calc.profit,
+      updatedAt: new Date().toISOString()
     }, st);
   };
 
   const markEnded = async (existing, snap, txn) => {
+    if (shouldDiscardOpen(existing, sessionsRefLive.current)) return;
     let fields = {
       kwh: snap.totalEnergyKwh != null ? Number(snap.totalEnergyKwh) : Number(existing.liveKwh) || 0,
       cost: snap.totalCost != null ? Number(snap.totalCost) : existing.liveWevoCost,
@@ -4723,16 +4732,21 @@ function WevoOpenLiveSync({
       start: existing.startDate,
       wevoTxnId: txn != null ? String(txn) : existing.wevoTxnId
     };
+    let fetched = null;
     try {
-      const fetched = await fetchWevoFinalForOpen({
+      fetched = await fetchWevoFinalForOpen({
         ...existing,
         wevoTxnId: txn != null ? txn : existing.wevoTxnId
       }, {
         retries: 4,
         gapMs: 1200
       });
-      if (fetched) fields = fetched;
-    } catch {}
+    } catch {
+      fetched = null;
+    }
+    if (stationStillCharging(readLiveStation())) return;
+    if (!finalWevoFetchCanClose(fetched)) return;
+    fields = fetched;
     const payload = buildPayload({
       totalEnergyKwh: fields.kwh,
       totalCost: fields.cost,
@@ -4794,7 +4808,9 @@ function WevoOpenLiveSync({
         }
         const opensNow = openRef.current || [];
         if (st && chargerReportsVehicle(st, sessionsRefLive.current) && (isActuallyCharging(st) || isWaitingForAuthorize(st) || hasActive)) {
-          const existing = isActuallyCharging(st) ? findLiveTxnOpen(opensNow, st) : findActiveWevoOpen(opensNow, st);
+          const existing = isActuallyCharging(st)
+            ? findChargeStillOnStation(opensNow, st, sessionsRefLive.current)
+            : findActiveWevoOpen(opensNow, st);
           const stillThisCharge = existing && isActuallyCharging(st) && !shouldDiscardOpen(existing, sessionsRefLive.current);
           if (existing && existing.clientId && (stillThisCharge || !existing.readyToComplete)) {
             onUpsertOpen(buildPayload(st, existing.clientId, existing), {
@@ -4860,25 +4876,14 @@ function WevoOpenLiveSync({
           // שחזור: טעינה פתוחה קיימת אבל פספסנו את רגע הניתוק (טלפון סגור וכו')
           for (const o of pendingWevo) {
             if (cancelled) break;
+            if (shouldDiscardOpen(o, sessionsRefLive.current)) continue;
             try {
               const fetched = await fetchWevoFinalForOpen(o, {
                 retries: 2,
                 gapMs: 800
               });
-              if (!fetched || !(fetched.kwh > 0)) {
-                if (shouldCloseStaleWevoOpen(o, { nowIdle: true })) {
-                  onUpsertOpen({
-                    ...repairWevoOpenRecord(o),
-                    readyToComplete: true,
-                    wevoEnded: true,
-                    liveKw: 0
-                  }, {
-                    silent: true
-                  });
-                  notifyReady(o, o.liveKwh);
-                }
-                continue;
-              }
+              if (stationStillCharging(readLiveStation())) continue;
+              if (!finalWevoFetchCanClose(fetched)) continue;
               onUpsertOpen({
                 ...o,
                 liveKwh: fetched.kwh,
@@ -4964,7 +4969,7 @@ function WevoLivePanel({
   const lastFailAlertAtRef = useRef(0);
   const wakeLockRef = useRef(null);
 
-  const linkedOpen = openForLiveStation(openSess, state);
+  const linkedOpen = openForLiveStation(openSess, state, sessions);
   const selectedClient = clients.find(c => c.id === cid) || null;
   const isSelfSelected = !!(selectedClient && isSelfClient(selectedClient));
   const intentArmed = !!(authIntent && isWevoAuthIntentMode(authIntent.mode) && authIntent.clientId);
@@ -5063,6 +5068,7 @@ function WevoLivePanel({
       liveRate: est.isSelf ? null : est.calc.rate,
       liveRateLabel: est.isSelf ? null : est.calc.rateLabel,
       liveProfit: est.isSelf ? null : est.calc.profit,
+      updatedAt: new Date().toISOString(),
       avgRateKW: st && st.avgRateKW != null ? Number(st.avgRateKW) : existing && existing.avgRateKW,
       maxRateKW: st && st.maxRateKW != null ? Number(st.maxRateKW) : existing && existing.maxRateKW,
       wevoFlags: {
@@ -5175,7 +5181,9 @@ function WevoLivePanel({
       }
 
       if (st && chargerReportsVehicle(st, sessions) && (isActuallyCharging(st) || isWaitingForAuthorize(st))) {
-        const existing = isActuallyCharging(st) ? findLiveTxnOpen(openRef.current, st) : findActiveWevoOpen(openRef.current, st);
+        const existing = isActuallyCharging(st)
+          ? findChargeStillOnStation(openRef.current, st, sessions)
+          : findActiveWevoOpen(openRef.current, st);
         const stillThisCharge = existing && isActuallyCharging(st) && !shouldDiscardOpen(existing, sessions);
         if (existing && existing.clientId && (stillThisCharge || !existing.readyToComplete)) {
           onUpsertOpen(buildOpenPayload(st, existing.clientId, existing), {
@@ -5203,8 +5211,9 @@ function WevoLivePanel({
             start: existing.startDate,
             wevoTxnId: txn != null ? String(txn) : existing.wevoTxnId
           };
+          let fetched = null;
           try {
-            const fetched = await fetchWevoFinalForOpen({
+            fetched = await fetchWevoFinalForOpen({
               ...existing,
               wevoTxnId: txn != null ? txn : existing.wevoTxnId,
               chargeEndedAt: existing.chargeEndedAt,
@@ -5213,8 +5222,11 @@ function WevoLivePanel({
               retries: 4,
               gapMs: 1200
             });
-            if (fetched) fields = fetched;
-          } catch {}
+          } catch {
+            fetched = null;
+          }
+          if (!stationStillCharging(readLiveStation()) && finalWevoFetchCanClose(fetched)) {
+          fields = fetched;
           const snap = {
             totalEnergyKwh: fields.kwh,
             totalCost: fields.cost,
@@ -5247,6 +5259,7 @@ function WevoLivePanel({
             pushWevoLog("ready", `${cl && cl.name || "לקוח"}: מוכן לאישור`, true);
             appAlert(`✓ טעינה הסתיימה — מוכן לאישור (${cl && cl.name || "לקוח"})`, "ok", 6000);
             notifyPhone("הטעינה נגמרה", cl && cl.name || "לקוח", `ev-end-${existing.id}`);
+          }
           }
         }
       }

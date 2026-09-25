@@ -47,6 +47,10 @@ ${body}
     shouldCloseStaleWevoOpen: shouldCloseStaleWevoOpen,
     repairWevoOpenRecord: repairWevoOpenRecord,
     shouldShowNotifyEnable: shouldShowNotifyEnable,
+    finalWevoFetchCanClose: finalWevoFetchCanClose,
+    openFollowsLiveCharge: openFollowsLiveCharge,
+    findChargeStillOnStation: findChargeStillOnStation,
+    pickFinishedWevoTx: pickFinishedWevoTx,
     stationStillCharging: stationStillCharging,
     isUsableStationSample: isUsableStationSample,
     holdLiveStation: holdLiveStation,
@@ -96,6 +100,10 @@ var wevoOpenLooksFinished = __EV_MONEY__.wevoOpenLooksFinished;
 var shouldCloseStaleWevoOpen = __EV_MONEY__.shouldCloseStaleWevoOpen;
 var repairWevoOpenRecord = __EV_MONEY__.repairWevoOpenRecord;
 var shouldShowNotifyEnable = __EV_MONEY__.shouldShowNotifyEnable;
+var finalWevoFetchCanClose = __EV_MONEY__.finalWevoFetchCanClose;
+var openFollowsLiveCharge = __EV_MONEY__.openFollowsLiveCharge;
+var findChargeStillOnStation = __EV_MONEY__.findChargeStillOnStation;
+var pickFinishedWevoTx = __EV_MONEY__.pickFinishedWevoTx;
 var stationStillCharging = __EV_MONEY__.stationStillCharging;
 var isUsableStationSample = __EV_MONEY__.isUsableStationSample;
 var holdLiveStation = __EV_MONEY__.holdLiveStation;

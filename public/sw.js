@@ -1,5 +1,18 @@
+const SW_VERSION = "2026-09-26-live-once";
+
 self.addEventListener("install", event => {
   event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener("fetch", event => {
+  const req = event.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  const path = url.pathname;
+  const isDoc = req.mode === "navigate" || path === "/" || path.endsWith("/index.html");
+  if (!isDoc) return;
+  event.respondWith(fetch(req, { cache: "reload" }).catch(() => fetch(req)));
 });
 
 self.addEventListener("activate", event => {

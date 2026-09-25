@@ -40,6 +40,9 @@ import {
   isUsableStationSample,
   holdLiveStation,
   shouldShowNotifyEnable,
+  finalWevoFetchCanClose,
+  findChargeStillOnStation,
+  pickFinishedWevoTx,
   repairWevoOpenRecord,
   savedSessionMatchesCharge,
   shouldDiscardOpen,
@@ -427,6 +430,37 @@ describe("Wevo open session match", () => {
     const charging = { state: "Charging", transactionId: "42", rateKw: 7.2 };
     assert.equal(openChargeStatus(open, charging).kind, "live");
     assert.equal(openChargeStatus(open, { state: "Charging", transactionId: "99", rateKw: 7.2 }).kind, "cable");
+    const falseEnd = {
+      source: "wevo-live",
+      wevoTxnId: "77",
+      plugInAt: "2026-09-26T00:42",
+      startDate: "2026-09-26T00:42",
+      chargeEndedAt: "2026-09-26T00:45",
+      endDate: "2026-09-26T00:45",
+      readyToComplete: true,
+      wevoEnded: true,
+      liveKwh: 0.55,
+      liveWevoCost: 0.48,
+      liveKw: 0
+    };
+    const still = {
+      state: "Charging",
+      transactionId: "88",
+      plugInTime: "2026-09-26T00:42",
+      totalEnergyKwh: 6.59,
+      rateKw: 10.8
+    };
+    assert.equal(openChargeStatus(falseEnd, still).kind, "live");
+    assert.equal(findChargeStillOnStation([{ ...falseEnd, id: "live" }], still, []).id, "live");
+    const savedSmall = { wevoTxnId: "77", kwhRaw: 0.55, costToOwner: 0.48, source: "manual" };
+    assert.equal(findChargeStillOnStation([{ ...falseEnd, id: "saved" }], still, [savedSmall]), null);
+    assert.equal(findChargeStillOnStation([{ ...falseEnd, id: "other", plugInAt: "2026-09-20T10:00", startDate: "2026-09-20T10:00" }], still, []), null);
+    assert.equal(finalWevoFetchCanClose(null), false);
+    assert.equal(finalWevoFetchCanClose({ kwh: 0, end: "2026-09-26T00:45" }), false);
+    assert.equal(finalWevoFetchCanClose({ kwh: 0.55, end: "2026-09-26T00:45" }), true);
+    const older = { transactionId: "1", isOngoing: false, plugInTime: Date.parse("2026-09-26T00:42"), totalEnergyKwh: 0.55 };
+    assert.equal(pickFinishedWevoTx([older], { wevoTxnId: "88", plugInAt: "2026-09-26T00:42" }), null);
+    assert.equal(pickFinishedWevoTx([older], { wevoTxnId: "1" }), older);
     assert.equal(openChargeStatus({ wevoTxnId: "42", liveKw: 6 }, { state: "Finishing", transactionId: "42" }).kind, "cable");
     assert.match(readFileSync(join(root, "app-source.js"), "utf8"), /liveChargeEndStamp/);
     assert.match(readFileSync(join(root, "app-source.js"), "utf8"), /clearFinishedIfStillCharging/);
@@ -602,6 +636,10 @@ describe("app-source drift guards", () => {
     assert.match(src, /listConflictingWevoOpens/);
     assert.match(src, /repairWevoOpenRecord/);
     assert.match(src, /openChargeStatus/);
+    assert.match(src, /findChargeStillOnStation/);
+    assert.match(src, /finalWevoFetchCanClose/);
+    assert.match(src, /openCards/);
+    assert.doesNotMatch(src, /perm === "granted"\s*\?\s*"התראות פעילות"/);
     assert.match(src, /chargerReportsVehicle/);
     assert.match(src, /dropOpensAlreadySaved/);
     assert.match(src, /shouldDiscardOpen/);
