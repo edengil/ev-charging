@@ -3562,17 +3562,10 @@ function App() {
 function NotifyEnableButton() {
   const supported = typeof Notification !== "undefined";
   const [perm, setPerm] = useState(() => supported ? Notification.permission : "unsupported");
-  const label = perm === "granted"
-    ? "התראות פעילות"
-    : perm === "denied"
-      ? "התראות חסומות"
-      : perm === "unsupported"
-        ? "אין התראות בדפדפן"
-        : "הפעל התראות";
+  if (perm !== "default") return null;
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
     "data-testid": "notify-enable",
-    disabled: perm === "granted" || perm === "denied" || perm === "unsupported",
     onClick: async () => {
       const next = await ensureNotifyPermission();
       setPerm(next);
@@ -3581,17 +3574,13 @@ function NotifyEnableButton() {
       }
     },
     style: {
-      flex: 1,
-      background: perm === "granted" ? "#ecfdf5" : "#f8fafc",
-      border: perm === "granted" ? "1.5px solid #6ee7b7" : "1.5px solid #cbd5e1",
-      borderRadius: 10,
-      padding: "11px",
-      fontSize: 13,
-      color: perm === "granted" ? "#047857" : "#334155",
-      cursor: perm === "granted" || perm === "denied" ? "default" : "pointer",
-      fontWeight: 700
+      ...S.quietBtn,
+      flex: "0 0 auto",
+      padding: "6px 10px",
+      fontSize: 12,
+      fontWeight: 600
     }
-  }, label);
+  }, "הפעל התראות");
 }
 
 function DebtsSendView({
