@@ -46,6 +46,7 @@ ${body}
     wevoOpenLooksFinished: wevoOpenLooksFinished,
     shouldCloseStaleWevoOpen: shouldCloseStaleWevoOpen,
     repairWevoOpenRecord: repairWevoOpenRecord,
+    shouldShowNotifyEnable: shouldShowNotifyEnable,
     stationStillCharging: stationStillCharging,
     isUsableStationSample: isUsableStationSample,
     holdLiveStation: holdLiveStation,
@@ -94,6 +95,7 @@ var validChargeEndMs = __EV_MONEY__.validChargeEndMs;
 var wevoOpenLooksFinished = __EV_MONEY__.wevoOpenLooksFinished;
 var shouldCloseStaleWevoOpen = __EV_MONEY__.shouldCloseStaleWevoOpen;
 var repairWevoOpenRecord = __EV_MONEY__.repairWevoOpenRecord;
+var shouldShowNotifyEnable = __EV_MONEY__.shouldShowNotifyEnable;
 var stationStillCharging = __EV_MONEY__.stationStillCharging;
 var isUsableStationSample = __EV_MONEY__.isUsableStationSample;
 var holdLiveStation = __EV_MONEY__.holdLiveStation;

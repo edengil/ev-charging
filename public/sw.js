@@ -3,7 +3,22 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async () => {
+    await self.clients.claim();
+    const list = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    await Promise.all(list.map(client => {
+      if (!client.navigate) return undefined;
+      return client.navigate(client.url);
+    }));
+  })());
+});
+
+self.addEventListener("message", event => {
+  if (!event.data || event.data.type !== "ev-notify-perm") return;
+  const perm = typeof Notification !== "undefined" ? Notification.permission : "unsupported";
+  if (event.source && event.source.postMessage) {
+    event.source.postMessage({ type: "ev-notify-perm", perm });
+  }
 });
 
 self.addEventListener("notificationclick", event => {

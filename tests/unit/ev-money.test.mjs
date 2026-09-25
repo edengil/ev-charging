@@ -39,6 +39,7 @@ import {
   stationStillCharging,
   isUsableStationSample,
   holdLiveStation,
+  shouldShowNotifyEnable,
   repairWevoOpenRecord,
   savedSessionMatchesCharge,
   shouldDiscardOpen,
@@ -385,6 +386,16 @@ describe("Wevo open session match", () => {
     const out = { ...cable, plugOutAt: "2026-09-23T15:40" };
     assert.equal(openChargeStatus(out).kind, "unplugged");
     assert.equal(openChargeStatus({ liveKw: 7, source: "wevo-live" }).kind, "live");
+  });
+
+  it("כפתור התראות נסתר אם כבר אושרו או סומנו כפעילות", () => {
+    assert.equal(shouldShowNotifyEnable("granted", null), false);
+    assert.equal(shouldShowNotifyEnable("granted", "1"), false);
+    assert.equal(shouldShowNotifyEnable("default", "1"), false);
+    assert.equal(shouldShowNotifyEnable("default", true), false);
+    assert.equal(shouldShowNotifyEnable("denied", null), false);
+    assert.equal(shouldShowNotifyEnable("default", null), true);
+    assert.equal(shouldShowNotifyEnable("default", "0"), true);
   });
 
   it("דגימה חסרה לא מוחקת טעינה חיה", () => {

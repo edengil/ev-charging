@@ -379,10 +379,41 @@ function ensureNotifyPermission() {
   return Notification.requestPermission();
 }
 
+const NOTIFY_ON_KEY = "ev_notify_on";
+
+function notifyStoredOn() {
+  try {
+    return localStorage.getItem(NOTIFY_ON_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markNotifyEnabled() {
+  try {
+    localStorage.setItem(NOTIFY_ON_KEY, "1");
+  } catch {}
+}
+
+function windowNotifyPermission() {
+  try {
+    if (typeof Notification === "undefined") return "unsupported";
+    return Notification.permission;
+  } catch {
+    return "unsupported";
+  }
+}
+
 function installAppServiceWorker() {
   try {
     if (!navigator.serviceWorker) return;
     if (location.protocol === "file:") return;
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   } catch {}
 }
@@ -3560,16 +3591,49 @@ function App() {
 }
 
 function NotifyEnableButton() {
-  const supported = typeof Notification !== "undefined";
-  const [perm, setPerm] = useState(() => supported ? Notification.permission : "unsupported");
-  if (perm !== "default") return null;
+  const [show, setShow] = useState(() => shouldShowNotifyEnable(windowNotifyPermission(), notifyStoredOn()));
+  useEffect(() => {
+    let dead = false;
+    const apply = perm => {
+      if (dead) return;
+      if (perm === "granted") markNotifyEnabled();
+      setShow(shouldShowNotifyEnable(perm, notifyStoredOn()));
+    };
+    apply(windowNotifyPermission());
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: "notifications" }).then(status => {
+        if (!status) return;
+        apply(status.state);
+        status.onchange = () => apply(status.state);
+      }).catch(() => {});
+    }
+    const onMsg = event => {
+      if (event.data && event.data.type === "ev-notify-perm") apply(event.data.perm);
+    };
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener("message", onMsg);
+      navigator.serviceWorker.ready.then(reg => {
+        if (reg && reg.active) reg.active.postMessage({ type: "ev-notify-perm" });
+      }).catch(() => {});
+    }
+    return () => {
+      dead = true;
+      if (navigator.serviceWorker) navigator.serviceWorker.removeEventListener("message", onMsg);
+    };
+  }, []);
+  if (!show) return null;
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
     "data-testid": "notify-enable",
     onClick: async () => {
       const next = await ensureNotifyPermission();
-      setPerm(next);
+      if (!shouldShowNotifyEnable(next, notifyStoredOn())) {
+        markNotifyEnabled();
+        setShow(false);
+      }
       if (next === "granted") {
+        markNotifyEnabled();
+        setShow(false);
         notifyPhone("התראות פעילות", "תקבל עדכון כשרכב מתחבר, כשהטעינה נגמרת, ואם אישור מראש נכשל", "ev-notify-on");
       }
     },
