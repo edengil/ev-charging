@@ -13,7 +13,9 @@
 function UncataloguedView({
   sessions,
   clients,
+  archivedKeys,
   onAssign,
+  onArchive,
   onBack
 }) {
   const [txs, setTxs] = useState([]);
@@ -50,13 +52,14 @@ function UncataloguedView({
   useEffect(() => {
     load();
   }, []);
+  const archivedSet = useMemo(() => new Set(archivedKeys || []), [archivedKeys]);
   const list = useMemo(() => {
     try {
-      return findUncataloguedCharges(txs, sessions);
+      return findUncataloguedCharges(txs, sessions).filter(tx => !archivedSet.has(uncataloguedTxKey(tx)));
     } catch (e) {
       return [];
     }
-  }, [txs, sessions]);
+  }, [txs, sessions, archivedSet]);
   const fmtTxTime = tx => {
     const ms = wevoTxTimeMs(tx);
     if (!ms) return "—";
@@ -136,7 +139,7 @@ function UncataloguedView({
     },
     "data-testid": "uncatalogued-empty"
   }, "✅ כל הטעינות מקוטלגות — אין מה להשלים"), list.map(tx => {
-    const tid = tx.transactionId != null ? String(tx.transactionId) : "tx-" + wevoTxTimeMs(tx);
+    const tid = uncataloguedTxKey(tx);
     const pick = clientPick[tid] || "";
     const kwh = Number(tx.totalEnergyKwh);
     const cost = tx.totalCost != null ? Number(tx.totalCost) : null;
@@ -215,7 +218,14 @@ function UncataloguedView({
       disabled: !pick,
       onClick: tryAssign,
       "data-testid": "uncatalogued-assign-" + tid
-    }, "שייך וחייב")), warn && /*#__PURE__*/React.createElement("div", {
+    }, "שייך וחייב"), onArchive && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      style: { ...S.btnS,
+        whiteSpace: "nowrap"
+      },
+      onClick: () => onArchive(tx),
+      "data-testid": "uncatalogued-archive-" + tid
+    }, "📦 ארכב")), warn && /*#__PURE__*/React.createElement("div", {
       style: {
         background: "#fffbeb",
         border: "1.5px solid #fcd34d",

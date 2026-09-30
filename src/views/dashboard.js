@@ -127,22 +127,6 @@ function Dashboard({
       marginTop: 4
     }
   }, paceDelta == null ? "אין מספיק נתונים להשוואה" : paceDelta >= 0 ? "בקצב טוב לעומת התקופה המקבילה בחודש שעבר" : "מאחורי החודש שעבר — שווה להציע ליותר אנשים להטעין")), /*#__PURE__*/React.createElement(WevoMiniLog, null), /*#__PURE__*/React.createElement("div", {
-    style: S.actRow
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...S.actBtn,
-      flex: 2,
-      background: "#059669",
-      padding: "13px 8px",
-      fontSize: 15
-    },
-    onClick: () => go("add-s", null),
-    "data-testid": "nav-add-session"
-  }, "טעינה חדשה"), /*#__PURE__*/React.createElement("button", {
-    style: S.quietBtn,
-    onClick: () => go("add-c"),
-    "data-testid": "nav-add-client"
-  }, "לקוח חדש")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexWrap: "wrap",
@@ -150,14 +134,6 @@ function Dashboard({
       marginBottom: 18
     }
   }, /*#__PURE__*/React.createElement("button", {
-    style: S.quietBtn,
-    onClick: () => go("stats"),
-    "data-testid": "nav-stats"
-  }, "דוח חודשי"), /*#__PURE__*/React.createElement("button", {
-    style: S.quietBtn,
-    onClick: () => go("settings"),
-    "data-testid": "nav-settings"
-  }, "תעריפים"), /*#__PURE__*/React.createElement("button", {
     style: S.quietBtn,
     onClick: () => go("import"),
     "data-testid": "nav-backup"
@@ -177,12 +153,7 @@ function Dashboard({
     style: S.quietBtn,
     onClick: () => go("uncatalogued"),
     "data-testid": "nav-uncatalogued"
-  }, "טעינות לא מקוטלגות"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: S.quietBtn,
-    onClick: () => go("debts"),
-    "data-testid": "nav-debts"
-  }, "חובות"), /*#__PURE__*/React.createElement(NotifyEnableButton, null)), openCards.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "טעינות לא מקוטלגות"), /*#__PURE__*/React.createElement(NotifyEnableButton, null)), openCards.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 16
     }
@@ -498,7 +469,10 @@ function Dashboard({
 function ArchiveView({
   stats,
   go,
-  onToggleArchive
+  onBack,
+  onToggleArchive,
+  archivedUncat,
+  onUnarchiveUncat
 }) {
   const list = useMemo(() => {
     return [...stats].filter(c => !c.isSelf && c.hidden).sort((a, b) => {
@@ -586,16 +560,71 @@ function ArchiveView({
       flex: 1.2
     },
     "data-testid": `archive-restore-${c.id}`
-  }, "שחזר מהארכיון"))), /*#__PURE__*/React.createElement("button", {
+  }, "שחזר מהארכיון"))), archivedUncat && archivedUncat.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#f8fafc",
+      border: "1.5px solid #e2e8f0",
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 14,
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 16,
+      color: "#334155",
+      marginBottom: 6
+    }
+  }, "🔌 טעינות מאורכבות (לא שויכו)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#64748b",
+      lineHeight: 1.45,
+      marginBottom: 10
+    }
+  }, "טעינות שהועברו לארכיון מהרשימה הלא־מקוטלגת בלי שיוך ללקוח. לא נוצר חיוב. אפשר לשחזר בכל רגע."), archivedUncat.map(e => /*#__PURE__*/React.createElement("div", {
+    key: e.key,
+    style: {
+      ...S.cCard,
+      opacity: 0.95,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.cTop
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.cName
+  }, e.plugInTime ? fdate(e.plugInTime) : "—"), /*#__PURE__*/React.createElement("div", {
+    style: S.cMeta
+  }, e.kwh != null ? Number(e.kwh).toFixed(2) + ' קוט"ש' : "", e.cost != null ? " · ₪" + Number(e.cost).toFixed(2) : "", e.transactionId ? " · txn#" + e.transactionId : ""))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => go("dash"),
+    onClick: () => onUnarchiveUncat && onUnarchiveUncat(e.key),
+    style: {
+      ...S.btnS,
+      padding: "8px",
+      fontSize: 13
+    },
+    "data-testid": "archive-uncat-restore-" + e.key
+  }, "שחזר לרשימה"))))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => (typeof onBack === "function" ? onBack() : go("dash")),
     style: {
       ...S.btnS,
       marginTop: 12,
       width: "100%"
     },
     "data-testid": "nav-dash"
-  }, "← חזרה לדשבורד")));
+  }, "← חזרה")));
 }
 
 

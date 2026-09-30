@@ -492,6 +492,32 @@ function findRecentDuplicatePayment(payments, candidate, windowMs = DUPLICATE_SA
   );
 }
 
+/**
+ * כפילות תשלום באותו יום קלנדרי (מעבר לחלון 90 השניות של לחיצה כפולה).
+ * מחזיר את התשלום החשוד או null. לא חוסם — רק אזהרה עם "שמור בכל זאת",
+ * כי תשלום כפול לגיטימי באותו יום אפשרי (בוקר + ערב).
+ */
+function findSameDayDuplicatePayment(payments, candidate) {
+  if (!candidate || !candidate.clientId || candidate.method === "debt") return null;
+  const amt = Number(candidate.amount) || 0;
+  if (!(amt > 0)) return null;
+  const d = new Date(candidate.date || Date.now());
+  if (isNaN(d.getTime())) return null;
+  const dayKey = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  const sameDay = dt => {
+    if (isNaN(dt.getTime())) return false;
+    return dt.getFullYear() * 10000 + (dt.getMonth() + 1) * 100 + dt.getDate() === dayKey;
+  };
+  return (
+    (payments || []).find(p => {
+      if (!p || p.id === candidate.id || p.clientId !== candidate.clientId || p.method === "debt") return false;
+      if ((p.method || "") !== (candidate.method || "")) return false;
+      if (Math.abs((Number(p.amount) || 0) - amt) >= 0.02) return false;
+      return sameDay(new Date(p.date));
+    }) || null
+  );
+}
+
 function validatePaymentInput(p) {
   if (!p || !p.clientId) {
     return {
@@ -1245,13 +1271,32 @@ function wevoTxTimeMs(tx) {
   return localDtMs(tx.plugInTime) || localDtMs(tx.chargingFullTime) || 0;
 }
 
+/** מפתח יציב לשורת טעינה לא מקוטלגת — לארכוב ולזיהוי בשחזור. */
+function uncataloguedTxKey(tx) {
+  if (!tx) return "";
+  return tx.transactionId != null && String(tx.transactionId) !== ""
+    ? String(tx.transactionId)
+    : "tx-" + wevoTxTimeMs(tx);
+}
+
 /** תחילת חלון "טעינות לא מקוטלגו" — 28.09.2026 בחצות מקומית. */
 const UNCATALOGUED_SINCE_MS = new Date(2026, 8, 28).getTime();
+
+/**
+ * עסקת Wevo סגורה/סופית — יש חותמת סיום טעינה או ניתוק כבל.
+ * טעינה שעדיין מתקיימת (אין שום חותמת סיום) אינה סופית ולא מופיעה
+ * ברשימת "טעינות לא מקוטלגות".
+ */
+function wevoTxIsClosed(tx) {
+  if (!tx) return false;
+  return !!(tx.chargingFullTime || tx.chargeEndedAt || tx.plugOutTime);
+}
 
 /**
  * טעינות Wevo שעוד לא קוטלגו ללקוח: מההיסטוריה, החל מ-sinceMs,
  * כל עסקה שאין לה טעינה אמיתית תואמת באפליקציה (שורות מראה wevo-sync לא נחשבות קיטלוג).
  * התאמה = אותו txn, או קוט"ש דומה (±0.05) + סכום דומה (±0.05) + חפיפת זמנים (36 שעות).
+ * מוצגות רק עסקאות סגורות — טעינה שעדיין מתקיימת אינה סופית.
  */
 function findUncataloguedCharges(transactions, sessions, sinceMs = UNCATALOGUED_SINCE_MS) {
   const real = (sessions || []).filter(s => s && s.source !== "wevo-sync");
@@ -1259,6 +1304,7 @@ function findUncataloguedCharges(transactions, sessions, sinceMs = UNCATALOGUED_
     if (!tx) return false;
     if (!(wevoTxTimeMs(tx) >= sinceMs)) return false;
     if (!(Number(tx.totalEnergyKwh) > 0)) return false;
+    if (!wevoTxIsClosed(tx)) return false;
     return !real.some(s => savedSessionMatchesCharge(s, tx));
   });
 }
@@ -1382,6 +1428,7 @@ function waDebtPing(balance, lastAmount) {
     normalizePayments: normalizePayments,
     dedupeDuplicatePayments: dedupeDuplicatePayments,
     findRecentDuplicatePayment: findRecentDuplicatePayment,
+    findSameDayDuplicatePayment: findSameDayDuplicatePayment,
     validatePaymentInput: validatePaymentInput,
     canSaveNewPayment: canSaveNewPayment,
     clientBalance: clientBalance,
@@ -1426,6 +1473,8 @@ function waDebtPing(balance, lastAmount) {
     combineDateWithTime: combineDateWithTime,
     manualEndDateTime: manualEndDateTime,
     wevoTxTimeMs: wevoTxTimeMs,
+    uncataloguedTxKey: uncataloguedTxKey,
+    wevoTxIsClosed: wevoTxIsClosed,
     UNCATALOGUED_SINCE_MS: UNCATALOGUED_SINCE_MS,
     findUncataloguedCharges: findUncataloguedCharges,
     wevoTxToOpenSession: wevoTxToOpenSession,
@@ -1449,6 +1498,7 @@ var mergeByIdPreferNewer = __EV_MONEY__.mergeByIdPreferNewer;
 var normalizePayments = __EV_MONEY__.normalizePayments;
 var dedupeDuplicatePayments = __EV_MONEY__.dedupeDuplicatePayments;
 var findRecentDuplicatePayment = __EV_MONEY__.findRecentDuplicatePayment;
+var findSameDayDuplicatePayment = __EV_MONEY__.findSameDayDuplicatePayment;
 var validatePaymentInput = __EV_MONEY__.validatePaymentInput;
 var canSaveNewPayment = __EV_MONEY__.canSaveNewPayment;
 var clientBalance = __EV_MONEY__.clientBalance;
@@ -1491,6 +1541,8 @@ var parseManualTimeHHMM = __EV_MONEY__.parseManualTimeHHMM;
 var combineDateWithTime = __EV_MONEY__.combineDateWithTime;
 var manualEndDateTime = __EV_MONEY__.manualEndDateTime;
 var wevoTxTimeMs = __EV_MONEY__.wevoTxTimeMs;
+var uncataloguedTxKey = __EV_MONEY__.uncataloguedTxKey;
+var wevoTxIsClosed = __EV_MONEY__.wevoTxIsClosed;
 var UNCATALOGUED_SINCE_MS = __EV_MONEY__.UNCATALOGUED_SINCE_MS;
 var findUncataloguedCharges = __EV_MONEY__.findUncataloguedCharges;
 var wevoTxToOpenSession = __EV_MONEY__.wevoTxToOpenSession;
@@ -4177,22 +4229,119 @@ const S = {
  * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
  */
 // ── APP ────────────────────────────────────────────────────────────────────
+function BottomNav({ view, go }) {
+  const items = [{
+    key: "home",
+    label: "בית",
+    icon: "🏠",
+    views: ["dash"],
+    onTap: () => go("dash")
+  }, {
+    key: "charge",
+    label: "טעינה חדשה",
+    icon: "⚡",
+    views: ["add-s"],
+    onTap: () => go("add-s", null)
+  }, {
+    key: "report",
+    label: "דוח חודשי",
+    icon: "📊",
+    views: ["stats"],
+    onTap: () => go("stats")
+  }, {
+    key: "debts",
+    label: "חובות",
+    icon: "💰",
+    views: ["debts"],
+    onTap: () => go("debts")
+  }, {
+    key: "client",
+    label: "לקוח חדש",
+    icon: "👤",
+    views: ["add-c"],
+    onTap: () => go("add-c")
+  }, {
+    key: "settings",
+    label: "הגדרות",
+    icon: "⚙️",
+    views: ["settings"],
+    onTap: () => go("settings")
+  }];
+  return /*#__PURE__*/React.createElement("nav", {
+    "data-testid": "bottom-nav",
+    style: {
+      position: "fixed",
+      bottom: 0,
+      left: "50%",
+      transform: "translateX(-50%)",
+      width: "100%",
+      maxWidth: 500,
+      background: "#ffffff",
+      borderTop: "1px solid #e2e8f0",
+      boxShadow: "0 -2px 12px rgba(15, 23, 42, 0.06)",
+      zIndex: 60,
+      paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      direction: "rtl"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      width: "100%"
+    }
+  }, items.map(it => {
+    const active = it.views.includes(view);
+    return /*#__PURE__*/React.createElement("button", {
+      key: it.key,
+      type: "button",
+      onClick: it.onTap,
+      "data-testid": "bottomnav-" + it.key,
+      style: {
+        flex: 1,
+        border: "none",
+        background: "none",
+        cursor: "pointer",
+        padding: "8px 2px 9px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 2,
+        color: active ? "#0ea5c6" : "#64748b",
+        fontFamily: "'Heebo', sans-serif",
+        fontSize: 10.5,
+        fontWeight: active ? 800 : 600
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 21, lineHeight: 1 }
+    }, it.icon), /*#__PURE__*/React.createElement("span", null, it.label), active && /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 18,
+        height: 3,
+        borderRadius: 2,
+        background: "#0ea5c6",
+        marginTop: 1
+      }
+    }));
+  })));
+}
+
 function App() {
   const [clients, setClients] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [payments, setPayments] = useState([]);
   const [openSess, setOpenSess] = useState([]);
+  const [archivedUncat, setArchivedUncat] = useState([]);
   const [ready, setReady] = useState(false);
   const [, bump] = useState(0);
   useEffect(() => {
     _configListeners.push(() => bump(v => v + 1));
     (async () => {
       installAppServiceWorker();
-      const [c, s, p, o] = await Promise.all([
+      const [c, s, p, o, au] = await Promise.all([
         DB.get("ev_clients"),
         DB.get("ev_sessions"),
         DB.get("ev_payments"),
-        DB.get("ev_open")
+        DB.get("ev_open"),
+        DB.get("ev_archived_uncat")
       ]);
       const mappedLocal = (c || []).map(cl => isSelfClient(cl) ? {
         ...cl,
@@ -4225,6 +4374,7 @@ function App() {
       setPayments(localPayments);
       if (payFix.changed || deduped.removed > 0) DB.set("ev_payments", localPayments);
       setOpenSess(localOpen);
+      setArchivedUncat(Array.isArray(au) ? au : []);
       if ((o || []).some((item, i) => item !== localOpen[i])) DB.set("ev_open", localOpen);
       if (deduped.removed > 0) {
         try {
@@ -4468,20 +4618,106 @@ function App() {
       setCloudBusy(false);
     }
   };
-  const go = (v, id = undefined) => {
-    setView(v);
-    if (id !== undefined) setCid(id);
+  // מחסנית ניווט: "חזרה" מחזיר למקום שממנו יצאנו, כולל מיקום הגלילה.
+  // מקומות (places) נדחפים למחסנית; טפסים (forms) הם שכבה מעל המקום הנוכחי ולא נדחפים.
+  const PLACE_VIEWS = useMemo(() => new Set(["dash", "client", "debts", "archive", "settings", "uncatalogued", "wevo", "wevo-bill", "wevo-sync", "stats", "report"]), []);
+  const navStackRef = useRef([]);
+  const placeRef = useRef({ view: "dash", cid: null, scrollY: 0 });
+  const pendingScrollRef = useRef(null);
+  const readScrollY = () => {
+    try { return window.scrollY || 0; } catch { return 0; }
   };
+  const scrollTopSoon = () => {
+    try { requestAnimationFrame(() => { try { window.scrollTo(0, 0); } catch {} }); } catch {}
+  };
+  const go = (v, id = undefined) => {
+    const y = readScrollY();
+    if (!PLACE_VIEWS.has(v)) {
+      // טופס מעל המקום הנוכחי — לא דוחף למחסנית
+      placeRef.current.scrollY = y;
+      if (id !== undefined) setCid(id);
+      setView(v);
+      scrollTopSoon();
+      return;
+    }
+    const curView = placeRef.current.view;
+    const targetCid = id !== undefined ? id : cid;
+    if (v === curView && targetCid === cid) {
+      // כבר במקום היעד — רק יוצא מטופס אם צריך
+      if (view !== v) setView(v);
+      if (id !== undefined && cid !== id) setCid(id);
+      pendingScrollRef.current = placeRef.current.scrollY || 0;
+      return;
+    }
+    const stack = navStackRef.current;
+    const existing = stack.findIndex(e => e.view === v && (e.cid ?? null) === (targetCid ?? null));
+    if (existing >= 0) {
+      // היעד כבר במחסנית — חותך אליו במקום לדחוף כפילות
+      navStackRef.current = stack.slice(0, existing);
+    } else {
+      stack.push({ view: curView, cid: cid ?? null, scrollY: y });
+      if (stack.length > 30) stack.shift();
+    }
+    placeRef.current = { view: v, cid: targetCid ?? null, scrollY: 0 };
+    if (id !== undefined) setCid(id);
+    setView(v);
+    scrollTopSoon();
+  };
+  const goBack = () => {
+    const stack = navStackRef.current;
+    if (!PLACE_VIEWS.has(view)) {
+      // טופס פתוח — חוזר למקום שמתחתיו
+      setEditId(null);
+      setSid(null);
+      setPid(null);
+      if (view !== placeRef.current.view) setView(placeRef.current.view);
+      pendingScrollRef.current = placeRef.current.scrollY || 0;
+      return;
+    }
+    const prev = stack.pop();
+    if (!prev) {
+      placeRef.current = { view: "dash", cid: null, scrollY: 0 };
+      setCid(null);
+      setEditId(null);
+      setSid(null);
+      setPid(null);
+      if (view !== "dash") setView("dash");
+      pendingScrollRef.current = 0;
+      return;
+    }
+    placeRef.current = { view: prev.view, cid: prev.cid ?? null, scrollY: prev.scrollY || 0 };
+    setCid(prev.cid ?? null);
+    setEditId(null);
+    setSid(null);
+    setPid(null);
+    setView(prev.view);
+    pendingScrollRef.current = prev.scrollY || 0;
+  };
+  useEffect(() => {
+    if (pendingScrollRef.current == null) return;
+    const y = pendingScrollRef.current;
+    pendingScrollRef.current = null;
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        try { window.scrollTo(0, y); } catch {}
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [view, cid]);
   const applyNotifyRoute = tag => {
     const route = routeNotifyClick(tag, openSessRef.current, sessionsRef.current);
     if (!route) return;
     if (route.view === "complete" && route.openId) {
       setEditId(route.openId);
       setCid(route.clientId);
-      setView("complete");
+      go("complete");
       return;
     }
-    if (route.view === "dash") setView("dash");
+    if (route.view === "dash") go("dash");
   };
   useEffect(() => {
     _notifyClickHook = tag => {
@@ -4893,6 +5129,32 @@ function App() {
     DB.set("ev_clients", n);
     toast$(archived ? "הועבר לארכיון ✓" : "שוחזר מהארכיון ✓");
   };
+  const archiveUncatalogued = tx => {
+    const key = uncataloguedTxKey(tx);
+    if (!key) return;
+    setArchivedUncat(prev => {
+      if (prev.some(e => e.key === key)) return prev;
+      const n = [...prev, {
+        key,
+        transactionId: tx.transactionId != null ? String(tx.transactionId) : null,
+        plugInTime: tx.plugInTime || null,
+        kwh: tx.totalEnergyKwh != null ? Number(tx.totalEnergyKwh) : null,
+        cost: tx.totalCost != null ? Number(tx.totalCost) : null,
+        archivedAt: new Date().toISOString()
+      }];
+      DB.set("ev_archived_uncat", n);
+      return n;
+    });
+    toast$("הועבר לארכיון ✓");
+  };
+  const unarchiveUncatalogued = key => {
+    setArchivedUncat(prev => {
+      const n = prev.filter(e => e.key !== key);
+      DB.set("ev_archived_uncat", n);
+      return n;
+    });
+    toast$("שוחזר מהארכיון ✓");
+  };
   if (!ready) {
     return /*#__PURE__*/React.createElement("div", {
       style: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3fafc", fontFamily: "'Heebo', sans-serif", color: "#0ea5c6", fontWeight: 700, fontSize: 15 }
@@ -4909,7 +5171,9 @@ function App() {
       background: "#fff",
       padding: 0,
       maxWidth: "100%"
-    } : S.app
+    } : { ...S.app,
+      paddingBottom: 84
+    }
   }, /*#__PURE__*/React.createElement(WevoOpenLiveSync, {
     openSess: openSess,
     clients: clients,
@@ -4938,9 +5202,9 @@ function App() {
     subtitle: pageSubtitle
   }), view !== "dash" && /*#__PURE__*/React.createElement("button", {
     style: S.backBtn,
-    onClick: () => go("dash", null),
+    onClick: goBack,
     "data-testid": "nav-dash"
-  }, "← דשבורד"))), /*#__PURE__*/React.createElement(WaDraftSheet, null), toast && /*#__PURE__*/React.createElement("div", {
+  }, "← חזרה"))), /*#__PURE__*/React.createElement(WaDraftSheet, null), toast && /*#__PURE__*/React.createElement("div", {
     style: S.toast(toast.t),
     "data-testid": "app-toast"
   }, toast.msg), view === "dash" && /*#__PURE__*/React.createElement(Dashboard, {
@@ -4963,7 +5227,10 @@ function App() {
   }), view === "archive" && /*#__PURE__*/React.createElement(ArchiveView, {
     stats: stats,
     go: go,
-    onToggleArchive: setClientArchived
+    onBack: goBack,
+    onToggleArchive: setClientArchived,
+    archivedUncat: archivedUncat,
+    onUnarchiveUncat: unarchiveUncatalogued
   }), view === "stats" && /*#__PURE__*/React.createElement(StatsView, {
     sessions: sessions,
     clients: clients
@@ -4971,18 +5238,18 @@ function App() {
     sessions: sessions,
     clients: clients,
     mode: "owner",
-    onBack: () => go("dash")
+    onBack: goBack
   }), view === "wevo-bill" && /*#__PURE__*/React.createElement(WevoHistoryView, {
     sessions: sessions,
     clients: clients,
     mode: "billing",
-    onBack: () => go("dash")
+    onBack: goBack
   }), view === "settings" && /*#__PURE__*/React.createElement(SettingsView, {
     onSaved: () => {
       toast$("תעריפים נשמרו ✓");
       go("dash");
     },
-    onCancel: () => go("dash")
+    onCancel: goBack
   }), view === "client" && /*#__PURE__*/React.createElement(ClientView, {
     cid: cid,
     clients: clients,
@@ -5014,7 +5281,7 @@ function App() {
       saveSession(s);
       go(cid ? "client" : "dash", cid);
     },
-    onCancel: () => go(cid ? "client" : "dash", cid)
+    onCancel: goBack
   }), view === "edit-s" && /*#__PURE__*/React.createElement(EditSession, {
     session: sessions.find(s => s.id === sid),
     clients: clients,
@@ -5022,7 +5289,7 @@ function App() {
       updateSession(id, d);
       go("client", cid);
     },
-    onCancel: () => go("client", cid)
+    onCancel: goBack
   }), view === "add-open" && /*#__PURE__*/React.createElement(AddOpenSession, {
     clients: clients,
     defaultCid: cid,
@@ -5030,7 +5297,7 @@ function App() {
       saveOpen(o);
       go(cid ? "client" : "dash", cid);
     },
-    onCancel: () => go(cid ? "client" : "dash", cid)
+    onCancel: goBack
   }), view === "complete" && /*#__PURE__*/React.createElement(CompleteSession, {
     openSession: openSess.find(o => o.id === editId),
     clients: clients,
@@ -5044,15 +5311,16 @@ function App() {
       delOpen(id);
       go("dash");
     },
-    onCancel: () => go(cid ? "client" : "dash", cid)
+    onCancel: goBack
   }), view === "add-p" && /*#__PURE__*/React.createElement(AddPayment, {
     cid: cid,
     clients: clients,
     stats: stats,
+    payments: payments,
     onSave: p => {
       if (savePayment(p)) go("client", cid);
     },
-    onCancel: () => go("client", cid)
+    onCancel: goBack
   }), view === "add-debt" && /*#__PURE__*/React.createElement(AddDebt, {
     cid: cid,
     clients: clients,
@@ -5062,20 +5330,20 @@ function App() {
         amount: -Math.abs(d.amount)
       })) go("client", cid);
     },
-    onCancel: () => go("client", cid)
+    onCancel: goBack
   }), view === "add-c" && /*#__PURE__*/React.createElement(AddClient, {
     onSave: c => {
       if (!saveClient(c)) return;
       go("dash");
     },
-    onCancel: () => go("dash")
+    onCancel: goBack
   }), view === "edit-c" && /*#__PURE__*/React.createElement(EditClient, {
     client: clients.find(c => c.id === cid),
     onSave: (id, d) => {
       if (!updateClient(id, d)) return;
       go("client", cid);
     },
-    onCancel: () => go("client", cid)
+    onCancel: goBack
   }), view === "report" && /*#__PURE__*/React.createElement(Report, {
     cid: cid,
     clients: clients,
@@ -5091,7 +5359,7 @@ function App() {
       delPayment(id);
       go("client", cid);
     },
-    onCancel: () => go("client", cid)
+    onCancel: goBack
   }), view === "import" && /*#__PURE__*/React.createElement(ImportData, {
     onImport: j => {
       importData(j);
@@ -5115,12 +5383,12 @@ function App() {
       setCloudErr("");
       setCloudNeedLogin(true);
     },
-    onCancel: () => go("dash")
+    onCancel: goBack
   }), view === "wevo-sync" && /*#__PURE__*/React.createElement(WevoSyncView, {
     clients: clients,
     sessions: sessions,
     openSess: openSess,
-    onCancel: () => go("dash"),
+    onCancel: goBack,
     onMerged: result => {
       setClients(result.clients);
       setSessions(result.sessions);
@@ -5138,8 +5406,13 @@ function App() {
   }), view === "uncatalogued" && /*#__PURE__*/React.createElement(UncataloguedView, {
     sessions: sessions,
     clients: clients,
+    archivedKeys: archivedUncat.map(e => e.key),
     onAssign: assignUncatalogued,
-    onBack: () => go("dash")
+    onArchive: archiveUncatalogued,
+    onBack: goBack
+  }), !hideAppChrome && /*#__PURE__*/React.createElement(BottomNav, {
+    view: view,
+    go: go
   }));
 }
 
@@ -5400,22 +5673,6 @@ function Dashboard({
       marginTop: 4
     }
   }, paceDelta == null ? "אין מספיק נתונים להשוואה" : paceDelta >= 0 ? "בקצב טוב לעומת התקופה המקבילה בחודש שעבר" : "מאחורי החודש שעבר — שווה להציע ליותר אנשים להטעין")), /*#__PURE__*/React.createElement(WevoMiniLog, null), /*#__PURE__*/React.createElement("div", {
-    style: S.actRow
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...S.actBtn,
-      flex: 2,
-      background: "#059669",
-      padding: "13px 8px",
-      fontSize: 15
-    },
-    onClick: () => go("add-s", null),
-    "data-testid": "nav-add-session"
-  }, "טעינה חדשה"), /*#__PURE__*/React.createElement("button", {
-    style: S.quietBtn,
-    onClick: () => go("add-c"),
-    "data-testid": "nav-add-client"
-  }, "לקוח חדש")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexWrap: "wrap",
@@ -5423,14 +5680,6 @@ function Dashboard({
       marginBottom: 18
     }
   }, /*#__PURE__*/React.createElement("button", {
-    style: S.quietBtn,
-    onClick: () => go("stats"),
-    "data-testid": "nav-stats"
-  }, "דוח חודשי"), /*#__PURE__*/React.createElement("button", {
-    style: S.quietBtn,
-    onClick: () => go("settings"),
-    "data-testid": "nav-settings"
-  }, "תעריפים"), /*#__PURE__*/React.createElement("button", {
     style: S.quietBtn,
     onClick: () => go("import"),
     "data-testid": "nav-backup"
@@ -5450,12 +5699,7 @@ function Dashboard({
     style: S.quietBtn,
     onClick: () => go("uncatalogued"),
     "data-testid": "nav-uncatalogued"
-  }, "טעינות לא מקוטלגות"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: S.quietBtn,
-    onClick: () => go("debts"),
-    "data-testid": "nav-debts"
-  }, "חובות"), /*#__PURE__*/React.createElement(NotifyEnableButton, null)), openCards.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "טעינות לא מקוטלגות"), /*#__PURE__*/React.createElement(NotifyEnableButton, null)), openCards.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 16
     }
@@ -5771,7 +6015,10 @@ function Dashboard({
 function ArchiveView({
   stats,
   go,
-  onToggleArchive
+  onBack,
+  onToggleArchive,
+  archivedUncat,
+  onUnarchiveUncat
 }) {
   const list = useMemo(() => {
     return [...stats].filter(c => !c.isSelf && c.hidden).sort((a, b) => {
@@ -5859,16 +6106,71 @@ function ArchiveView({
       flex: 1.2
     },
     "data-testid": `archive-restore-${c.id}`
-  }, "שחזר מהארכיון"))), /*#__PURE__*/React.createElement("button", {
+  }, "שחזר מהארכיון"))), archivedUncat && archivedUncat.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#f8fafc",
+      border: "1.5px solid #e2e8f0",
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 14,
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 16,
+      color: "#334155",
+      marginBottom: 6
+    }
+  }, "🔌 טעינות מאורכבות (לא שויכו)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#64748b",
+      lineHeight: 1.45,
+      marginBottom: 10
+    }
+  }, "טעינות שהועברו לארכיון מהרשימה הלא־מקוטלגת בלי שיוך ללקוח. לא נוצר חיוב. אפשר לשחזר בכל רגע."), archivedUncat.map(e => /*#__PURE__*/React.createElement("div", {
+    key: e.key,
+    style: {
+      ...S.cCard,
+      opacity: 0.95,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.cTop
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.cName
+  }, e.plugInTime ? fdate(e.plugInTime) : "—"), /*#__PURE__*/React.createElement("div", {
+    style: S.cMeta
+  }, e.kwh != null ? Number(e.kwh).toFixed(2) + ' קוט"ש' : "", e.cost != null ? " · ₪" + Number(e.cost).toFixed(2) : "", e.transactionId ? " · txn#" + e.transactionId : ""))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => go("dash"),
+    onClick: () => onUnarchiveUncat && onUnarchiveUncat(e.key),
+    style: {
+      ...S.btnS,
+      padding: "8px",
+      fontSize: 13
+    },
+    "data-testid": "archive-uncat-restore-" + e.key
+  }, "שחזר לרשימה"))))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => (typeof onBack === "function" ? onBack() : go("dash")),
     style: {
       ...S.btnS,
       marginTop: 12,
       width: "100%"
     },
     "data-testid": "nav-dash"
-  }, "← חזרה לדשבורד")));
+  }, "← חזרה")));
 }
 
 
@@ -8636,7 +8938,7 @@ function WevoHistoryView({
       cursor: "pointer",
       fontFamily: "'Heebo', sans-serif"
     }
-  }, "← חזרה לדשבורד")),
+  }, "← חזרה")),
 
   // Header: logo left, title right (LTR row)
   h("div", {
@@ -9179,7 +9481,9 @@ function WevoHistoryView({
 function UncataloguedView({
   sessions,
   clients,
+  archivedKeys,
   onAssign,
+  onArchive,
   onBack
 }) {
   const [txs, setTxs] = useState([]);
@@ -9216,13 +9520,14 @@ function UncataloguedView({
   useEffect(() => {
     load();
   }, []);
+  const archivedSet = useMemo(() => new Set(archivedKeys || []), [archivedKeys]);
   const list = useMemo(() => {
     try {
-      return findUncataloguedCharges(txs, sessions);
+      return findUncataloguedCharges(txs, sessions).filter(tx => !archivedSet.has(uncataloguedTxKey(tx)));
     } catch (e) {
       return [];
     }
-  }, [txs, sessions]);
+  }, [txs, sessions, archivedSet]);
   const fmtTxTime = tx => {
     const ms = wevoTxTimeMs(tx);
     if (!ms) return "—";
@@ -9302,7 +9607,7 @@ function UncataloguedView({
     },
     "data-testid": "uncatalogued-empty"
   }, "✅ כל הטעינות מקוטלגות — אין מה להשלים"), list.map(tx => {
-    const tid = tx.transactionId != null ? String(tx.transactionId) : "tx-" + wevoTxTimeMs(tx);
+    const tid = uncataloguedTxKey(tx);
     const pick = clientPick[tid] || "";
     const kwh = Number(tx.totalEnergyKwh);
     const cost = tx.totalCost != null ? Number(tx.totalCost) : null;
@@ -9381,7 +9686,14 @@ function UncataloguedView({
       disabled: !pick,
       onClick: tryAssign,
       "data-testid": "uncatalogued-assign-" + tid
-    }, "שייך וחייב")), warn && /*#__PURE__*/React.createElement("div", {
+    }, "שייך וחייב"), onArchive && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      style: { ...S.btnS,
+        whiteSpace: "nowrap"
+      },
+      onClick: () => onArchive(tx),
+      "data-testid": "uncatalogued-archive-" + tid
+    }, "📦 ארכב")), warn && /*#__PURE__*/React.createElement("div", {
       style: {
         background: "#fffbeb",
         border: "1.5px solid #fcd34d",
@@ -11735,6 +12047,7 @@ function AddPayment({
   cid,
   clients,
   stats,
+  payments,
   onSave,
   onCancel
 }) {
@@ -11745,7 +12058,30 @@ function AddPayment({
   const [amt, setAmt] = useState(String(Math.max(0, Math.round(bal))));
   const [method, setMethod] = useState(DEFAULT_PAYMENT_METHOD);
   const [notes, setNotes] = useState("");
+  const [dupWarn, setDupWarn] = useState(null);
   const afterBal = bal - parseFloat(amt || 0);
+  const clearDup = () => setDupWarn(null);
+  const trySave = force => {
+    const amount = parseFloat(amt);
+    if (!amt || !(amount > 0)) return;
+    const candidate = {
+      id: uid(),
+      clientId: cid,
+      amount: amount,
+      method: method,
+      date: new Date().toISOString(),
+      notes: notes
+    };
+    if (!force) {
+      const suspect = findSameDayDuplicatePayment(payments || [], candidate);
+      if (suspect) {
+        setDupWarn(suspect);
+        return;
+      }
+    }
+    setDupWarn(null);
+    onSave(candidate);
+  };
   return /*#__PURE__*/React.createElement("main", {
     style: S.main
   }, /*#__PURE__*/React.createElement("div", {
@@ -11770,7 +12106,10 @@ function AddPayment({
     type: "number",
     step: "1",
     value: amt,
-    onChange: e => setAmt(e.target.value),
+    onChange: e => {
+      setAmt(e.target.value);
+      clearDup();
+    },
     "data-testid": "payment-amount"
   })), /*#__PURE__*/React.createElement(FG, {
     lbl: "שיטת תשלום"
@@ -11784,7 +12123,10 @@ function AddPayment({
     name: "pm",
     value: v,
     checked: method === v,
-    onChange: () => setMethod(v)
+    onChange: () => {
+      setMethod(v);
+      clearDup();
+    }
   }), " ", l)))), /*#__PURE__*/React.createElement(FG, {
     lbl: "הערות"
   }, /*#__PURE__*/React.createElement("input", {
@@ -11815,7 +12157,48 @@ function AddPayment({
       marginTop: 6,
       fontWeight: 600
     }
-  }, "שולם מראש — הטעינות הבאות ינוכו מיתרת הזכות")) : null, /*#__PURE__*/React.createElement("div", {
+  }, "שולם מראש — הטעינות הבאות ינוכו מיתרת הזכות")) : null, dupWarn && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#fffbeb",
+        border: "1.5px solid #fcd34d",
+        borderRadius: 10,
+        padding: "10px 12px",
+        marginTop: 10,
+        fontSize: 13,
+        color: "#92400e",
+        lineHeight: 1.5
+      },
+      "data-testid": "payment-dupwarn"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        marginBottom: 8
+      }
+    }, "⚠️ נראה שכבר נרשם היום תשלום דומה: ", ils(Number(dupWarn.amount) || 0), " (", METHODS[dupWarn.method] || dupWarn.method || "", ", ", new Date(dupWarn.date).toLocaleTimeString("he-IL", {
+      hour: "2-digit",
+      minute: "2-digit"
+    }), "). זו כפילות?"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...S.btnP,
+        fontSize: 13,
+        padding: "8px 12px"
+      },
+      onClick: () => trySave(true),
+      "data-testid": "payment-dupwarn-force"
+    }, "שמור בכל זאת"), /*#__PURE__*/React.createElement("button", {
+      style: {
+        ...S.btnS,
+        fontSize: 13,
+        padding: "8px 12px"
+      },
+      onClick: clearDup,
+      "data-testid": "payment-dupwarn-cancel"
+    }, "לא, זו טעות"))), /*#__PURE__*/React.createElement("div", {
     style: S.acts
   }, /*#__PURE__*/React.createElement("button", {
     style: {
@@ -11823,14 +12206,7 @@ function AddPayment({
       opacity: !amt || !(parseFloat(amt) > 0) ? 0.5 : 1
     },
     disabled: !amt || !(parseFloat(amt) > 0),
-    onClick: () => onSave({
-      id: uid(),
-      clientId: cid,
-      amount: parseFloat(amt),
-      method,
-      date: new Date().toISOString(),
-      notes
-    }),
+    onClick: () => trySave(false),
     "data-testid": "payment-save"
   }, "אשר תשלום"), /*#__PURE__*/React.createElement("button", {
     style: S.btnS,

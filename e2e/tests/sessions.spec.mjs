@@ -3,7 +3,7 @@ import { test, expect, openApp, CLIENT_A, CLIENT_SELF } from "../helpers/app.mjs
 test.describe("sessions", () => {
   test("טעינה ידנית נשמרת ומעלה חוב", async ({ page }) => {
     await openApp(page, { clients: [CLIENT_A, CLIENT_SELF] });
-    await page.getByTestId("nav-add-session").click();
+    await page.getByTestId("bottomnav-charge").click();
     await page.getByTestId("session-client").selectOption(CLIENT_A.id);
     await page.getByTestId("session-kwh").fill("10");
     await expect(page.getByTestId("session-save")).toBeEnabled({ timeout: 5000 });

@@ -7,6 +7,8 @@ import {
   wevoTxTimeMs,
   UNCATALOGUED_SINCE_MS,
   findUncataloguedCharges,
+  wevoTxIsClosed,
+  uncataloguedTxKey,
   wevoTxToOpenSession,
   findDuplicateSuspect,
   duplicateSuspectLabel,
@@ -74,12 +76,12 @@ describe("זיהוי טעינות לא מקוטלגות", () => {
     { id: "m1", wevoTxnId: "t6", date: "2026-09-29T15:00", kwhRaw: 8, costToOwner: 6.96, source: "wevo-sync" }
   ];
   const txs = [
-    { transactionId: "t1", plugInTime: "2026-09-29T10:00", totalEnergyKwh: 20, totalCost: 17.4 },
-    { transactionId: null, plugInTime: "2026-09-29T12:00", totalEnergyKwh: 10.5, totalCost: 9.14 },
-    { transactionId: "t3", plugInTime: "2026-09-29T14:00", totalEnergyKwh: 30, totalCost: 26.1 },
-    { transactionId: "t4", plugInTime: "2026-09-20T10:00", totalEnergyKwh: 20, totalCost: 17.4 },
+    { transactionId: "t1", plugInTime: "2026-09-29T10:00", chargingFullTime: "2026-09-29T11:00", totalEnergyKwh: 20, totalCost: 17.4 },
+    { transactionId: null, plugInTime: "2026-09-29T12:00", chargingFullTime: "2026-09-29T12:40", totalEnergyKwh: 10.5, totalCost: 9.14 },
+    { transactionId: "t3", plugInTime: "2026-09-29T14:00", plugOutTime: "2026-09-29T15:30", totalEnergyKwh: 30, totalCost: 26.1 },
+    { transactionId: "t4", plugInTime: "2026-09-20T10:00", chargingFullTime: "2026-09-20T11:00", totalEnergyKwh: 20, totalCost: 17.4 },
     { transactionId: "t5", plugInTime: "2026-09-29T10:00", totalEnergyKwh: 0, totalCost: 0 },
-    { transactionId: "t6", plugInTime: "2026-09-29T15:05", totalEnergyKwh: 8, totalCost: 6.96 }
+    { transactionId: "t6", plugInTime: "2026-09-29T15:05", chargeEndedAt: "2026-09-29T15:50", totalEnergyKwh: 8, totalCost: 6.96 }
   ];
   it("מחזיר רק טעינות לא מקוטלגות", () => {
     const out = findUncataloguedCharges(txs, sessions);
@@ -87,9 +89,26 @@ describe("זיהוי טעינות לא מקוטלגות", () => {
     // t1 מותאם לפי txn · t2 מותאם לפי קוט״ש+סכום+זמן · t4 ישן מדי · t5 ריק · t6 רק מראה wevo-sync
     assert.deepEqual(ids, ["t3", "t6"]);
   });
+  it("wevoTxIsClosed: סגורה רק עם חותמת סיום", () => {
+    assert.equal(wevoTxIsClosed(null), false);
+    assert.equal(wevoTxIsClosed({ transactionId: "x", plugInTime: "2026-09-29T10:00", totalEnergyKwh: 5 }), false);
+    assert.equal(wevoTxIsClosed({ plugInTime: "2026-09-29T10:00", chargingFullTime: "2026-09-29T11:00" }), true);
+    assert.equal(wevoTxIsClosed({ plugInTime: "2026-09-29T10:00", chargeEndedAt: "2026-09-29T11:00" }), true);
+    assert.equal(wevoTxIsClosed({ plugInTime: "2026-09-29T10:00", plugOutTime: "2026-09-29T11:00" }), true);
+  });
+  it("uncataloguedTxKey: מפתח יציב לארכוב", () => {
+    assert.equal(uncataloguedTxKey({ transactionId: 123 }), "123");
+    assert.equal(uncataloguedTxKey({ transactionId: null, plugInTime: "2026-09-29T10:00" }), "tx-" + wevoTxTimeMs({ plugInTime: "2026-09-29T10:00" }));
+    assert.equal(uncataloguedTxKey(null), "");
+  });
+  it("טעינה שעדיין מתקיימת (בלי חותמת סיום) לא מופיעה כלא מקוטלגת", () => {
+    const open = [{ transactionId: "to", plugInTime: "2026-09-29T16:00", totalEnergyKwh: 12, totalCost: 10.4 }];
+    const out = findUncataloguedCharges(open, sessions);
+    assert.equal(out.length, 0);
+  });
   it("עסקה רחוקה בזמן לא מותאמת גם עם קוט״ש וסכום זהים", () => {
     // 28.09 00:01 מול טעינה ב־29.09 12:30 = 36.5 שעות — מחוץ לחלון 36 השעות
-    const far = [{ transactionId: "tf", plugInTime: "2026-09-28T00:01", totalEnergyKwh: 10.5, totalCost: 9.14 }];
+    const far = [{ transactionId: "tf", plugInTime: "2026-09-28T00:01", chargingFullTime: "2026-09-28T01:00", totalEnergyKwh: 10.5, totalCost: 9.14 }];
     const out = findUncataloguedCharges(far, sessions);
     assert.equal(out.length, 1);
   });

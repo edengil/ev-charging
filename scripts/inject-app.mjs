@@ -28,6 +28,7 @@ ${body}
     normalizePayments: normalizePayments,
     dedupeDuplicatePayments: dedupeDuplicatePayments,
     findRecentDuplicatePayment: findRecentDuplicatePayment,
+    findSameDayDuplicatePayment: findSameDayDuplicatePayment,
     validatePaymentInput: validatePaymentInput,
     canSaveNewPayment: canSaveNewPayment,
     clientBalance: clientBalance,
@@ -72,6 +73,8 @@ ${body}
     combineDateWithTime: combineDateWithTime,
     manualEndDateTime: manualEndDateTime,
     wevoTxTimeMs: wevoTxTimeMs,
+    uncataloguedTxKey: uncataloguedTxKey,
+    wevoTxIsClosed: wevoTxIsClosed,
     UNCATALOGUED_SINCE_MS: UNCATALOGUED_SINCE_MS,
     findUncataloguedCharges: findUncataloguedCharges,
     wevoTxToOpenSession: wevoTxToOpenSession,
@@ -95,6 +98,7 @@ var mergeByIdPreferNewer = __EV_MONEY__.mergeByIdPreferNewer;
 var normalizePayments = __EV_MONEY__.normalizePayments;
 var dedupeDuplicatePayments = __EV_MONEY__.dedupeDuplicatePayments;
 var findRecentDuplicatePayment = __EV_MONEY__.findRecentDuplicatePayment;
+var findSameDayDuplicatePayment = __EV_MONEY__.findSameDayDuplicatePayment;
 var validatePaymentInput = __EV_MONEY__.validatePaymentInput;
 var canSaveNewPayment = __EV_MONEY__.canSaveNewPayment;
 var clientBalance = __EV_MONEY__.clientBalance;
@@ -137,6 +141,8 @@ var parseManualTimeHHMM = __EV_MONEY__.parseManualTimeHHMM;
 var combineDateWithTime = __EV_MONEY__.combineDateWithTime;
 var manualEndDateTime = __EV_MONEY__.manualEndDateTime;
 var wevoTxTimeMs = __EV_MONEY__.wevoTxTimeMs;
+var uncataloguedTxKey = __EV_MONEY__.uncataloguedTxKey;
+var wevoTxIsClosed = __EV_MONEY__.wevoTxIsClosed;
 var UNCATALOGUED_SINCE_MS = __EV_MONEY__.UNCATALOGUED_SINCE_MS;
 var findUncataloguedCharges = __EV_MONEY__.findUncataloguedCharges;
 var wevoTxToOpenSession = __EV_MONEY__.wevoTxToOpenSession;

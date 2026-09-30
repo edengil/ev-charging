@@ -50,7 +50,7 @@ export async function seedStorage(page, overrides = {}) {
 export async function openApp(page, overrides = {}) {
   await seedStorage(page, overrides);
   await page.goto("/");
-  await expect(page.getByTestId("nav-add-client")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId("bottomnav-client")).toBeVisible({ timeout: 15000 });
 }
 
 export const test = base.extend({});

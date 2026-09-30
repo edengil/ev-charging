@@ -14,6 +14,7 @@ import {
   normalizePayments,
   dedupeDuplicatePayments,
   findRecentDuplicatePayment,
+  findSameDayDuplicatePayment,
   canSaveNewPayment,
   clientBalance,
   buildClientLedger,
@@ -148,6 +149,42 @@ describe("duplicate payment guards", () => {
     assert.ok(findRecentDuplicatePayment(existing, candidate));
     assert.equal(canSaveNewPayment(existing, candidate).ok, false);
     assert.equal(canSaveNewPayment(existing, candidate).reason, "double_click");
+  });
+
+  it("findSameDayDuplicatePayment: מזהה תשלום כפול באותו יום (באג עידן 600₪)", () => {
+    const day = "2026-09-30T10:00:00+03:00";
+    const existing = [
+      { id: "p1", clientId: "c1", amount: 600, method: "cash", date: new Date(day).toISOString() }
+    ];
+    const candidate = {
+      id: "p2", clientId: "c1", amount: 600, method: "cash",
+      date: new Date("2026-09-30T18:30:00+03:00").toISOString()
+    };
+    const dup = findSameDayDuplicatePayment(existing, candidate);
+    assert.ok(dup, "אמור לזהות כפילות באותו יום");
+    assert.equal(dup.id, "p1");
+  });
+
+  it("findSameDayDuplicatePayment: לא מתריע על תשלום ביום אחר", () => {
+    const existing = [
+      { id: "p1", clientId: "c1", amount: 600, method: "cash", date: new Date("2026-09-29T10:00:00+03:00").toISOString() }
+    ];
+    const candidate = {
+      id: "p2", clientId: "c1", amount: 600, method: "cash",
+      date: new Date("2026-09-30T10:00:00+03:00").toISOString()
+    };
+    assert.equal(findSameDayDuplicatePayment(existing, candidate), null);
+  });
+
+  it("findSameDayDuplicatePayment: לא מתריע על סכום/שיטה/לקוח שונים", () => {
+    const existing = [
+      { id: "p1", clientId: "c1", amount: 600, method: "cash", date: new Date("2026-09-30T10:00:00+03:00").toISOString() }
+    ];
+    const base = { id: "p2", clientId: "c1", amount: 600, method: "cash", date: new Date("2026-09-30T12:00:00+03:00").toISOString() };
+    assert.equal(findSameDayDuplicatePayment(existing, { ...base, amount: 500 }), null);
+    assert.equal(findSameDayDuplicatePayment(existing, { ...base, method: "bit" }), null);
+    assert.equal(findSameDayDuplicatePayment(existing, { ...base, clientId: "c2" }), null);
+    assert.equal(findSameDayDuplicatePayment(existing, { ...base, method: "debt" }), null);
   });
 
   it("dedupe מוחק כפילות בתוך רבע שעה אבל שומר הפקדות ביום אחר", () => {
@@ -691,7 +728,7 @@ describe("app-source drift guards", () => {
     assert.match(src, /routeNotifyClick/);
     assert.match(src, /ev-notify/);
     assert.match(src, /notifyPhone/);
-    assert.match(src, /nav-debts/);
+    assert.match(src, /bottomnav-/);
     assert.match(src, /wa-draft/);
     assert.match(src, /openWaDraft/);
     assert.match(src, /complete-delete-empty/);

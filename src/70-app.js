@@ -5,22 +5,119 @@
  * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
  */
 // ── APP ────────────────────────────────────────────────────────────────────
+function BottomNav({ view, go }) {
+  const items = [{
+    key: "home",
+    label: "בית",
+    icon: "🏠",
+    views: ["dash"],
+    onTap: () => go("dash")
+  }, {
+    key: "charge",
+    label: "טעינה חדשה",
+    icon: "⚡",
+    views: ["add-s"],
+    onTap: () => go("add-s", null)
+  }, {
+    key: "report",
+    label: "דוח חודשי",
+    icon: "📊",
+    views: ["stats"],
+    onTap: () => go("stats")
+  }, {
+    key: "debts",
+    label: "חובות",
+    icon: "💰",
+    views: ["debts"],
+    onTap: () => go("debts")
+  }, {
+    key: "client",
+    label: "לקוח חדש",
+    icon: "👤",
+    views: ["add-c"],
+    onTap: () => go("add-c")
+  }, {
+    key: "settings",
+    label: "הגדרות",
+    icon: "⚙️",
+    views: ["settings"],
+    onTap: () => go("settings")
+  }];
+  return /*#__PURE__*/React.createElement("nav", {
+    "data-testid": "bottom-nav",
+    style: {
+      position: "fixed",
+      bottom: 0,
+      left: "50%",
+      transform: "translateX(-50%)",
+      width: "100%",
+      maxWidth: 500,
+      background: "#ffffff",
+      borderTop: "1px solid #e2e8f0",
+      boxShadow: "0 -2px 12px rgba(15, 23, 42, 0.06)",
+      zIndex: 60,
+      paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      direction: "rtl"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      width: "100%"
+    }
+  }, items.map(it => {
+    const active = it.views.includes(view);
+    return /*#__PURE__*/React.createElement("button", {
+      key: it.key,
+      type: "button",
+      onClick: it.onTap,
+      "data-testid": "bottomnav-" + it.key,
+      style: {
+        flex: 1,
+        border: "none",
+        background: "none",
+        cursor: "pointer",
+        padding: "8px 2px 9px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 2,
+        color: active ? "#0ea5c6" : "#64748b",
+        fontFamily: "'Heebo', sans-serif",
+        fontSize: 10.5,
+        fontWeight: active ? 800 : 600
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 21, lineHeight: 1 }
+    }, it.icon), /*#__PURE__*/React.createElement("span", null, it.label), active && /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 18,
+        height: 3,
+        borderRadius: 2,
+        background: "#0ea5c6",
+        marginTop: 1
+      }
+    }));
+  })));
+}
+
 function App() {
   const [clients, setClients] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [payments, setPayments] = useState([]);
   const [openSess, setOpenSess] = useState([]);
+  const [archivedUncat, setArchivedUncat] = useState([]);
   const [ready, setReady] = useState(false);
   const [, bump] = useState(0);
   useEffect(() => {
     _configListeners.push(() => bump(v => v + 1));
     (async () => {
       installAppServiceWorker();
-      const [c, s, p, o] = await Promise.all([
+      const [c, s, p, o, au] = await Promise.all([
         DB.get("ev_clients"),
         DB.get("ev_sessions"),
         DB.get("ev_payments"),
-        DB.get("ev_open")
+        DB.get("ev_open"),
+        DB.get("ev_archived_uncat")
       ]);
       const mappedLocal = (c || []).map(cl => isSelfClient(cl) ? {
         ...cl,
@@ -53,6 +150,7 @@ function App() {
       setPayments(localPayments);
       if (payFix.changed || deduped.removed > 0) DB.set("ev_payments", localPayments);
       setOpenSess(localOpen);
+      setArchivedUncat(Array.isArray(au) ? au : []);
       if ((o || []).some((item, i) => item !== localOpen[i])) DB.set("ev_open", localOpen);
       if (deduped.removed > 0) {
         try {
@@ -296,20 +394,106 @@ function App() {
       setCloudBusy(false);
     }
   };
-  const go = (v, id = undefined) => {
-    setView(v);
-    if (id !== undefined) setCid(id);
+  // מחסנית ניווט: "חזרה" מחזיר למקום שממנו יצאנו, כולל מיקום הגלילה.
+  // מקומות (places) נדחפים למחסנית; טפסים (forms) הם שכבה מעל המקום הנוכחי ולא נדחפים.
+  const PLACE_VIEWS = useMemo(() => new Set(["dash", "client", "debts", "archive", "settings", "uncatalogued", "wevo", "wevo-bill", "wevo-sync", "stats", "report"]), []);
+  const navStackRef = useRef([]);
+  const placeRef = useRef({ view: "dash", cid: null, scrollY: 0 });
+  const pendingScrollRef = useRef(null);
+  const readScrollY = () => {
+    try { return window.scrollY || 0; } catch { return 0; }
   };
+  const scrollTopSoon = () => {
+    try { requestAnimationFrame(() => { try { window.scrollTo(0, 0); } catch {} }); } catch {}
+  };
+  const go = (v, id = undefined) => {
+    const y = readScrollY();
+    if (!PLACE_VIEWS.has(v)) {
+      // טופס מעל המקום הנוכחי — לא דוחף למחסנית
+      placeRef.current.scrollY = y;
+      if (id !== undefined) setCid(id);
+      setView(v);
+      scrollTopSoon();
+      return;
+    }
+    const curView = placeRef.current.view;
+    const targetCid = id !== undefined ? id : cid;
+    if (v === curView && targetCid === cid) {
+      // כבר במקום היעד — רק יוצא מטופס אם צריך
+      if (view !== v) setView(v);
+      if (id !== undefined && cid !== id) setCid(id);
+      pendingScrollRef.current = placeRef.current.scrollY || 0;
+      return;
+    }
+    const stack = navStackRef.current;
+    const existing = stack.findIndex(e => e.view === v && (e.cid ?? null) === (targetCid ?? null));
+    if (existing >= 0) {
+      // היעד כבר במחסנית — חותך אליו במקום לדחוף כפילות
+      navStackRef.current = stack.slice(0, existing);
+    } else {
+      stack.push({ view: curView, cid: cid ?? null, scrollY: y });
+      if (stack.length > 30) stack.shift();
+    }
+    placeRef.current = { view: v, cid: targetCid ?? null, scrollY: 0 };
+    if (id !== undefined) setCid(id);
+    setView(v);
+    scrollTopSoon();
+  };
+  const goBack = () => {
+    const stack = navStackRef.current;
+    if (!PLACE_VIEWS.has(view)) {
+      // טופס פתוח — חוזר למקום שמתחתיו
+      setEditId(null);
+      setSid(null);
+      setPid(null);
+      if (view !== placeRef.current.view) setView(placeRef.current.view);
+      pendingScrollRef.current = placeRef.current.scrollY || 0;
+      return;
+    }
+    const prev = stack.pop();
+    if (!prev) {
+      placeRef.current = { view: "dash", cid: null, scrollY: 0 };
+      setCid(null);
+      setEditId(null);
+      setSid(null);
+      setPid(null);
+      if (view !== "dash") setView("dash");
+      pendingScrollRef.current = 0;
+      return;
+    }
+    placeRef.current = { view: prev.view, cid: prev.cid ?? null, scrollY: prev.scrollY || 0 };
+    setCid(prev.cid ?? null);
+    setEditId(null);
+    setSid(null);
+    setPid(null);
+    setView(prev.view);
+    pendingScrollRef.current = prev.scrollY || 0;
+  };
+  useEffect(() => {
+    if (pendingScrollRef.current == null) return;
+    const y = pendingScrollRef.current;
+    pendingScrollRef.current = null;
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        try { window.scrollTo(0, y); } catch {}
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [view, cid]);
   const applyNotifyRoute = tag => {
     const route = routeNotifyClick(tag, openSessRef.current, sessionsRef.current);
     if (!route) return;
     if (route.view === "complete" && route.openId) {
       setEditId(route.openId);
       setCid(route.clientId);
-      setView("complete");
+      go("complete");
       return;
     }
-    if (route.view === "dash") setView("dash");
+    if (route.view === "dash") go("dash");
   };
   useEffect(() => {
     _notifyClickHook = tag => {
@@ -721,6 +905,32 @@ function App() {
     DB.set("ev_clients", n);
     toast$(archived ? "הועבר לארכיון ✓" : "שוחזר מהארכיון ✓");
   };
+  const archiveUncatalogued = tx => {
+    const key = uncataloguedTxKey(tx);
+    if (!key) return;
+    setArchivedUncat(prev => {
+      if (prev.some(e => e.key === key)) return prev;
+      const n = [...prev, {
+        key,
+        transactionId: tx.transactionId != null ? String(tx.transactionId) : null,
+        plugInTime: tx.plugInTime || null,
+        kwh: tx.totalEnergyKwh != null ? Number(tx.totalEnergyKwh) : null,
+        cost: tx.totalCost != null ? Number(tx.totalCost) : null,
+        archivedAt: new Date().toISOString()
+      }];
+      DB.set("ev_archived_uncat", n);
+      return n;
+    });
+    toast$("הועבר לארכיון ✓");
+  };
+  const unarchiveUncatalogued = key => {
+    setArchivedUncat(prev => {
+      const n = prev.filter(e => e.key !== key);
+      DB.set("ev_archived_uncat", n);
+      return n;
+    });
+    toast$("שוחזר מהארכיון ✓");
+  };
   if (!ready) {
     return /*#__PURE__*/React.createElement("div", {
       style: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3fafc", fontFamily: "'Heebo', sans-serif", color: "#0ea5c6", fontWeight: 700, fontSize: 15 }
@@ -737,7 +947,9 @@ function App() {
       background: "#fff",
       padding: 0,
       maxWidth: "100%"
-    } : S.app
+    } : { ...S.app,
+      paddingBottom: 84
+    }
   }, /*#__PURE__*/React.createElement(WevoOpenLiveSync, {
     openSess: openSess,
     clients: clients,
@@ -766,9 +978,9 @@ function App() {
     subtitle: pageSubtitle
   }), view !== "dash" && /*#__PURE__*/React.createElement("button", {
     style: S.backBtn,
-    onClick: () => go("dash", null),
+    onClick: goBack,
     "data-testid": "nav-dash"
-  }, "← דשבורד"))), /*#__PURE__*/React.createElement(WaDraftSheet, null), toast && /*#__PURE__*/React.createElement("div", {
+  }, "← חזרה"))), /*#__PURE__*/React.createElement(WaDraftSheet, null), toast && /*#__PURE__*/React.createElement("div", {
     style: S.toast(toast.t),
     "data-testid": "app-toast"
   }, toast.msg), view === "dash" && /*#__PURE__*/React.createElement(Dashboard, {
@@ -791,7 +1003,10 @@ function App() {
   }), view === "archive" && /*#__PURE__*/React.createElement(ArchiveView, {
     stats: stats,
     go: go,
-    onToggleArchive: setClientArchived
+    onBack: goBack,
+    onToggleArchive: setClientArchived,
+    archivedUncat: archivedUncat,
+    onUnarchiveUncat: unarchiveUncatalogued
   }), view === "stats" && /*#__PURE__*/React.createElement(StatsView, {
     sessions: sessions,
     clients: clients
@@ -799,18 +1014,18 @@ function App() {
     sessions: sessions,
     clients: clients,
     mode: "owner",
-    onBack: () => go("dash")
+    onBack: goBack
   }), view === "wevo-bill" && /*#__PURE__*/React.createElement(WevoHistoryView, {
     sessions: sessions,
     clients: clients,
     mode: "billing",
-    onBack: () => go("dash")
+    onBack: goBack
   }), view === "settings" && /*#__PURE__*/React.createElement(SettingsView, {
     onSaved: () => {
       toast$("תעריפים נשמרו ✓");
       go("dash");
     },
-    onCancel: () => go("dash")
+    onCancel: goBack
   }), view === "client" && /*#__PURE__*/React.createElement(ClientView, {
     cid: cid,
     clients: clients,
@@ -842,7 +1057,7 @@ function App() {
       saveSession(s);
       go(cid ? "client" : "dash", cid);
     },
-    onCancel: () => go(cid ? "client" : "dash", cid)
+    onCancel: goBack
   }), view === "edit-s" && /*#__PURE__*/React.createElement(EditSession, {
     session: sessions.find(s => s.id === sid),
     clients: clients,
@@ -850,7 +1065,7 @@ function App() {
       updateSession(id, d);
       go("client", cid);
     },
-    onCancel: () => go("client", cid)
+    onCancel: goBack
   }), view === "add-open" && /*#__PURE__*/React.createElement(AddOpenSession, {
     clients: clients,
     defaultCid: cid,
@@ -858,7 +1073,7 @@ function App() {
       saveOpen(o);
       go(cid ? "client" : "dash", cid);
     },
-    onCancel: () => go(cid ? "client" : "dash", cid)
+    onCancel: goBack
   }), view === "complete" && /*#__PURE__*/React.createElement(CompleteSession, {
     openSession: openSess.find(o => o.id === editId),
     clients: clients,
@@ -872,15 +1087,16 @@ function App() {
       delOpen(id);
       go("dash");
     },
-    onCancel: () => go(cid ? "client" : "dash", cid)
+    onCancel: goBack
   }), view === "add-p" && /*#__PURE__*/React.createElement(AddPayment, {
     cid: cid,
     clients: clients,
     stats: stats,
+    payments: payments,
     onSave: p => {
       if (savePayment(p)) go("client", cid);
     },
-    onCancel: () => go("client", cid)
+    onCancel: goBack
   }), view === "add-debt" && /*#__PURE__*/React.createElement(AddDebt, {
     cid: cid,
     clients: clients,
@@ -890,20 +1106,20 @@ function App() {
         amount: -Math.abs(d.amount)
       })) go("client", cid);
     },
-    onCancel: () => go("client", cid)
+    onCancel: goBack
   }), view === "add-c" && /*#__PURE__*/React.createElement(AddClient, {
     onSave: c => {
       if (!saveClient(c)) return;
       go("dash");
     },
-    onCancel: () => go("dash")
+    onCancel: goBack
   }), view === "edit-c" && /*#__PURE__*/React.createElement(EditClient, {
     client: clients.find(c => c.id === cid),
     onSave: (id, d) => {
       if (!updateClient(id, d)) return;
       go("client", cid);
     },
-    onCancel: () => go("client", cid)
+    onCancel: goBack
   }), view === "report" && /*#__PURE__*/React.createElement(Report, {
     cid: cid,
     clients: clients,
@@ -919,7 +1135,7 @@ function App() {
       delPayment(id);
       go("client", cid);
     },
-    onCancel: () => go("client", cid)
+    onCancel: goBack
   }), view === "import" && /*#__PURE__*/React.createElement(ImportData, {
     onImport: j => {
       importData(j);
@@ -943,12 +1159,12 @@ function App() {
       setCloudErr("");
       setCloudNeedLogin(true);
     },
-    onCancel: () => go("dash")
+    onCancel: goBack
   }), view === "wevo-sync" && /*#__PURE__*/React.createElement(WevoSyncView, {
     clients: clients,
     sessions: sessions,
     openSess: openSess,
-    onCancel: () => go("dash"),
+    onCancel: goBack,
     onMerged: result => {
       setClients(result.clients);
       setSessions(result.sessions);
@@ -966,8 +1182,13 @@ function App() {
   }), view === "uncatalogued" && /*#__PURE__*/React.createElement(UncataloguedView, {
     sessions: sessions,
     clients: clients,
+    archivedKeys: archivedUncat.map(e => e.key),
     onAssign: assignUncatalogued,
-    onBack: () => go("dash")
+    onArchive: archiveUncatalogued,
+    onBack: goBack
+  }), !hideAppChrome && /*#__PURE__*/React.createElement(BottomNav, {
+    view: view,
+    go: go
   }));
 }
 
