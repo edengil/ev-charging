@@ -15,6 +15,7 @@
     "src/views/wevo-live-panel.js",
     "src/views/wevo-sync-view.js",
     "src/views/wevo-history-view.js",
+    "src/views/uncatalogued.js",
     "src/views/settings.js",
     "src/views/clients.js",
     "src/views/session-form.js",

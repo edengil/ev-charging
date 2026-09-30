@@ -513,6 +513,30 @@ function App() {
     setOpenSess(n);
     DB.set("ev_open", n);
   };
+  // שיוך טעינה לא מקוטלגת ללקוח: פותח אותה בכרטיס הסיום עם חיוב מלא ואפשרויות שעה.
+  // אם כבר נפתחה טיוטה לאותה עסקה — חוזרים אליה במקום ליצור כפילות.
+  const assignUncatalogued = (tx, clientId) => {
+    const tid = tx && tx.transactionId != null && String(tx.transactionId) !== "" ? String(tx.transactionId) : null;
+    const opens = openSessRef.current || [];
+    const existing = tid ? opens.find(o => {
+      const ot = o.wevoTxnId != null && String(o.wevoTxnId) !== "" ? String(o.wevoTxnId) : null;
+      return ot != null && ot === tid;
+    }) : null;
+    if (existing) {
+      setEditId(existing.id);
+      setCid(existing.clientId || clientId);
+      go("complete");
+      return;
+    }
+    const open = {
+      id: uid(),
+      ...wevoTxToOpenSession(tx, clientId)
+    };
+    upsertWevoOpen(open);
+    setEditId(open.id);
+    setCid(clientId);
+    go("complete");
+  };
   const delOpen = id => {
     const n = openSess.filter(o => o.id !== id);
     setOpenSess(n);
@@ -939,6 +963,11 @@ function App() {
       toast$(`Wevo: +${result.added} חדשות, ${result.tagged} תויגו, ${result.skipped} דולגו${closed}${pending} (מתוך ${result.fetched})`);
       go(result.pendingApprove ? "dash" : "wevo");
     }
+  }), view === "uncatalogued" && /*#__PURE__*/React.createElement(UncataloguedView, {
+    sessions: sessions,
+    clients: clients,
+    onAssign: assignUncatalogued,
+    onBack: () => go("dash")
   }));
 }
 

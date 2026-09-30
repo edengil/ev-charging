@@ -174,6 +174,10 @@ function Dashboard({
     onClick: () => go("wevo-sync"),
     "data-testid": "nav-wevo-sync"
   }, "סנכרון Wevo"), /*#__PURE__*/React.createElement("button", {
+    style: S.quietBtn,
+    onClick: () => go("uncatalogued"),
+    "data-testid": "nav-uncatalogued"
+  }, "טעינות לא מקוטלגות"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     style: S.quietBtn,
     onClick: () => go("debts"),

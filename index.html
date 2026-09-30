@@ -1187,6 +1187,137 @@ function buildCloudSnapFromParts(cache = {}, fromHook = null, configFallback = n
   };
 }
 
+/* ── שעות ידניות וטעינות לא מקוטלגות ─────────────────────────────── */
+
+/**
+ * פענוח שעה ידנית בפורמט HH:MM (כולל ":" מהמקלדת).
+ * מחזיר {h, m} או null כשהפורמט לא תקין.
+ */
+function parseManualTimeHHMM(str) {
+  if (str == null) return null;
+  const m = String(str).trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return { h, m: min };
+}
+
+/**
+ * שילוב תאריך (datetime-local / Date / ms) עם שעה ידנית HH:MM.
+ * מחזיר "YYYY-MM-DDTHH:MM" מקומי, או "" כשאין תאריך/שעה תקינים.
+ */
+function combineDateWithTime(dateStr, hhmm) {
+  const parsed = parseManualTimeHHMM(hhmm);
+  if (!parsed) return "";
+  const ms = localDtMs(dateStr);
+  if (ms == null) return "";
+  const d = new Date(ms);
+  const pad = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(parsed.h)}:${pad(parsed.m)}`;
+}
+
+/**
+ * שעת סיום ידנית: תאריך מתוך שעת ההתחלה + HH:MM.
+ * אם הסיום יוצא לפני/בזמן ההתחלה — גולל קדימה ביממות (טעינת לילה).
+ * מחזיר "YYYY-MM-DDTHH:MM" מקומי, או "" כשאין קלט תקין.
+ */
+function manualEndDateTime(startDtStr, hhmm) {
+  const parsed = parseManualTimeHHMM(hhmm);
+  if (!parsed) return "";
+  let dt = combineDateWithTime(startDtStr, hhmm) || combineDateWithTime(Date.now(), hhmm);
+  if (!dt) return "";
+  const startMs = localDtMs(startDtStr);
+  let endMs = localDtMs(dt);
+  if (startMs != null && endMs != null) {
+    let guard = 0;
+    while (endMs <= startMs && guard++ < 3) endMs += 24 * 60 * 60 * 1000;
+  }
+  const d = new Date(endMs);
+  const pad = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * פיצול דקות בין חלון פרימיום (16:00–23:00) לרגיל — לחיוב יחסי לפי שעות.
+ * מחזיר {premiumMin, regularMin}. חוצה חצות בצורה אנליטית.
+ */
+function splitPremiumMinutes(startMs, endMs) {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || !(endMs > startMs)) {
+    return { premiumMin: 0, regularMin: 0 };
+  }
+  let premiumMin = 0;
+  let cur = startMs;
+  while (cur < endMs) {
+    const d = new Date(cur);
+    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const segEnd = Math.min(endMs, dayStart + 24 * 3600 * 1000);
+    const premStart = dayStart + BILLING_PREMIUM_START_H * 3600 * 1000;
+    const premEnd = dayStart + BILLING_PREMIUM_END_H * 3600 * 1000;
+    premiumMin += Math.max(0, Math.min(segEnd, premEnd) - Math.max(cur, premStart)) / 60000;
+    cur = segEnd;
+  }
+  const totalMin = (endMs - startMs) / 60000;
+  const r2 = n => Math.round(n * 100) / 100;
+  return { premiumMin: r2(premiumMin), regularMin: r2(totalMin - premiumMin) };
+}
+
+/** חותמת הזמן של עסקת Wevo — חיבור הכבל, ואם אין אז סיום הטעינה. */
+function wevoTxTimeMs(tx) {
+  if (!tx) return 0;
+  return localDtMs(tx.plugInTime) || localDtMs(tx.chargingFullTime) || 0;
+}
+
+/** תחילת חלון "טעינות לא מקוטלגו" — 28.09.2026 בחצות מקומית. */
+const UNCATALOGUED_SINCE_MS = new Date(2026, 8, 28).getTime();
+
+/**
+ * טעינות Wevo שעוד לא קוטלגו ללקוח: מההיסטוריה, החל מ-sinceMs,
+ * כל עסקה שאין לה טעינה אמיתית תואמת באפליקציה (שורות מראה wevo-sync לא נחשבות קיטלוג).
+ * התאמה = אותו txn, או קוט"ש דומה (±0.05) + סכום דומה (±0.05) + חפיפת זמנים (36 שעות).
+ */
+function findUncataloguedCharges(transactions, sessions, sinceMs = UNCATALOGUED_SINCE_MS) {
+  const real = (sessions || []).filter(s => s && s.source !== "wevo-sync");
+  return (transactions || []).filter(tx => {
+    if (!tx) return false;
+    if (!(wevoTxTimeMs(tx) >= sinceMs)) return false;
+    if (!(Number(tx.totalEnergyKwh) > 0)) return false;
+    return !real.some(s => savedSessionMatchesCharge(s, tx));
+  });
+}
+
+/**
+ * ממפה עסקת Wevo לרשומת "טעינה פתוחה" כדי לפתוח אותה בכרטיס הסיום
+ * עם כל אפשרויות השעה והחיוב המלא. המזהה (id) נקבע בחוץ.
+ */
+function wevoTxToOpenSession(tx, clientId) {
+  const tid = tx && tx.transactionId != null && String(tx.transactionId) !== "" ? String(tx.transactionId) : null;
+  const end = tx
+    ? tx.chargingFullTime != null
+      ? tx.chargingFullTime
+      : tx.chargeEndedAt != null
+        ? tx.chargeEndedAt
+        : null
+    : null;
+  return {
+    clientId: clientId || null,
+    source: "wevo-live",
+    wevoTxnId: tid,
+    startDate: tx ? tx.plugInTime : null,
+    plugInAt: tx ? tx.plugInTime : null,
+    chargeStartedAt: null,
+    chargeEndedAt: end,
+    endDate: end,
+    plugOutAt: tx && tx.plugOutTime != null ? tx.plugOutTime : null,
+    liveKwh: tx && tx.totalEnergyKwh != null ? Number(tx.totalEnergyKwh) : null,
+    liveWevoCost: tx && tx.totalCost != null ? Math.round(Number(tx.totalCost) * 100) / 100 : null,
+    liveElecCost: tx && tx.electricityCost != null ? Math.round(Number(tx.electricityCost) * 100) / 100 : null,
+    readyToComplete: true,
+    wevoEnded: true,
+    notes: tid ? "txn#" + tid : ""
+  };
+}
+
   return {
     METHODS: METHODS,
     PAYMENT_METHOD_OPTIONS: PAYMENT_METHOD_OPTIONS,
@@ -1241,6 +1372,14 @@ function buildCloudSnapFromParts(cache = {}, fromHook = null, configFallback = n
     chargerReportsVehicle: chargerReportsVehicle,
     dedupeSessionsByTxn: dedupeSessionsByTxn,
     routeNotifyClick: routeNotifyClick,
+    parseManualTimeHHMM: parseManualTimeHHMM,
+    combineDateWithTime: combineDateWithTime,
+    manualEndDateTime: manualEndDateTime,
+    splitPremiumMinutes: splitPremiumMinutes,
+    wevoTxTimeMs: wevoTxTimeMs,
+    UNCATALOGUED_SINCE_MS: UNCATALOGUED_SINCE_MS,
+    findUncataloguedCharges: findUncataloguedCharges,
+    wevoTxToOpenSession: wevoTxToOpenSession,
     fictionalBilledDisplay: fictionalBilledDisplay
   };
 })();
@@ -1294,6 +1433,14 @@ var dropOpensAlreadySaved = __EV_MONEY__.dropOpensAlreadySaved;
 var chargerReportsVehicle = __EV_MONEY__.chargerReportsVehicle;
 var dedupeSessionsByTxn = __EV_MONEY__.dedupeSessionsByTxn;
 var routeNotifyClick = __EV_MONEY__.routeNotifyClick;
+var parseManualTimeHHMM = __EV_MONEY__.parseManualTimeHHMM;
+var combineDateWithTime = __EV_MONEY__.combineDateWithTime;
+var manualEndDateTime = __EV_MONEY__.manualEndDateTime;
+var splitPremiumMinutes = __EV_MONEY__.splitPremiumMinutes;
+var wevoTxTimeMs = __EV_MONEY__.wevoTxTimeMs;
+var UNCATALOGUED_SINCE_MS = __EV_MONEY__.UNCATALOGUED_SINCE_MS;
+var findUncataloguedCharges = __EV_MONEY__.findUncataloguedCharges;
+var wevoTxToOpenSession = __EV_MONEY__.wevoTxToOpenSession;
 var fictionalBilledDisplay = __EV_MONEY__.fictionalBilledDisplay;
 /* === end lib/ev-money === */
 
@@ -4505,6 +4652,30 @@ function App() {
     setOpenSess(n);
     DB.set("ev_open", n);
   };
+  // שיוך טעינה לא מקוטלגת ללקוח: פותח אותה בכרטיס הסיום עם חיוב מלא ואפשרויות שעה.
+  // אם כבר נפתחה טיוטה לאותה עסקה — חוזרים אליה במקום ליצור כפילות.
+  const assignUncatalogued = (tx, clientId) => {
+    const tid = tx && tx.transactionId != null && String(tx.transactionId) !== "" ? String(tx.transactionId) : null;
+    const opens = openSessRef.current || [];
+    const existing = tid ? opens.find(o => {
+      const ot = o.wevoTxnId != null && String(o.wevoTxnId) !== "" ? String(o.wevoTxnId) : null;
+      return ot != null && ot === tid;
+    }) : null;
+    if (existing) {
+      setEditId(existing.id);
+      setCid(existing.clientId || clientId);
+      go("complete");
+      return;
+    }
+    const open = {
+      id: uid(),
+      ...wevoTxToOpenSession(tx, clientId)
+    };
+    upsertWevoOpen(open);
+    setEditId(open.id);
+    setCid(clientId);
+    go("complete");
+  };
   const delOpen = id => {
     const n = openSess.filter(o => o.id !== id);
     setOpenSess(n);
@@ -4931,6 +5102,11 @@ function App() {
       toast$(`Wevo: +${result.added} חדשות, ${result.tagged} תויגו, ${result.skipped} דולגו${closed}${pending} (מתוך ${result.fetched})`);
       go(result.pendingApprove ? "dash" : "wevo");
     }
+  }), view === "uncatalogued" && /*#__PURE__*/React.createElement(UncataloguedView, {
+    sessions: sessions,
+    clients: clients,
+    onAssign: assignUncatalogued,
+    onBack: () => go("dash")
   }));
 }
 
@@ -5238,6 +5414,10 @@ function Dashboard({
     onClick: () => go("wevo-sync"),
     "data-testid": "nav-wevo-sync"
   }, "סנכרון Wevo"), /*#__PURE__*/React.createElement("button", {
+    style: S.quietBtn,
+    onClick: () => go("uncatalogued"),
+    "data-testid": "nav-uncatalogued"
+  }, "טעינות לא מקוטלגות"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     style: S.quietBtn,
     onClick: () => go("debts"),
@@ -8952,6 +9132,197 @@ function WevoHistoryView({
 
 
 /**
+ * src/views/uncatalogued.js — טעינות Wevo שעוד לא קוטלגו ללקוח.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ *
+ * בכל פתיחת הדף נמשכת היסטוריית Wevo טרייה (wevoApi("sync")) ומושווית מול
+ * הטעינות השמורות באפליקציה החל מ־28.09.2026. מה שלא מותאם (לפי txn, או
+ * קוט״ש דומה + סכום דומה + חפיפת זמנים) מוצג כלא מקוטלג, ובחירת לקוח
+ * פותחת את כרטיס הסיום עם חיוב מלא ואפשרויות השעה.
+ */
+// ── UncataloguedView ─────────────────────────────────────────────────────
+function UncataloguedView({
+  sessions,
+  clients,
+  onAssign,
+  onBack
+}) {
+  const [txs, setTxs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [clientPick, setClientPick] = useState({});
+  const load = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await wevoApi("sync");
+      setTxs(data && data.transactions ? data.transactions : []);
+    } catch (e) {
+      const msg = e && e.message === "NO_CREDS" ? "אין התחברות Wevo — היכנס תחילה ב״סנכרון Wevo״" : e && e.message || "שגיאה בשליפת היסטוריית Wevo";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    load();
+  }, []);
+  const list = useMemo(() => {
+    try {
+      return findUncataloguedCharges(txs, sessions);
+    } catch (e) {
+      return [];
+    }
+  }, [txs, sessions]);
+  const fmtTxTime = tx => {
+    const ms = wevoTxTimeMs(tx);
+    if (!ms) return "—";
+    try {
+      return new Date(ms).toLocaleString("he-IL", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    } catch {
+      return "—";
+    }
+  };
+  const sinceLabel = (() => {
+    try {
+      return new Date(UNCATALOGUED_SINCE_MS).toLocaleDateString("he-IL", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      });
+    } catch {
+      return "";
+    }
+  })();
+  return /*#__PURE__*/React.createElement("main", {
+    style: S.main
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.form
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.cHeader
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: S.cNameLg
+  }, "טעינות לא מקוטלגות"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 600
+    }
+  }, "השוואת היסטוריית Wevo מול האפליקציה · החל מ־", sinceLabel))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: S.btnS,
+    onClick: load,
+    disabled: loading,
+    "data-testid": "uncatalogued-refresh"
+  }, loading ? "שולף מ-Wevo…" : "🔄 רענן מ-Wevo"), onBack && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: S.btnS,
+    onClick: onBack
+  }, "← חזרה")), error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fef2f2",
+      border: "1.5px solid #fecaca",
+      borderRadius: 10,
+      padding: "10px 12px",
+      marginBottom: 14,
+      fontSize: 13,
+      color: "#991b1b",
+      lineHeight: 1.45
+    }
+  }, error), !error && !loading && list.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#f0fdf4",
+      border: "1.5px solid #86efac",
+      borderRadius: 10,
+      padding: "12px",
+      fontSize: 14,
+      color: "#166534",
+      fontWeight: 600,
+      textAlign: "center"
+    },
+    "data-testid": "uncatalogued-empty"
+  }, "✅ כל הטעינות מקוטלגות — אין מה להשלים"), list.map(tx => {
+    const tid = tx.transactionId != null ? String(tx.transactionId) : "tx-" + wevoTxTimeMs(tx);
+    const pick = clientPick[tid] || "";
+    const kwh = Number(tx.totalEnergyKwh);
+    const cost = tx.totalCost != null ? Number(tx.totalCost) : null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: tid,
+      style: {
+        background: "#fff",
+        border: "1.5px solid #e2e8f0",
+        borderRadius: 12,
+        padding: "12px",
+        marginBottom: 10
+      },
+      "data-testid": "uncatalogued-row-" + tid
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 8,
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 14,
+        color: "#0f172a"
+      }
+    }, "🔌 ", fmtTxTime(tx)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: "#475569",
+        fontWeight: 600,
+        whiteSpace: "nowrap"
+      }
+    }, Number.isFinite(kwh) ? kwh.toFixed(2) + ' קוט"ש' : "", cost != null && Number.isFinite(cost) ? " · ₪" + cost.toFixed(2) : "")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("select", {
+      style: { ...S.inp,
+        flex: 1
+      },
+      value: pick,
+      onChange: e => setClientPick(prev => ({ ...prev,
+        [tid]: e.target.value
+      })),
+      "data-testid": "uncatalogued-client-" + tid
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "בחר לקוח…"), (clients || []).map(c => /*#__PURE__*/React.createElement("option", {
+      key: c.id,
+      value: c.id
+    }, c.name))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      style: { ...S.btnP,
+        whiteSpace: "nowrap",
+        opacity: pick ? 1 : 0.5
+      },
+      disabled: !pick,
+      onClick: () => onAssign && onAssign(tx, pick),
+      "data-testid": "uncatalogued-assign-" + tid
+    }, "שייך וחייב")));
+  })));
+}
+
+/**
  * src/views/settings.js — עדכון תעריפים.
  * חלק מחבילת הדפדפן של EV Charge Manager.
  * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
@@ -10448,6 +10819,8 @@ function CompleteSession({
   const [preferMaxBill, setPreferMaxBill] = useState(true);
   const [billStartKey, setBillStartKey] = useState(() => openSession && openSession.billStartKey || "plugIn");
   const [billEndKey, setBillEndKey] = useState(() => openSession && openSession.billEndKey || "chargeEnd");
+  const [manualStart, setManualStart] = useState("");
+  const [manualEnd, setManualEnd] = useState("");
   const [timelineOverride, setTimelineOverride] = useState(null);
   const adjVal = isSelf ? 0 : parseFloat(adjust) || 0;
   const startDt = (_openSession$startDat = openSession === null || openSession === void 0 ? void 0 : openSession.startDate) !== null && _openSession$startDat !== void 0 ? _openSession$startDat : "";
@@ -10501,6 +10874,55 @@ function CompleteSession({
     });
     if (best) applyWindowKeys(best.startKey, best.endKey, tl);
     return best;
+  };
+  // ── בחירת שעת התחלה/סיום ידנית ──────────────────────────────────────────
+  // התחלה: הכנסת כבל / התחלת טעינה / שעה ידנית · סיום: סיום טעינה / הוצאת כבל / שעה ידנית.
+  // הבחירה נכנסת ל-startEdit/endDt ולכן גם לחישוב החיוב (calcSession).
+  const startKeyOptions = () => {
+    const pts = timelinePoints(sessionTimeline);
+    const opts = [];
+    const pIn = pts.find(p => p.key === "plugIn");
+    const cStart = pts.find(p => p.key === "chargeStart");
+    if (pIn) opts.push({ key: "plugIn", label: "הכנסת כבל", at: pIn.at });
+    if (cStart) opts.push({ key: "chargeStart", label: "התחלת טעינה", at: cStart.at });
+    opts.push({ key: "manual", label: "שעה ידנית", at: null });
+    return opts;
+  };
+  const endKeyOptions = () => {
+    const pts = timelinePoints(sessionTimeline);
+    const opts = [];
+    const cEnd = pts.find(p => p.key === "chargeEnd");
+    const pOut = pts.find(p => p.key === "plugOut");
+    if (cEnd) opts.push({ key: "chargeEnd", label: "סיום טעינה", at: cEnd.at });
+    if (pOut) opts.push({ key: "plugOut", label: "הוצאת כבל", at: pOut.at });
+    opts.push({ key: "manual", label: "שעה ידנית", at: null });
+    return opts;
+  };
+  const onStartKeyChange = key => {
+    setPreferMaxBill(false);
+    setBillStartKey(key);
+    if (key === "manual") return;
+    const p = pointAt(sessionTimeline, key);
+    if (p) onStartChange(asLocalDT(p));
+  };
+  const onEndKeyChange = key => {
+    setPreferMaxBill(false);
+    setBillEndKey(key);
+    if (key === "manual") return;
+    const p = pointAt(sessionTimeline, key);
+    if (p) onEndChange(asLocalDT(p));
+  };
+  const onManualStartTime = val => {
+    setManualStart(val);
+    if (!parseManualTimeHHMM(val)) return;
+    const dt = combineDateWithTime(effectiveStart || startDt, val) || combineDateWithTime(Date.now(), val);
+    if (dt) onStartChange(dt);
+  };
+  const onManualEndTime = val => {
+    setManualEnd(val);
+    if (!parseManualTimeHHMM(val)) return;
+    const dt = manualEndDateTime(effectiveStart || startDt, val);
+    if (dt) onEndChange(dt);
   };
   const applyWevoFields = fields => {
     if (!fields) return;
@@ -10757,29 +11179,82 @@ function CompleteSession({
     style: S.inp,
     value: billStartKey,
     disabled: preferMaxBill,
-    onChange: e => {
-      setPreferMaxBill(false);
-      applyWindowKeys(e.target.value, billEndKey);
-    },
+    onChange: e => onStartKeyChange(e.target.value),
     "data-testid": "bill-start-key"
   }, tlPoints.map(p => /*#__PURE__*/React.createElement("option", {
     key: p.key,
     value: p.key
-  }, p.label, " · ", formatTimelineClock(p.at))))), /*#__PURE__*/React.createElement(FG, {
+  }, p.label, " · ", formatTimelineClock(p.at))).concat([/*#__PURE__*/React.createElement("option", {
+    key: "manual",
+    value: "manual"
+  }, "שעה ידנית")]))), /*#__PURE__*/React.createElement(FG, {
     lbl: "סיום חיוב"
   }, /*#__PURE__*/React.createElement("select", {
     style: S.inp,
     value: billEndKey,
     disabled: preferMaxBill,
-    onChange: e => {
-      setPreferMaxBill(false);
-      applyWindowKeys(billStartKey, e.target.value);
-    },
+    onChange: e => onEndKeyChange(e.target.value),
     "data-testid": "bill-end-key"
   }, tlPoints.map(p => /*#__PURE__*/React.createElement("option", {
     key: p.key,
     value: p.key
   }, p.label, " · ", formatTimelineClock(p.at)))))), /*#__PURE__*/React.createElement(FG, {
+    lbl: "שעת התחלה (לבחירה)"
+  }, /*#__PURE__*/React.createElement("select", {
+    style: S.inp,
+    value: billStartKey,
+    onChange: e => onStartKeyChange(e.target.value),
+    "data-testid": "start-time-choice"
+  }, startKeyOptions().map(o => /*#__PURE__*/React.createElement("option", {
+    key: o.key,
+    value: o.key
+  }, o.label, o.at ? " · " + formatTimelineClock(o.at) : ""))), billStartKey === "manual" && /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      marginTop: 8
+    },
+    type: "text",
+    inputMode: "text",
+    placeholder: "שעה ידנית — למשל 22:30",
+    value: manualStart,
+    onChange: e => onManualStartTime(e.target.value),
+    "data-testid": "manual-start-time"
+  }), billStartKey === "manual" && manualStart && !parseManualTimeHHMM(manualStart) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#b91c1c",
+      marginTop: 4,
+      fontWeight: 600
+    }
+  }, "פורמט לא תקין — כתוב שעה:דקות, למשל 22:30")), /*#__PURE__*/React.createElement(FG, {
+    lbl: "שעת סיום (לבחירה)"
+  }, /*#__PURE__*/React.createElement("select", {
+    style: S.inp,
+    value: billEndKey,
+    onChange: e => onEndKeyChange(e.target.value),
+    "data-testid": "end-time-choice"
+  }, endKeyOptions().map(o => /*#__PURE__*/React.createElement("option", {
+    key: o.key,
+    value: o.key
+  }, o.label, o.at ? " · " + formatTimelineClock(o.at) : ""))), billEndKey === "manual" && /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      marginTop: 8
+    },
+    type: "text",
+    inputMode: "text",
+    placeholder: "שעה ידנית — למשל 23:45",
+    value: manualEnd,
+    onChange: e => onManualEndTime(e.target.value),
+    "data-testid": "manual-end-time"
+  }), billEndKey === "manual" && manualEnd && !parseManualTimeHHMM(manualEnd) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#b91c1c",
+      marginTop: 4,
+      fontWeight: 600
+    }
+  }, "פורמט לא תקין — כתוב שעה:דקות, למשל 23:45")), /*#__PURE__*/React.createElement(FG, {
     lbl: "חיבור כבל / התחלת חלון (ניתן לעריכה)"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
@@ -10796,7 +11271,6 @@ function CompleteSession({
   }, (isWevoLinked || readyFromWevo || !useEnd) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
     type: "text",
-    inputMode: "decimal",
     placeholder: "3:24 או 3h 24m",
     value: durInput,
     onChange: e => {

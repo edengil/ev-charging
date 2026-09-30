@@ -34,6 +34,8 @@ function CompleteSession({
   const [preferMaxBill, setPreferMaxBill] = useState(true);
   const [billStartKey, setBillStartKey] = useState(() => openSession && openSession.billStartKey || "plugIn");
   const [billEndKey, setBillEndKey] = useState(() => openSession && openSession.billEndKey || "chargeEnd");
+  const [manualStart, setManualStart] = useState("");
+  const [manualEnd, setManualEnd] = useState("");
   const [timelineOverride, setTimelineOverride] = useState(null);
   const adjVal = isSelf ? 0 : parseFloat(adjust) || 0;
   const startDt = (_openSession$startDat = openSession === null || openSession === void 0 ? void 0 : openSession.startDate) !== null && _openSession$startDat !== void 0 ? _openSession$startDat : "";
@@ -87,6 +89,55 @@ function CompleteSession({
     });
     if (best) applyWindowKeys(best.startKey, best.endKey, tl);
     return best;
+  };
+  // ── בחירת שעת התחלה/סיום ידנית ──────────────────────────────────────────
+  // התחלה: הכנסת כבל / התחלת טעינה / שעה ידנית · סיום: סיום טעינה / הוצאת כבל / שעה ידנית.
+  // הבחירה נכנסת ל-startEdit/endDt ולכן גם לחישוב החיוב (calcSession).
+  const startKeyOptions = () => {
+    const pts = timelinePoints(sessionTimeline);
+    const opts = [];
+    const pIn = pts.find(p => p.key === "plugIn");
+    const cStart = pts.find(p => p.key === "chargeStart");
+    if (pIn) opts.push({ key: "plugIn", label: "הכנסת כבל", at: pIn.at });
+    if (cStart) opts.push({ key: "chargeStart", label: "התחלת טעינה", at: cStart.at });
+    opts.push({ key: "manual", label: "שעה ידנית", at: null });
+    return opts;
+  };
+  const endKeyOptions = () => {
+    const pts = timelinePoints(sessionTimeline);
+    const opts = [];
+    const cEnd = pts.find(p => p.key === "chargeEnd");
+    const pOut = pts.find(p => p.key === "plugOut");
+    if (cEnd) opts.push({ key: "chargeEnd", label: "סיום טעינה", at: cEnd.at });
+    if (pOut) opts.push({ key: "plugOut", label: "הוצאת כבל", at: pOut.at });
+    opts.push({ key: "manual", label: "שעה ידנית", at: null });
+    return opts;
+  };
+  const onStartKeyChange = key => {
+    setPreferMaxBill(false);
+    setBillStartKey(key);
+    if (key === "manual") return;
+    const p = pointAt(sessionTimeline, key);
+    if (p) onStartChange(asLocalDT(p));
+  };
+  const onEndKeyChange = key => {
+    setPreferMaxBill(false);
+    setBillEndKey(key);
+    if (key === "manual") return;
+    const p = pointAt(sessionTimeline, key);
+    if (p) onEndChange(asLocalDT(p));
+  };
+  const onManualStartTime = val => {
+    setManualStart(val);
+    if (!parseManualTimeHHMM(val)) return;
+    const dt = combineDateWithTime(effectiveStart || startDt, val) || combineDateWithTime(Date.now(), val);
+    if (dt) onStartChange(dt);
+  };
+  const onManualEndTime = val => {
+    setManualEnd(val);
+    if (!parseManualTimeHHMM(val)) return;
+    const dt = manualEndDateTime(effectiveStart || startDt, val);
+    if (dt) onEndChange(dt);
   };
   const applyWevoFields = fields => {
     if (!fields) return;
@@ -343,29 +394,82 @@ function CompleteSession({
     style: S.inp,
     value: billStartKey,
     disabled: preferMaxBill,
-    onChange: e => {
-      setPreferMaxBill(false);
-      applyWindowKeys(e.target.value, billEndKey);
-    },
+    onChange: e => onStartKeyChange(e.target.value),
     "data-testid": "bill-start-key"
   }, tlPoints.map(p => /*#__PURE__*/React.createElement("option", {
     key: p.key,
     value: p.key
-  }, p.label, " · ", formatTimelineClock(p.at))))), /*#__PURE__*/React.createElement(FG, {
+  }, p.label, " · ", formatTimelineClock(p.at))).concat([/*#__PURE__*/React.createElement("option", {
+    key: "manual",
+    value: "manual"
+  }, "שעה ידנית")]))), /*#__PURE__*/React.createElement(FG, {
     lbl: "סיום חיוב"
   }, /*#__PURE__*/React.createElement("select", {
     style: S.inp,
     value: billEndKey,
     disabled: preferMaxBill,
-    onChange: e => {
-      setPreferMaxBill(false);
-      applyWindowKeys(billStartKey, e.target.value);
-    },
+    onChange: e => onEndKeyChange(e.target.value),
     "data-testid": "bill-end-key"
   }, tlPoints.map(p => /*#__PURE__*/React.createElement("option", {
     key: p.key,
     value: p.key
   }, p.label, " · ", formatTimelineClock(p.at)))))), /*#__PURE__*/React.createElement(FG, {
+    lbl: "שעת התחלה (לבחירה)"
+  }, /*#__PURE__*/React.createElement("select", {
+    style: S.inp,
+    value: billStartKey,
+    onChange: e => onStartKeyChange(e.target.value),
+    "data-testid": "start-time-choice"
+  }, startKeyOptions().map(o => /*#__PURE__*/React.createElement("option", {
+    key: o.key,
+    value: o.key
+  }, o.label, o.at ? " · " + formatTimelineClock(o.at) : ""))), billStartKey === "manual" && /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      marginTop: 8
+    },
+    type: "text",
+    inputMode: "text",
+    placeholder: "שעה ידנית — למשל 22:30",
+    value: manualStart,
+    onChange: e => onManualStartTime(e.target.value),
+    "data-testid": "manual-start-time"
+  }), billStartKey === "manual" && manualStart && !parseManualTimeHHMM(manualStart) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#b91c1c",
+      marginTop: 4,
+      fontWeight: 600
+    }
+  }, "פורמט לא תקין — כתוב שעה:דקות, למשל 22:30")), /*#__PURE__*/React.createElement(FG, {
+    lbl: "שעת סיום (לבחירה)"
+  }, /*#__PURE__*/React.createElement("select", {
+    style: S.inp,
+    value: billEndKey,
+    onChange: e => onEndKeyChange(e.target.value),
+    "data-testid": "end-time-choice"
+  }, endKeyOptions().map(o => /*#__PURE__*/React.createElement("option", {
+    key: o.key,
+    value: o.key
+  }, o.label, o.at ? " · " + formatTimelineClock(o.at) : ""))), billEndKey === "manual" && /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...S.inp,
+      marginTop: 8
+    },
+    type: "text",
+    inputMode: "text",
+    placeholder: "שעה ידנית — למשל 23:45",
+    value: manualEnd,
+    onChange: e => onManualEndTime(e.target.value),
+    "data-testid": "manual-end-time"
+  }), billEndKey === "manual" && manualEnd && !parseManualTimeHHMM(manualEnd) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#b91c1c",
+      marginTop: 4,
+      fontWeight: 600
+    }
+  }, "פורמט לא תקין — כתוב שעה:דקות, למשל 23:45")), /*#__PURE__*/React.createElement(FG, {
     lbl: "חיבור כבל / התחלת חלון (ניתן לעריכה)"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
@@ -382,7 +486,6 @@ function CompleteSession({
   }, (isWevoLinked || readyFromWevo || !useEnd) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
     type: "text",
-    inputMode: "decimal",
     placeholder: "3:24 או 3h 24m",
     value: durInput,
     onChange: e => {
