@@ -375,7 +375,7 @@ const S = {
   toast(t) {
     return {
       position: "fixed",
-      bottom: 20,
+      top: 14,
       left: "50%",
       transform: "translateX(-50%)",
       color: "#fff",
