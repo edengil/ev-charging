@@ -1,8 +1,13 @@
 import fs from "fs";
+import path from "path";
 import { spawnSync } from "child_process";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const root = path.join(__dirname, "..");
 
 function bundleMoneyLib() {
-  const raw = fs.readFileSync("lib/ev-money.mjs", "utf8");
+  const raw = fs.readFileSync(path.join(root, "lib/ev-money.mjs"), "utf8");
   const body = raw
     .replace(/^export\s+/gm, "")
     .replace(/\nexport\s*\{[\s\S]*?\};?\s*$/m, "\n");
@@ -121,30 +126,42 @@ var fictionalBilledDisplay = __EV_MONEY__.fictionalBilledDisplay;
 `;
 }
 
+/** Concatenate src/ modules in manifest order (single classic <script> bundle). */
+function bundleAppSources() {
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, "src/manifest.json"), "utf8"));
+  return manifest.order
+    .map(rel => {
+      const abs = path.join(root, rel);
+      const check = spawnSync(process.execPath, ["--check", abs], { encoding: "utf8" });
+      if (check.status !== 0) {
+        console.error(`syntax error in ${rel}:\n${check.stderr || check.stdout}`);
+        process.exit(1);
+      }
+      return fs.readFileSync(abs, "utf8");
+    })
+    .join("\n");
+}
+
 const money = bundleMoneyLib();
-const app = fs.readFileSync("app-source.js", "utf8");
+const app = bundleAppSources();
 const src = money + "\n" + app;
 
-const checkMoney = spawnSync(process.execPath, ["--check", "lib/ev-money.mjs"], { encoding: "utf8" });
+const checkMoney = spawnSync(process.execPath, ["--check", path.join(root, "lib/ev-money.mjs")], { encoding: "utf8" });
 if (checkMoney.status !== 0) {
   console.error(checkMoney.stderr || checkMoney.stdout);
   process.exit(1);
 }
-const checkApp = spawnSync(process.execPath, ["--check", "app-source.js"], { encoding: "utf8" });
-if (checkApp.status !== 0) {
-  console.error(checkApp.stderr || checkApp.stdout);
-  process.exit(1);
-}
 
 function inject(file) {
-  if (!fs.existsSync(file)) return false;
-  const html = fs.readFileSync(file, "utf8");
+  const abs = path.join(root, file);
+  if (!fs.existsSync(abs)) return false;
+  const html = fs.readFileSync(abs, "utf8");
   const idx = html.lastIndexOf("<script>");
   const end = html.lastIndexOf("</script>");
   if (idx < 0 || end < idx) throw new Error("no script in " + file);
   const next =
     html.slice(0, idx) + "<script>\n" + src + "\n</script>" + html.slice(end + "</script>".length);
-  fs.writeFileSync(file, next);
+  fs.writeFileSync(abs, next);
   console.log("injected", file);
   return true;
 }

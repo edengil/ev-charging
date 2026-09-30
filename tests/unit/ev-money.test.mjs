@@ -55,6 +55,19 @@ import {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
+/** חבילת הדפדפן כפי שהיא נבנית: src/* בסדר src/manifest.json (ללא ההערות). */
+function readAppBundle() {
+  const manifest = JSON.parse(
+    readFileSync(join(root, "src/manifest.json"), "utf8")
+  );
+  return manifest.order
+    .map(rel => {
+      const lines = readFileSync(join(root, rel), "utf8").split("\n");
+      return lines.slice(6, -1).join("\n");
+    })
+    .join("\n");
+}
+
 describe("payment method order", () => {
   it("ברירת מחדל מזומן ואז פייבוקס → ביט → העברה", () => {
     assert.equal(DEFAULT_PAYMENT_METHOD, "cash");
@@ -372,11 +385,11 @@ describe("Wevo open session match", () => {
     };
     const now = new Date("2026-09-23T16:30:00").getTime();
     assert.equal(wevoOpenLooksFinished(stale, now), true);
-    const repaired = repairWevoOpenRecord(stale, now);
+    const repaired = repairWevoOpenRecord(stale, now, { state: "Available" });
     assert.equal(repaired.readyToComplete, true);
     assert.equal(repaired.liveKw, 0);
     assert.equal(shouldCloseStaleWevoOpen(stale, { nowMs: now, nowIdle: false }), true);
-    assert.equal(repairWevoOpenRecord(repaired, now), repaired);
+    assert.equal(repairWevoOpenRecord(repaired, now, { state: "Available" }), repaired);
   });
 
   it("מבדיל בין כבל מחובר לכבל שנותק", () => {
@@ -413,7 +426,7 @@ describe("Wevo open session match", () => {
     assert.equal(holdLiveStation(null, { state: "Unknown", connected: true }).state, "Unknown");
     assert.equal(chargerReportsVehicle(holdLiveStation(null, { state: "Unknown", connected: true }), []), false);
     assert.equal(stationStillCharging(charging), true);
-    const src = readFileSync(join(root, "app-source.js"), "utf8");
+    const src = readAppBundle();
     assert.match(src, /holdLiveStation/);
     assert.match(src, /isUsableStationSample\(incoming\)/);
   });
@@ -462,8 +475,8 @@ describe("Wevo open session match", () => {
     assert.equal(pickFinishedWevoTx([older], { wevoTxnId: "88", plugInAt: "2026-09-26T00:42" }), null);
     assert.equal(pickFinishedWevoTx([older], { wevoTxnId: "1" }), older);
     assert.equal(openChargeStatus({ wevoTxnId: "42", liveKw: 6 }, { state: "Finishing", transactionId: "42" }).kind, "cable");
-    assert.match(readFileSync(join(root, "app-source.js"), "utf8"), /liveChargeEndStamp/);
-    assert.match(readFileSync(join(root, "app-source.js"), "utf8"), /clearFinishedIfStillCharging/);
+    assert.match(readAppBundle(), /liveChargeEndStamp/);
+    assert.match(readAppBundle(), /clearFinishedIfStillCharging/);
   });
 
   it("טעינה שנשמרה לא חוזרת כממתינה גם כשהשעון שונה", () => {
@@ -525,7 +538,7 @@ describe("Wevo open session match", () => {
     assert.equal(fictionalBilledDisplay(25, 9), 25);
     assert.equal(fictionalBilledDisplay(25, 9).toFixed(2), "25.00");
     assert.equal(clientBalance({ id: "c1", name: "שכן" }, [{ clientId: "c1", amountBilled: 18.99 }], []), 18.99);
-    const src = readFileSync(join(root, "app-source.js"), "utf8");
+    const src = readAppBundle();
     assert.match(src, /ownCar[\s\S]{0,400}fictionalBilledDisplay/);
     assert.match(src, /Math\.ceil\(kwhInflated \* rate\)/);
   });
@@ -611,7 +624,7 @@ describe("Wevo open session match", () => {
 
 describe("app-source drift guards", () => {
   it("לא מחזיר חלונות כפילות אגרסיביים של ימים/שבוע", () => {
-    const src = readFileSync(join(root, "app-source.js"), "utf8");
+    const src = readAppBundle();
     assert.doesNotMatch(src, /findRecentDuplicatePayment\([^)]*48\s*\*\s*60\s*\*\s*60\s*\*?\s*1000/);
     assert.doesNotMatch(src, /dedupeDuplicatePayments\([^)]*7\s*\*\s*24/);
     assert.match(src, /canSaveNewPayment/);
@@ -626,7 +639,7 @@ describe("app-source drift guards", () => {
   });
 
   it("יש כפתורי אישור ייעודיים + אישור ראשון אוטומטי + כפתור לקוח", () => {
-    const src = readFileSync(join(root, "app-source.js"), "utf8");
+    const src = readAppBundle();
     assert.match(src, /wevo-preauth-arm/);
     assert.match(src, /wevo-fullauth-arm/);
     assert.match(src, /client-preauth-/);
@@ -656,5 +669,52 @@ describe("app-source drift guards", () => {
     assert.match(src, /first-auth/);
     assert.doesNotMatch(src, /fullAutoReady/);
     assert.doesNotMatch(src, /autoAuthClient/);
+  });
+});
+
+describe("באג סגירה מוקדמת של טעינה פתוחה", () => {
+  // תרחיש: העמדה הבהבה ל־Finishing באמצע טעינה (הפסקה רגעית של הרכב),
+  // נכתבה חותמת סיום ספקולטיבית, והאפליקציה נפתחה מחדש אחרי 50 דקות —
+  // עוד לפני סקר חי ראשון, כשהטעינה בפועל עוד רצה.
+  const flickerOpen = () => ({
+    id: "flick",
+    source: "wevo-live",
+    wevoTxnId: "777",
+    notes: "txn#777 | Wevo live",
+    clientId: "c1",
+    plugInAt: "2026-09-23T15:32",
+    startDate: "2026-09-23T15:32",
+    chargeEndedAt: "2026-09-23T15:40",
+    endDate: "2026-09-23T15:40",
+    readyToComplete: false,
+    wevoEnded: false,
+    liveKw: 7.1,
+    liveKwh: 3.2
+  });
+  const now = new Date("2026-09-23T16:30:00").getTime();
+
+  it("לא סוגר טעינה על חותמת ספקולטיבית כשאין דגימת עמדה חיה", () => {
+    const repaired = repairWevoOpenRecord(flickerOpen(), now, null);
+    assert.equal(repaired.readyToComplete, false);
+    assert.equal(repaired.wevoEnded, false);
+    assert.equal(repaired.chargeEndedAt, "2026-09-23T15:40");
+  });
+
+  it("כן סוגר כשהעמדה מדווחת שהיא פנויה", () => {
+    const repaired = repairWevoOpenRecord(flickerOpen(), now, { state: "Available" });
+    assert.equal(repaired.readyToComplete, true);
+    assert.equal(repaired.wevoEnded, true);
+    assert.equal(repaired.liveKw, 0);
+  });
+
+  it("מנקה חותמת כוזבת כשהעמדה עדיין טוענת את אותה עסקה", () => {
+    const repaired = repairWevoOpenRecord(flickerOpen(), now, {
+      state: "Charging",
+      transactionId: "777",
+      rateKw: 7.1
+    });
+    assert.equal(repaired.chargeEndedAt, null);
+    assert.equal(repaired.endDate, null);
+    assert.equal(repaired.readyToComplete, false);
   });
 });

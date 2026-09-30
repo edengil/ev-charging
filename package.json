@@ -2,7 +2,6 @@
   "name": "ev-charge-manager",
   "version": "1.0.0",
   "description": "Eden Gil EV Charge Manager",
-  "main": "app-source.js",
   "scripts": {
     "start": "node scripts/local-wevo-proxy.mjs",
     "build": "node scripts/build-dist.mjs",

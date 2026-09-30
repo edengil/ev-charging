@@ -324,7 +324,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 /* === lib/ev-money (injected) === */
 var __EV_MONEY__ = (function () {
 /**
- * לוגיקת כסף / תשלומים / סנכרון — מקור אמת לבדיקות ול־runtime (מוזרק לפני app-source).
+ * לוגיקת כסף / תשלומים / סנכרון — מקור אמת לבדיקות ול־runtime (מוזרק לפני src/).
  * מונע רגרסיות: מחיקת תשלומים בענן, חסימת הפקדות לגיטימיות, יתרה שגויה.
  */
 
@@ -888,6 +888,9 @@ function openChargeStatus(open, liveState) {
 
 /** מתקן סיום לפני חיבור, ומסמן טעינה שנגמרה כמוכנה לאישור.
  * אם העמדה עדיין טוענת את אותה טעינה — מוחקים סיום כוזב.
+ * אין דגימת עמדה חיה (האפליקציה נטענה לפני הסקר הראשון) — לא סוגרים טעינה
+ * על סמך חותמת סיום ספקולטיבית (למשל הבהוב Finishing באמצע טעינה).
+ * הסקר החי יסגור אותה עם נתוני Wevo אמיתיים אם באמת נגמרה.
  */
 function repairWevoOpenRecord(open, nowMs = Date.now(), liveState = null) {
   if (!open) return open;
@@ -911,7 +914,8 @@ function repairWevoOpenRecord(open, nowMs = Date.now(), liveState = null) {
       wevoEnded: false
     };
   }
-  const shouldReady = !base.readyToComplete && wevoOpenLooksFinished(base, nowMs);
+  const stationKnown = liveState != null && typeof liveState === "object";
+  const shouldReady = !base.readyToComplete && stationKnown && wevoOpenLooksFinished(base, nowMs);
   if (!dropEnd && !dropEndDate && !shouldReady) return open;
   return {
     ...base,
@@ -1274,6 +1278,12 @@ var routeNotifyClick = __EV_MONEY__.routeNotifyClick;
 var fictionalBilledDisplay = __EV_MONEY__.fictionalBilledDisplay;
 /* === end lib/ev-money === */
 
+/**
+ * src/00-brand.js — לוגו Eden Gil Studio (מותג אישי, בשימוש חוזר בכל אפליקציה).
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 var useState=React.useState;var useEffect=React.useEffect;var useMemo=React.useMemo;var useCallback=React.useCallback;var useRef=React.useRef;
 
 // ── Eden Gil Studio mark (personal brand — reuse in every app) ─────────────
@@ -1383,6 +1393,13 @@ function BrandLogo({
   }, subtitle || "Studio")));
 }
 
+
+/**
+ * src/10-pricing.js — תמחור: ברירות מחדל, ניתנות לשינוי בהגדרות.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── תמחור: ברירות מחדל — ניתנות לשינוי בהגדרות ⚙️ ──────────────────────────
 const DEFAULT_CONFIG = {
   ratePremium: 2.98,
@@ -1573,6 +1590,13 @@ function estimateFromOpen(o, client) {
   }, client);
 }
 
+
+/**
+ * src/20-storage.js — אחסון: localStorage + גיבוי ענן (PIN).
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── Storage: localStorage + גיבוי ענן (PIN) ────────────────────────────────
 const CLOUD_PIN_KEY = "ev_cloud_pin";
 const CLOUD_UPDATED_KEY = "ev_cloud_updated";
@@ -1914,6 +1938,13 @@ const DB = {
   }
 };
 
+
+/**
+ * src/30-utils.js — פונקציות עזר כלליות.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── Utils ──────────────────────────────────────────────────────────────────
 const ils = n => `₪${Number(n).toFixed(0)}`;
 const ilsFull = n => `₪${Number(n).toFixed(2)}`;
@@ -2521,6 +2552,13 @@ function clientsByMonthlyFrequency(clients, sessions) {
   }));
 }
 
+
+/**
+ * src/40-wevo-sync.js — עזרי סנכרון Wevo (API, state, transactions).
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── Wevo sync helpers ──────────────────────────────────────────────────────
 function wevoSyncUrl() {
   try {
@@ -3377,6 +3415,13 @@ function mergeWevoTransactions(clients, sessions, transactions, openSess = []) {
   };
 }
 
+
+/**
+ * src/50-ocr.js — מפענח טקסט OCR.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── OCR Text Parser ────────────────────────────────────────────────────────
 function parseChargeText(raw) {
   let s = raw.trim();
@@ -3469,6 +3514,13 @@ function parseChargeText(raw) {
   };
 }
 
+
+/**
+ * src/60-styles.js — עיצוב (S).
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── Styles ─────────────────────────────────────────────────────────────────
 const S = {
   app: {
@@ -3917,6 +3969,13 @@ const S = {
   }
 };
 
+
+/**
+ * src/70-app.js — שורש האפליקציה: App, ניתוב, מצב גלובלי.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── APP ────────────────────────────────────────────────────────────────────
 function App() {
   const [clients, setClients] = useState([]);
@@ -4982,6 +5041,13 @@ function DebtsSendView({
   }));
 }
 
+
+/**
+ * src/views/dashboard.js — דשבורד.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── Dashboard ──────────────────────────────────────────────────────────────
 function Dashboard({
   stats,
@@ -5638,6 +5704,13 @@ function SumCard({
   }, lbl)));
 }
 
+
+/**
+ * src/views/stats.js — דוח חודשי כללי.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── StatsView: דוח חודשי כללי ──────────────────────────────────────────────
 function StatsView({
   sessions,
@@ -5823,6 +5896,13 @@ function StatsView({
   );
 }
 
+
+/**
+ * src/views/cloud-gate.js — התחברות ראשונית / שחזור גיבוי ענן.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── CloudGate: התחברות ראשונית / שחזור גיבוי ענן ─────────────────────────
 function CloudGate({
   mode = "login",
@@ -5926,6 +6006,13 @@ function CloudGate({
   }, "המשך בלי גיבוי (מקומי בלבד)")));
 }
 
+
+/**
+ * src/views/wevo-live-sync.js — סנכרון טעינות פתוחות חי גם מחוץ לדשבורד.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── WevoOpenLiveSync: מעדכן טעינות פתוחות גם מחוץ לדשבורד ─────────────────
 function WevoOpenLiveSync({
   openSess,
@@ -6198,6 +6285,13 @@ function WevoOpenLiveSync({
   return null;
 }
 
+
+/**
+ * src/views/wevo-live-panel.js — פאנל מטען חי + אישור + שיוך + עלות חיה.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── WevoLivePanel: מצב מטען חי + אישור + שיוך + עלות חיה ───────────────────
 function WevoLivePanel({
   clients = [],
@@ -7508,6 +7602,13 @@ function WevoLivePanel({
   }, "עודכן ", ftime(lastAt), alreadyAuthorized ? " · הטעינה פעילה" : waitingAuth ? " · ממתין לאישור במטען" : "")));
 }
 
+
+/**
+ * src/views/wevo-sync-view.js — התחברות Wevo + ייבוא טעינות.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── WevoSyncView: התחברות + ייבוא טעינות מ-Wevo ─────────────────────────────
 function WevoSyncView({
   clients,
@@ -7761,6 +7862,13 @@ function WevoSyncView({
   }, "הסיסמה נשלחת רק לפונקציית הסנכרון שלך ולא נשמרת בשרתי Wevo מעבר להתחברות.")));
 }
 
+
+/**
+ * src/views/wevo-history-view.js — מסך היסטוריית Wevo.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── WevoHistoryView: שיבוט ויזואלי מדויק של מסך היסטוריית Wevo ───────────────
 const WEVO = {
   blue: "#4EC4E8",
@@ -8820,6 +8928,13 @@ function WevoHistoryView({
   }, "סגור"))));
 }
 
+
+/**
+ * src/views/settings.js — עדכון תעריפים.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── SettingsView: עדכון תעריפים ─────────────────────────────────────────────
 function SettingsView({
   onSaved,
@@ -8951,6 +9066,13 @@ function SettingsView({
   }, "ביטול"))));
 }
 
+
+/**
+ * src/views/clients.js — תצוגת לקוח.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── ClientView ─────────────────────────────────────────────────────────────
 function ClientView({
   cid,
@@ -9551,6 +9673,13 @@ function ClientView({
   })));
 }
 
+
+/**
+ * src/views/session-form.js — לוגיקת טופס טעינה משותפת (הוספה + עריכה).
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── SessionForm: shared form logic (Add + Edit) ────────────────────────────
 function SessionFormFields({
   dt,
@@ -9699,6 +9828,13 @@ function parseDurStr(s) {
   return 0;
 }
 
+
+/**
+ * src/views/add-session.js — הוספת טעינה (ידנית / הדבק / מהיר).
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── AddSession (ידנית / הדבק / מהיר) ───────────────────────────────────────
 function AddSession({
   clients,
@@ -9975,6 +10111,13 @@ function AddSession({
   }, "ביטול")))));
 }
 
+
+/**
+ * src/views/edit-session.js — עריכת טעינה.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── EditSession: עריכת טעינה קיימת ─────────────────────────────────────────
 function EditSession({
   session,
@@ -10113,6 +10256,13 @@ function EditSession({
   }, "ביטול"))));
 }
 
+
+/**
+ * src/views/add-open-session.js — פתיחת טעינה.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── AddOpenSession ─────────────────────────────────────────────────────────
 function AddOpenSession({
   clients,
@@ -10182,6 +10332,13 @@ function AddOpenSession({
   }, "ביטול"))));
 }
 
+
+/**
+ * src/views/charge-time-window.js — חלון זמני טעינה (4 נקודות).
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── חלון זמני טעינה (4 נקודות) ─────────────────────────────────────────────
 function ChargeTimelineBox({
   timeline,
@@ -10232,6 +10389,13 @@ function ChargeTimelineBox({
   }));
 }
 
+
+/**
+ * src/views/complete-session.js — סיום ואישור טעינה.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── CompleteSession ────────────────────────────────────────────────────────
 function CompleteSession({
   openSession,
@@ -10793,6 +10957,13 @@ function CompleteSession({
   }, "ביטול")));
 }
 
+
+/**
+ * src/views/edit-payment.js — עריכת תשלום.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── EditPayment ────────────────────────────────────────────────────────────
 function EditPayment({
   payment,
@@ -10948,6 +11119,13 @@ function EditPayment({
   }, "🗑 מחק רישום")));
 }
 
+
+/**
+ * src/views/add-payment.js — הוספת תשלום.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── AddPayment ─────────────────────────────────────────────────────────────
 function AddPayment({
   cid,
@@ -11056,6 +11234,13 @@ function AddPayment({
   }, "ביטול")));
 }
 
+
+/**
+ * src/views/add-debt.js — הוספת חוב.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── AddDebt ────────────────────────────────────────────────────────────────
 function AddDebt({
   cid,
@@ -11133,6 +11318,13 @@ function AddDebt({
   }, "ביטול"))));
 }
 
+
+/**
+ * src/views/add-client.js — הוספת לקוח.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── AddClient ──────────────────────────────────────────────────────────────
 function AddClient({
   onSave,
@@ -11247,6 +11439,13 @@ function AddClient({
   }, "ביטול"))));
 }
 
+
+/**
+ * src/views/edit-client.js — עריכת לקוח.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── EditClient ─────────────────────────────────────────────────────────────
 function EditClient({
   client,
@@ -11392,6 +11591,13 @@ function EditClient({
   }, "ביטול"))));
 }
 
+
+/**
+ * src/views/report.js — דוח חודשי ללקוח + וואטסאפ.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── Report (חודשי ללקוח + וואטסאפ) ─────────────────────────────────────────
 function Report({
   cid,
@@ -11473,6 +11679,13 @@ function Report({
   }, "📋 העתק")));
 }
 
+
+/**
+ * src/views/import-data.js — ייבוא נתונים.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 // ── ImportData ─────────────────────────────────────────────────────────────
 function ImportData({
   onImport,
@@ -11779,6 +11992,13 @@ function FG({
     style: S.lbl
   }, lbl), children);
 }
+
+/**
+ * src/99-bootstrap.js — אתחול: render של App.
+ * חלק מחבילת הדפדפן של EV Charge Manager.
+ * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
+ * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ */
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 installPwaReturnRecovery();
 
