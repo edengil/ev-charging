@@ -2066,7 +2066,8 @@ function mergeWevoTransactions(clients, sessions, transactions, openSess = []) {
       if (!savedSessionMatchesCharge(s, {
         transactionId: tid,
         kwhRaw: kwh,
-        costToOwner: cost
+        costToOwner: cost,
+        plugInTime: plugMs || null
       })) return false;
       const sessionMs = new Date(s.date).getTime();
       if (!Number.isFinite(sessionMs) || !plugMs) return true;
@@ -3766,7 +3767,8 @@ function Dashboard({
     if (sortBy === "last") arr.sort((a, b) => (b.last ? new Date(b.last.date) : 0) - (a.last ? new Date(a.last.date) : 0));
     return arr;
   }, [stats, sortBy]);
-  const liveOpen = findChargeStillOnStation(openSess, liveStation, sessions);
+  // מוסתרת מהרשימה רק כשהפאנל החי באמת מציג רכב — אחרת הטעינה נעלמת משני המקומות
+  const liveOpen = chargerReportsVehicle(liveStation, sessions) ? findChargeStillOnStation(openSess, liveStation, sessions) : null;
   const openCards = dropOpensAlreadySaved(openSess, sessions).filter(o => !liveOpen || o.id !== liveOpen.id);
   return /*#__PURE__*/React.createElement("main", {
     style: S.main
@@ -5651,7 +5653,8 @@ function WevoLivePanel({
     wevoTxnId: st.transactionId,
     transactionId: st.transactionId,
     liveKwh: st.totalEnergyKwh,
-    liveWevoCost: st.totalCost
+    liveWevoCost: st.totalCost,
+    plugInTime: st.plugInTime
   }));
   const color = chargingNow ? "#065f46" : waitingAuth ? "#b45309" : "#334155";
   const bg = chargingNow ? "#ecfdf5" : waitingAuth ? "#fffbeb" : "#f8fafc";
