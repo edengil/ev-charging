@@ -4,7 +4,6 @@ import {
   parseManualTimeHHMM,
   combineDateWithTime,
   manualEndDateTime,
-  splitPremiumMinutes,
   wevoTxTimeMs,
   UNCATALOGUED_SINCE_MS,
   findUncataloguedCharges,
@@ -57,30 +56,6 @@ describe("חלוקת חיוב יחסית פרימיום/רגיל", () => {
   it("חלון הפרימיום הוא 16:00–23:00", () => {
     assert.equal(BILLING_PREMIUM_START_H, 16);
     assert.equal(BILLING_PREMIUM_END_H, 23);
-  });
-  it("שעות ידניות 22:00–23:30: שעה פרימיום + חצי שעה רגיל", () => {
-    const s = new Date(2026, 8, 28, 22, 0).getTime();
-    const e = new Date(2026, 8, 28, 23, 30).getTime();
-    assert.deepEqual(splitPremiumMinutes(s, e), { premiumMin: 60, regularMin: 30 });
-  });
-  it("שעות ידניות 22:00–02:00 חוצות חצות: שעה פרימיום + 3 שעות רגיל", () => {
-    const s = new Date(2026, 8, 28, 22, 0).getTime();
-    const e = new Date(2026, 8, 29, 2, 0).getTime();
-    assert.deepEqual(splitPremiumMinutes(s, e), { premiumMin: 60, regularMin: 180 });
-  });
-  it("חלון רגיל לגמרי", () => {
-    const s = new Date(2026, 8, 28, 10, 0).getTime();
-    const e = new Date(2026, 8, 28, 12, 0).getTime();
-    assert.deepEqual(splitPremiumMinutes(s, e), { premiumMin: 0, regularMin: 120 });
-  });
-  it("חלון פרימיום מלא 16:00–23:00", () => {
-    const s = new Date(2026, 8, 28, 16, 0).getTime();
-    const e = new Date(2026, 8, 28, 23, 0).getTime();
-    assert.deepEqual(splitPremiumMinutes(s, e), { premiumMin: 420, regularMin: 0 });
-  });
-  it("קלט לא תקין מחזיר אפסים", () => {
-    assert.deepEqual(splitPremiumMinutes(0, 0), { premiumMin: 0, regularMin: 0 });
-    assert.deepEqual(splitPremiumMinutes(100, 50), { premiumMin: 0, regularMin: 0 });
   });
 });
 

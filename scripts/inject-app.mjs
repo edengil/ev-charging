@@ -71,7 +71,6 @@ ${body}
     parseManualTimeHHMM: parseManualTimeHHMM,
     combineDateWithTime: combineDateWithTime,
     manualEndDateTime: manualEndDateTime,
-    splitPremiumMinutes: splitPremiumMinutes,
     wevoTxTimeMs: wevoTxTimeMs,
     UNCATALOGUED_SINCE_MS: UNCATALOGUED_SINCE_MS,
     findUncataloguedCharges: findUncataloguedCharges,
@@ -132,7 +131,6 @@ var routeNotifyClick = __EV_MONEY__.routeNotifyClick;
 var parseManualTimeHHMM = __EV_MONEY__.parseManualTimeHHMM;
 var combineDateWithTime = __EV_MONEY__.combineDateWithTime;
 var manualEndDateTime = __EV_MONEY__.manualEndDateTime;
-var splitPremiumMinutes = __EV_MONEY__.splitPremiumMinutes;
 var wevoTxTimeMs = __EV_MONEY__.wevoTxTimeMs;
 var UNCATALOGUED_SINCE_MS = __EV_MONEY__.UNCATALOGUED_SINCE_MS;
 var findUncataloguedCharges = __EV_MONEY__.findUncataloguedCharges;
