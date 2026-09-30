@@ -164,7 +164,7 @@ function CompleteSession({
     const creds = getWevoCreds();
     if (!(creds.email && creds.password)) {
       setWevoFetch("err");
-      setWevoFetchErr("אין התחברות Wevo — היכנס ב־סנכרן Wevo");
+      setWevoFetchErr("אין התחברות Wevo — היכנס תחילה ב״סנכרון Wevo״");
       return;
     }
     setWevoFetch("loading");
@@ -661,7 +661,7 @@ function CompleteSession({
   }, /*#__PURE__*/React.createElement(Icon, {
     n: "check",
     s: 12
-  }), " אשראי · ללא חוב"), C.primary]] : [[`קוט״ש מנופח`, `${prev.kwhRaw} → ${prev.kwhInflated}`, null], ["תעריף", `₪${prev.rate} | ${prev.rateLabel}`, null], ["לחיוב (לפני תוספת)", ils(prev.amountBilled - adjVal), null], ...(adjVal !== 0 ? [["תוספת/הנחה", `${adjVal > 0 ? "+" : ""}${adjVal}₪`, adjVal > 0 ? C.warn : C.ok]] : []), ["סהכ לחיוב", ils(prev.amountBilled), C.primaryStrong], ["עלות בפועל 🔒", `₪${(_prev$costToOwner2 = prev.costToOwner) === null || _prev$costToOwner2 === void 0 ? void 0 : _prev$costToOwner2.toFixed(2)}`, C.meta], ["רווח", ilsFull(prev.profit), C.okInk]]).map(([lbl, val, color]) => /*#__PURE__*/React.createElement("div", {
+  }), " אשראי · ללא חוב"), C.primary]] : [[`קוט״ש מנופח`, `${prev.kwhRaw} → ${prev.kwhInflated}`, null], ["תעריף", `₪${prev.rate} | ${prev.rateLabel}`, null], ["לחיוב (לפני תוספת)", ils(prev.amountBilled - adjVal), null], ...(adjVal !== 0 ? [["תוספת/הנחה", `${adjVal > 0 ? "+" : ""}${adjVal}₪`, adjVal > 0 ? C.warn : C.ok]] : []), ["סה״כ לחיוב", ils(prev.amountBilled), C.primaryStrong], ["עלות בפועל 🔒", `₪${(_prev$costToOwner2 = prev.costToOwner) === null || _prev$costToOwner2 === void 0 ? void 0 : _prev$costToOwner2.toFixed(2)}`, C.meta], ["רווח", ilsFull(prev.profit), C.okInk]]).map(([lbl, val, color]) => /*#__PURE__*/React.createElement("div", {
     key: lbl,
     style: S.pRow
   }, /*#__PURE__*/React.createElement("span", {
@@ -671,8 +671,8 @@ function CompleteSession({
     }
   }, lbl), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontWeight: lbl === "סהכ לחיוב" ? "800" : color ? "700" : "400",
-      fontSize: lbl === "סהכ לחיוב" ? 18 : color ? 15 : 13,
+      fontWeight: lbl === "סה״כ לחיוב" ? "800" : color ? "700" : "400",
+      fontSize: lbl === "סה״כ לחיוב" ? 18 : color ? 15 : 13,
       color: color || C.ink,
       fontVariantNumeric: "tabular-nums"
     }

@@ -1760,14 +1760,14 @@ function Icon(props) {
 // ── תמחור: ברירות מחדל — ניתנות לשינוי בהגדרות ⚙️ ──────────────────────────
 const DEFAULT_CONFIG = {
   ratePremium: 2.98,
-  // גביה 16:00–23:00
+  // גבייה 16:00–23:00
   rateRegular: 1.47,
-  // גביה שאר הזמן
+  // גבייה שאר הזמן
   ownerPeak: 2.08,
   // עלות בעלים 17:00–23:00
   ownerOff: 0.87,
   // עלות בעלים שאר הזמן + שישי/שבת
-  inflation: 1.21 // ניפוח קוט״ש לגביה (1.21 = +21%)
+  inflation: 1.21 // ניפוח קוט״ש לגבייה (1.21 = +21%)
 };
 const PREM_S = 16,
   PREM_E = 23;
@@ -1891,7 +1891,7 @@ function isOwnerPeakNow(d = new Date()) {
   return h >= OWNER_PS && h < OWNER_PE;
 }
 
-/** שעות פרימיום לגביה מלקוחות — 16:00–23:00 */
+/** שעות פרימיום לגבייה מלקוחות — 16:00–23:00 */
 function isBillingPeakNow(d = new Date()) {
   const h = d.getHours() + d.getMinutes() / 60;
   return h >= PREM_S && h < PREM_E;
@@ -3809,7 +3809,7 @@ function parseChargeText(raw) {
     }
   }
   if (kwhVal === null) return {
-    error: 'לא נמצא קוט"ש — ודא שהטקסט מכיל מספר + קוטש'
+    error: 'לא נמצא קוט״ש — ודא שהטקסט מכיל מספר + קוט״ש'
   };
   const tm = s.match(/(\d{1,2}):(\d{2})\s*(אחה["״צ]?|בערב|בלילה|pm)/i) || s.match(/(\d{1,2}):(\d{2})\s*(בצהריים)/i) || s.match(/(\d{1,2}):(\d{2})/);
   let timeStr = "00:00";
@@ -6668,7 +6668,7 @@ function ArchiveView({
     style: uncatSectionStyle
   }, /*#__PURE__*/React.createElement("div", {
     style: uncatTitleStyle
-  }, "🔌 טעינות מאורכבות (לא שויכו)"), /*#__PURE__*/React.createElement("div", {
+  }, "🔌 טעינות שהועברו לארכיון (לא שויכו)"), /*#__PURE__*/React.createElement("div", {
     style: uncatDescStyle
   }, "טעינות שהועברו לארכיון מהרשימה הלא־מקוטלגת בלי שיוך ללקוח. לא נוצר חיוב. אפשר לשחזר בכל רגע."), uncatPlain.map(e => /*#__PURE__*/React.createElement("div", {
     key: e.key,
@@ -9630,7 +9630,7 @@ function WevoHistoryView({
   })();
   const pageTitle = isBilling ? "היסטוריית חיוב" : "היסטוריית טעינה";
   const totalLabel = isBilling ? "Total billed · all time" : "Total charged · all time";
-  const ratesTitle = isBilling ? "תעריפי גביה" : "תעריף משתנה";
+  const ratesTitle = isBilling ? "תעריפי גבייה" : "תעריף משתנה";
   const ratesSub = isBilling ? "תעריפים שנגבים מהלקוחות:" : "תעריפים ל-24 השעות הקרובות:";
 
   return h("div", {
@@ -10654,7 +10654,7 @@ function SettingsView({
       fontWeight: 700,
       color: C.primaryInk
     }
-  }, "גביה מלקוחות")), /*#__PURE__*/React.createElement(FG, {
+  }, "גבייה מלקוחות")), /*#__PURE__*/React.createElement(FG, {
     lbl: "תעריף פרימיום (16:00–23:00) ₪/קוט״ש"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
@@ -11058,7 +11058,7 @@ function ClientView({
       color: C.meta,
       lineHeight: 1.45
     }
-  }, "היסטוריה מלאה כמו עובר ושב: טעינות מגדילות חוב (+), הפקדות מקטינות (−). הימין — יתרה אחרי כל שורה."), ledger.length === 0 ? /*#__PURE__*/React.createElement(EmptyState, {
+  }, "היסטוריה מלאה כמו עובר ושב: טעינות מגדילות חוב (+), הפקדות מקטינות (−). מימין — יתרה אחרי כל שורה."), ledger.length === 0 ? /*#__PURE__*/React.createElement(EmptyState, {
     icon: "clock",
     title: "אין תנועות עדיין",
     sub: "טעינות ותשלומים יופיעו כאן אוטומטית"
@@ -11632,10 +11632,10 @@ function SessionFormFields({
   }, /*#__PURE__*/React.createElement(Icon, {
     n: "check",
     s: 12
-  }), " אשראי · ללא חוב"), C.primary]] : [[`קוט״ש מנופח (${inflationPctLabel()})`, `${prev.kwhRaw} → ${prev.kwhInflated}`, null], ["תעריף", `₪${prev.rate} | ${prev.rateLabel}`, null], ["לחיוב (לפני תוספת)", ils(prev.amountBilled - (adjustVal || 0)), null], ...(adjustVal !== 0 ? [["תוספת/הנחה", `${adjustVal > 0 ? "+" : ""}${adjustVal}₪`, adjustVal > 0 ? C.warn : C.ok]] : []), ["סהכ לחיוב", ils(prev.amountBilled), C.primaryStrong], ["עלות בפועל 🔒", `₪${(_prev$costToOwner = prev.costToOwner) === null || _prev$costToOwner === void 0 ? void 0 : _prev$costToOwner.toFixed(2)}`, C.meta], ["רווח", ilsFull(prev.profit), C.okInk]]).map(([lbl, val, color]) => /*#__PURE__*/React.createElement("div", {
+  }), " אשראי · ללא חוב"), C.primary]] : [[`קוט״ש מנופח (${inflationPctLabel()})`, `${prev.kwhRaw} → ${prev.kwhInflated}`, null], ["תעריף", `₪${prev.rate} | ${prev.rateLabel}`, null], ["לחיוב (לפני תוספת)", ils(prev.amountBilled - (adjustVal || 0)), null], ...(adjustVal !== 0 ? [["תוספת/הנחה", `${adjustVal > 0 ? "+" : ""}${adjustVal}₪`, adjustVal > 0 ? C.warn : C.ok]] : []), ["סה״כ לחיוב", ils(prev.amountBilled), C.primaryStrong], ["עלות בפועל 🔒", `₪${(_prev$costToOwner = prev.costToOwner) === null || _prev$costToOwner === void 0 ? void 0 : _prev$costToOwner.toFixed(2)}`, C.meta], ["רווח", ilsFull(prev.profit), C.okInk]]).map(([lbl, val, color]) => /*#__PURE__*/React.createElement("div", {
     key: lbl,
     style: S.pRow,
-    "data-testid": lbl === "סהכ לחיוב" ? "session-preview-billed" : lbl === "עלות בפועל 🔒" ? "session-preview-cost" : undefined
+    "data-testid": lbl === "סה״כ לחיוב" ? "session-preview-billed" : lbl === "עלות בפועל 🔒" ? "session-preview-cost" : undefined
   }, /*#__PURE__*/React.createElement("span", {
     style: {
       color: C.meta,
@@ -11643,8 +11643,8 @@ function SessionFormFields({
     }
   }, lbl), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontWeight: lbl === "סהכ לחיוב" ? "800" : color ? "700" : "400",
-      fontSize: lbl === "סהכ לחיוב" ? 18 : color ? 15 : 13,
+      fontWeight: lbl === "סה״כ לחיוב" ? "800" : color ? "700" : "400",
+      fontSize: lbl === "סה״כ לחיוב" ? 18 : color ? 15 : 13,
       color: color || C.ink,
       fontVariantNumeric: "tabular-nums"
     }
@@ -12409,7 +12409,7 @@ function CompleteSession({
     const creds = getWevoCreds();
     if (!(creds.email && creds.password)) {
       setWevoFetch("err");
-      setWevoFetchErr("אין התחברות Wevo — היכנס ב־סנכרן Wevo");
+      setWevoFetchErr("אין התחברות Wevo — היכנס תחילה ב״סנכרון Wevo״");
       return;
     }
     setWevoFetch("loading");
@@ -12906,7 +12906,7 @@ function CompleteSession({
   }, /*#__PURE__*/React.createElement(Icon, {
     n: "check",
     s: 12
-  }), " אשראי · ללא חוב"), C.primary]] : [[`קוט״ש מנופח`, `${prev.kwhRaw} → ${prev.kwhInflated}`, null], ["תעריף", `₪${prev.rate} | ${prev.rateLabel}`, null], ["לחיוב (לפני תוספת)", ils(prev.amountBilled - adjVal), null], ...(adjVal !== 0 ? [["תוספת/הנחה", `${adjVal > 0 ? "+" : ""}${adjVal}₪`, adjVal > 0 ? C.warn : C.ok]] : []), ["סהכ לחיוב", ils(prev.amountBilled), C.primaryStrong], ["עלות בפועל 🔒", `₪${(_prev$costToOwner2 = prev.costToOwner) === null || _prev$costToOwner2 === void 0 ? void 0 : _prev$costToOwner2.toFixed(2)}`, C.meta], ["רווח", ilsFull(prev.profit), C.okInk]]).map(([lbl, val, color]) => /*#__PURE__*/React.createElement("div", {
+  }), " אשראי · ללא חוב"), C.primary]] : [[`קוט״ש מנופח`, `${prev.kwhRaw} → ${prev.kwhInflated}`, null], ["תעריף", `₪${prev.rate} | ${prev.rateLabel}`, null], ["לחיוב (לפני תוספת)", ils(prev.amountBilled - adjVal), null], ...(adjVal !== 0 ? [["תוספת/הנחה", `${adjVal > 0 ? "+" : ""}${adjVal}₪`, adjVal > 0 ? C.warn : C.ok]] : []), ["סה״כ לחיוב", ils(prev.amountBilled), C.primaryStrong], ["עלות בפועל 🔒", `₪${(_prev$costToOwner2 = prev.costToOwner) === null || _prev$costToOwner2 === void 0 ? void 0 : _prev$costToOwner2.toFixed(2)}`, C.meta], ["רווח", ilsFull(prev.profit), C.okInk]]).map(([lbl, val, color]) => /*#__PURE__*/React.createElement("div", {
     key: lbl,
     style: S.pRow
   }, /*#__PURE__*/React.createElement("span", {
@@ -12916,8 +12916,8 @@ function CompleteSession({
     }
   }, lbl), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontWeight: lbl === "סהכ לחיוב" ? "800" : color ? "700" : "400",
-      fontSize: lbl === "סהכ לחיוב" ? 18 : color ? 15 : 13,
+      fontWeight: lbl === "סה״כ לחיוב" ? "800" : color ? "700" : "400",
+      fontSize: lbl === "סה״כ לחיוב" ? 18 : color ? 15 : 13,
       color: color || C.ink,
       fontVariantNumeric: "tabular-nums"
     }

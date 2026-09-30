@@ -304,7 +304,7 @@ function ClientView({
       color: C.meta,
       lineHeight: 1.45
     }
-  }, "היסטוריה מלאה כמו עובר ושב: טעינות מגדילות חוב (+), הפקדות מקטינות (−). הימין — יתרה אחרי כל שורה."), ledger.length === 0 ? /*#__PURE__*/React.createElement(EmptyState, {
+  }, "היסטוריה מלאה כמו עובר ושב: טעינות מגדילות חוב (+), הפקדות מקטינות (−). מימין — יתרה אחרי כל שורה."), ledger.length === 0 ? /*#__PURE__*/React.createElement(EmptyState, {
     icon: "clock",
     title: "אין תנועות עדיין",
     sub: "טעינות ותשלומים יופיעו כאן אוטומטית"

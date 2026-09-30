@@ -500,7 +500,7 @@ function WevoHistoryView({
   })();
   const pageTitle = isBilling ? "היסטוריית חיוב" : "היסטוריית טעינה";
   const totalLabel = isBilling ? "Total billed · all time" : "Total charged · all time";
-  const ratesTitle = isBilling ? "תעריפי גביה" : "תעריף משתנה";
+  const ratesTitle = isBilling ? "תעריפי גבייה" : "תעריף משתנה";
   const ratesSub = isBilling ? "תעריפים שנגבים מהלקוחות:" : "תעריפים ל-24 השעות הקרובות:";
 
   return h("div", {

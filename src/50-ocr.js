@@ -48,7 +48,7 @@ function parseChargeText(raw) {
     }
   }
   if (kwhVal === null) return {
-    error: 'לא נמצא קוט"ש — ודא שהטקסט מכיל מספר + קוטש'
+    error: 'לא נמצא קוט״ש — ודא שהטקסט מכיל מספר + קוט״ש'
   };
   const tm = s.match(/(\d{1,2}):(\d{2})\s*(אחה["״צ]?|בערב|בלילה|pm)/i) || s.match(/(\d{1,2}):(\d{2})\s*(בצהריים)/i) || s.match(/(\d{1,2}):(\d{2})/);
   let timeStr = "00:00";

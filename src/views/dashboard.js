@@ -620,7 +620,7 @@ function ArchiveView({
     style: uncatSectionStyle
   }, /*#__PURE__*/React.createElement("div", {
     style: uncatTitleStyle
-  }, "🔌 טעינות מאורכבות (לא שויכו)"), /*#__PURE__*/React.createElement("div", {
+  }, "🔌 טעינות שהועברו לארכיון (לא שויכו)"), /*#__PURE__*/React.createElement("div", {
     style: uncatDescStyle
   }, "טעינות שהועברו לארכיון מהרשימה הלא־מקוטלגת בלי שיוך ללקוח. לא נוצר חיוב. אפשר לשחזר בכל רגע."), uncatPlain.map(e => /*#__PURE__*/React.createElement("div", {
     key: e.key,

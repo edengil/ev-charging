@@ -61,7 +61,7 @@ function SettingsView({
       fontWeight: 700,
       color: C.primaryInk
     }
-  }, "גביה מלקוחות")), /*#__PURE__*/React.createElement(FG, {
+  }, "גבייה מלקוחות")), /*#__PURE__*/React.createElement(FG, {
     lbl: "תעריף פרימיום (16:00–23:00) ₪/קוט״ש"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,

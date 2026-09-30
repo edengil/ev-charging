@@ -7,14 +7,14 @@
 // ── תמחור: ברירות מחדל — ניתנות לשינוי בהגדרות ⚙️ ──────────────────────────
 const DEFAULT_CONFIG = {
   ratePremium: 2.98,
-  // גביה 16:00–23:00
+  // גבייה 16:00–23:00
   rateRegular: 1.47,
-  // גביה שאר הזמן
+  // גבייה שאר הזמן
   ownerPeak: 2.08,
   // עלות בעלים 17:00–23:00
   ownerOff: 0.87,
   // עלות בעלים שאר הזמן + שישי/שבת
-  inflation: 1.21 // ניפוח קוט״ש לגביה (1.21 = +21%)
+  inflation: 1.21 // ניפוח קוט״ש לגבייה (1.21 = +21%)
 };
 const PREM_S = 16,
   PREM_E = 23;
@@ -138,7 +138,7 @@ function isOwnerPeakNow(d = new Date()) {
   return h >= OWNER_PS && h < OWNER_PE;
 }
 
-/** שעות פרימיום לגביה מלקוחות — 16:00–23:00 */
+/** שעות פרימיום לגבייה מלקוחות — 16:00–23:00 */
 function isBillingPeakNow(d = new Date()) {
   const h = d.getHours() + d.getMinutes() / 60;
   return h >= PREM_S && h < PREM_E;
