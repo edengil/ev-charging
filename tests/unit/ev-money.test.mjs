@@ -613,6 +613,37 @@ describe("Wevo open session match", () => {
     assert.equal(chargerReportsVehicle({ state: "Charging", rateKw: 9.2, totalEnergyKwh: 21.77, totalCost: 18.99 }, saved), true);
   });
 
+  it("טעינה מושהית עם קוט״ש כמו טעינה ישנה מההיסטוריה נשארת רכב בעמדה", () => {
+    const old = [
+      { date: "2026-07-14T13:00", kwhRaw: 3.191, costToOwner: 2.77, source: "wevo-import" }
+    ];
+    const plug = Date.parse("2026-09-26T17:00:00Z");
+    const paused = { state: "SuspendedEVSE", rateKw: 0, totalEnergyKwh: 3.2, totalCost: 2.78, transactionId: null, plugInTime: plug };
+    assert.equal(chargerReportsVehicle(paused, old), true);
+    assert.equal(chargerReportsVehicle({ ...paused, plugInTime: null }, old), true);
+    const liveOpen = {
+      id: "o-live",
+      source: "wevo-live",
+      clientId: "c1",
+      startDate: "2026-09-26T20:00",
+      plugInAt: "2026-09-26T20:00",
+      liveKwh: 3.2,
+      liveWevoCost: 2.78,
+      liveKw: 0
+    };
+    assert.equal(shouldDiscardOpen(liveOpen, old), false);
+    assert.equal(dropOpensAlreadySaved([liveOpen], old).length, 1);
+    const justSaved = [{ date: "2026-09-26T20:40", kwhRaw: 3.2, costToOwner: 2.78, source: "wevo-live" }];
+    assert.equal(chargerReportsVehicle(paused, justSaved), false);
+    assert.equal(shouldDiscardOpen(liveOpen, justSaved), true);
+    assert.equal(savedSessionMatchesCharge({ kwhRaw: 3.2, costToOwner: 2.78 }, liveOpen), false);
+  });
+
+  it("הרשימה מסתירה טעינה חיה רק כשהפאנל מציג רכב", () => {
+    const src = readFileSync(join(root, "src/views/dashboard.js"), "utf8");
+    assert.match(src, /const liveOpen = chargerReportsVehicle\(liveStation, sessions\) \? findChargeStillOnStation/);
+  });
+
   it("readyToComplete לא נחשב פעיל", () => {
     const opens = [
       { id: "done", source: "wevo-live", wevoTxnId: "111", readyToComplete: true }

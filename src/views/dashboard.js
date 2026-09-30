@@ -64,7 +64,8 @@ function Dashboard({
     if (sortBy === "last") arr.sort((a, b) => (b.last ? new Date(b.last.date) : 0) - (a.last ? new Date(a.last.date) : 0));
     return arr;
   }, [stats, sortBy]);
-  const liveOpen = findChargeStillOnStation(openSess, liveStation, sessions);
+  // מוסתרת מהרשימה רק כשהפאנל החי באמת מציג רכב — אחרת הטעינה נעלמת משני המקומות
+  const liveOpen = chargerReportsVehicle(liveStation, sessions) ? findChargeStillOnStation(openSess, liveStation, sessions) : null;
   const openCards = dropOpensAlreadySaved(openSess, sessions).filter(o => !liveOpen || o.id !== liveOpen.id);
   return /*#__PURE__*/React.createElement("main", {
     style: S.main

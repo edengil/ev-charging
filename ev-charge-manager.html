@@ -956,8 +956,26 @@ function chargeMoney(row) {
   return Number.isFinite(n) ? n : null;
 }
 
+const SAME_CHARGE_WINDOW_MS = 36 * 60 * 60 * 1000;
+
+function chargeTimes(row, keys) {
+  return keys.map(k => localDtMs(row[k])).filter(t => t != null);
+}
+
 /**
- * אותה טעינה: אותו txn, או אותו קוט״ש ואותו סכום גם אם השעון זז (אזור זמן / ייבוא מחדש).
+ * התעריף קבוע, אז קוט״ש וסכום לבד תואמים כמעט תמיד טעינה ישנה כלשהי מההיסטוריה.
+ * בלי txn — רק טעינה שנשמרה בחלון הזמן של אותה טעינה. בלי שעה בשמורה אין התאמה.
+ */
+function chargeTimesNear(session, charge) {
+  const st = chargeTimes(session, ["date", "startDate", "plugInAt", "chargeEndedAt", "endDate"]);
+  if (!st.length) return false;
+  let ct = chargeTimes(charge, ["plugInAt", "startDate", "chargeEndedAt", "endDate", "plugInTime", "date"]);
+  if (!ct.length) ct = [Date.now()];
+  return st.some(a => ct.some(b => Math.abs(a - b) <= SAME_CHARGE_WINDOW_MS));
+}
+
+/**
+ * אותה טעינה: אותו txn, או אותו קוט״ש ואותו סכום בחלון זמן קרוב (אזור זמן / ייבוא מחדש).
  */
 function savedSessionMatchesCharge(session, charge) {
   if (!session || !charge) return false;
@@ -970,7 +988,8 @@ function savedSessionMatchesCharge(session, charge) {
   const cc = chargeMoney(charge);
   if (sk == null || ck == null || sc == null || cc == null) return false;
   if (sk <= 0 || ck <= 0) return false;
-  return Math.abs(sk - ck) <= 0.05 && Math.abs(sc - cc) <= 0.05;
+  if (Math.abs(sk - ck) > 0.05 || Math.abs(sc - cc) > 0.05) return false;
+  return chargeTimesNear(session, charge);
 }
 
 function openIsFinishedPending(open) {
@@ -1133,7 +1152,8 @@ function chargerReportsVehicle(st, sessions) {
       wevoTxnId: st.transactionId != null ? String(st.transactionId) : null,
       transactionId: st.transactionId,
       liveKwh: st.totalEnergyKwh,
-      liveWevoCost: st.totalCost
+      liveWevoCost: st.totalCost,
+      plugInTime: st.plugInTime
     };
     if (shouldDiscardOpen({ ...echo, readyToComplete: true, liveKw: kw }, sessions)) return false;
   }
@@ -3380,7 +3400,8 @@ function mergeWevoTransactions(clients, sessions, transactions, openSess = []) {
       if (!savedSessionMatchesCharge(s, {
         transactionId: tid,
         kwhRaw: kwh,
-        costToOwner: cost
+        costToOwner: cost,
+        plugInTime: plugMs || null
       })) return false;
       const sessionMs = new Date(s.date).getTime();
       if (!Number.isFinite(sessionMs) || !plugMs) return true;
@@ -5108,7 +5129,8 @@ function Dashboard({
     if (sortBy === "last") arr.sort((a, b) => (b.last ? new Date(b.last.date) : 0) - (a.last ? new Date(a.last.date) : 0));
     return arr;
   }, [stats, sortBy]);
-  const liveOpen = findChargeStillOnStation(openSess, liveStation, sessions);
+  // מוסתרת מהרשימה רק כשהפאנל החי באמת מציג רכב — אחרת הטעינה נעלמת משני המקומות
+  const liveOpen = chargerReportsVehicle(liveStation, sessions) ? findChargeStillOnStation(openSess, liveStation, sessions) : null;
   const openCards = dropOpensAlreadySaved(openSess, sessions).filter(o => !liveOpen || o.id !== liveOpen.id);
   return /*#__PURE__*/React.createElement("main", {
     style: S.main
@@ -7021,7 +7043,8 @@ function WevoLivePanel({
     wevoTxnId: st.transactionId,
     transactionId: st.transactionId,
     liveKwh: st.totalEnergyKwh,
-    liveWevoCost: st.totalCost
+    liveWevoCost: st.totalCost,
+    plugInTime: st.plugInTime
   }));
   const color = chargingNow ? "#065f46" : waitingAuth ? "#b45309" : "#334155";
   const bg = chargingNow ? "#ecfdf5" : waitingAuth ? "#fffbeb" : "#f8fafc";

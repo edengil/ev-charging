@@ -825,7 +825,8 @@ function mergeWevoTransactions(clients, sessions, transactions, openSess = []) {
       if (!savedSessionMatchesCharge(s, {
         transactionId: tid,
         kwhRaw: kwh,
-        costToOwner: cost
+        costToOwner: cost,
+        plugInTime: plugMs || null
       })) return false;
       const sessionMs = new Date(s.date).getTime();
       if (!Number.isFinite(sessionMs) || !plugMs) return true;

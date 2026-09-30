@@ -733,7 +733,8 @@ function WevoLivePanel({
     wevoTxnId: st.transactionId,
     transactionId: st.transactionId,
     liveKwh: st.totalEnergyKwh,
-    liveWevoCost: st.totalCost
+    liveWevoCost: st.totalCost,
+    plugInTime: st.plugInTime
   }));
   const color = chargingNow ? "#065f46" : waitingAuth ? "#b45309" : "#334155";
   const bg = chargingNow ? "#ecfdf5" : waitingAuth ? "#fffbeb" : "#f8fafc";
