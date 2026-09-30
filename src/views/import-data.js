@@ -18,6 +18,18 @@ function ImportData({
   const [json, setJson] = useState("");
   const [err, setErr] = useState("");
   const [wevoLog, setWevoLog] = useState(() => getWevoLog());
+  const [importing, setImporting] = useState(false);
+  const chipStyle = (bg, ink) => ({
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    background: bg,
+    color: ink,
+    flexShrink: 0
+  });
   const status = cloudStatus || getCloudStatus();
   const fmtCloudTime = ts => {
     if (!ts) return null;
@@ -43,24 +55,33 @@ function ImportData({
   }, /*#__PURE__*/React.createElement("div", {
     style: S.form
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#ecfdf5",
-      border: "1.5px solid #99f6e4",
-      borderRadius: 12,
+    style: { ...S.row,
+      display: "block",
       padding: 14,
       marginBottom: 16
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "#0f766e",
+      display: "flex",
+      alignItems: "center",
+      gap: 9,
       marginBottom: 6
     }
-  }, "☁️ גיבוי ענן (מומלץ לטלפון)"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", {
+    style: chipStyle(C.okSoft, C.okInk)
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "send",
+    s: 17
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      color: C.ink
+    }
+  }, "גיבוי ענן (מומלץ לטלפון)")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
-      color: "#374151",
+      color: C.body,
       marginBottom: 8,
       lineHeight: 1.45
     }
@@ -69,53 +90,96 @@ function ImportData({
     : "שמור את הנתונים בענן עם PIN אישי, כדי שלא יימחקו כשמוחקים את האפליקציה מהטלפון."), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
-      background: lastErrTxt ? "#fef2f2" : "#f0fdf4",
+      background: lastErrTxt ? C.errSoft : C.okSoft,
       border: `1px solid ${lastErrTxt ? "#fecaca" : "#bbf7d0"}`,
       borderRadius: 8,
       padding: "8px 10px",
       marginBottom: 10,
-      color: lastErrTxt ? "#991b1b" : "#065f46",
+      color: lastErrTxt ? C.errInk : C.okInk,
       lineHeight: 1.45
     }
-  }, !cloudConfigured && /*#__PURE__*/React.createElement("div", null, "סטטוס: לא מוגדר PIN במכשיר הזה"), cloudConfigured && lastOkTxt && /*#__PURE__*/React.createElement("div", null, "✓ נשמר לאחרונה: ", lastOkTxt), cloudConfigured && !lastOkTxt && !lastErrTxt && /*#__PURE__*/React.createElement("div", null, "ממתין לשמירה ראשונה..."), lastErrTxt && /*#__PURE__*/React.createElement("div", {
+  }, !cloudConfigured && /*#__PURE__*/React.createElement("div", null, "סטטוס: לא מוגדר PIN במכשיר הזה"), cloudConfigured && lastOkTxt && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "check",
+    s: 14,
+    style: {
+      color: C.okInk
+    }
+  }), "נשמר לאחרונה: ", lastOkTxt), cloudConfigured && !lastOkTxt && !lastErrTxt && /*#__PURE__*/React.createElement("div", null, "ממתין לשמירה ראשונה..."), lastErrTxt && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: lastOkTxt ? 4 : 0
     }
-  }, "⚠ שגיאה אחרונה: ", lastErrTxt)), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "alert",
+    s: 14,
+    style: {
+      display: "inline-block",
+      verticalAlign: "-2px",
+      color: C.errInk
+    }
+  }), " שגיאה אחרונה: ", lastErrTxt)), /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnP,
       background: "#0f766e",
       padding: "11px",
       width: "100%",
-      marginBottom: 8
+      marginBottom: 8,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7
     },
     onClick: onCloudSetup
-  }, "🔐 הגדר / עדכן גיבוי ענן"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "cog",
+    s: 16
+  }), " הגדר / עדכן גיבוי ענן"), /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnS,
       padding: "11px",
-      width: "100%"
+      width: "100%",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7
     },
     onClick: onCloudLogin
-  }, "📥 שחזר מהענן עם PIN")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#f0fdf4",
-      border: "1px solid #bbf7d0",
-      borderRadius: 12,
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "inbox",
+    s: 16
+  }), " שחזר מהענן עם PIN")), /*#__PURE__*/React.createElement("div", {
+    style: { ...S.row,
+      display: "block",
       padding: 14,
       marginBottom: 16
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "#065f46",
+      display: "flex",
+      alignItems: "center",
+      gap: 9,
       marginBottom: 6
     }
-  }, "📤 גיבוי / ייצוא"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", {
+    style: chipStyle(C.primarySoft, C.primaryInk)
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "archive",
+    s: 17
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      color: C.ink
+    }
+  }, "גיבוי / ייצוא")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
-      color: "#374151",
+      color: C.body,
       marginBottom: 10
     }
   }, "הורדה מהירה לקובץ JSON — הכי בטוח לגיבוי ידני. אפשר גם להעתיק ללוח."), /*#__PURE__*/React.createElement("button", {
@@ -126,7 +190,7 @@ function ImportData({
     },
     onClick: onDownload,
     "data-testid": "backup-download"
-  }, "💾 הורד קובץ גיבוי (JSON)"), /*#__PURE__*/React.createElement("button", {
+  }, "הורד קובץ גיבוי (JSON)"), /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnS,
       padding: "11px",
@@ -134,11 +198,9 @@ function ImportData({
     },
     onClick: onExport,
     "data-testid": "backup-copy"
-  }, "📋 העתק נתונים ללוח")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fff7ed",
-      border: "1px solid #fed7aa",
-      borderRadius: 12,
+  }, "העתק נתונים ללוח")), /*#__PURE__*/React.createElement("div", {
+    style: { ...S.row,
+      display: "block",
       padding: 14,
       marginBottom: 16
     }
@@ -152,11 +214,22 @@ function ImportData({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 9
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: chipStyle(C.warnSoft, C.warnInk)
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "plug",
+    s: 17
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
       fontWeight: 700,
       fontSize: 14,
-      color: "#c2410c"
+      color: C.ink
     }
-  }, "🔌 יומן Wevo (קצר)"), /*#__PURE__*/React.createElement("button", {
+  }, "יומן Wevo (קצר)")), /*#__PURE__*/React.createElement("button", {
     style: {
       background: "none",
       border: "1px solid #fdba74",
@@ -164,14 +237,20 @@ function ImportData({
       padding: "4px 8px",
       fontSize: 11,
       cursor: "pointer",
-      color: "#9a3412",
-      fontWeight: 600
+      color: C.warnInk,
+      fontWeight: 600,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 5
     },
     onClick: () => setWevoLog(getWevoLog())
-  }, "רענן")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "refresh",
+    s: 13
+  }), "רענן")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
-      color: "#9a3412",
+      color: C.body,
       marginBottom: 8
     }
   }, "פעולות אחרונות (אישור / סנכרון / שגיאות) — עוזר כשנתקעים"), wevoLog.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -185,33 +264,58 @@ function ImportData({
       fontSize: 12,
       padding: "6px 0",
       borderBottom: i < Math.min(wevoLog.length, 8) - 1 ? "1px solid #ffedd5" : "none",
-      color: row.ok ? "#374151" : "#991b1b",
+      color: row.ok ? C.body : C.errInk,
       lineHeight: 1.35
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#a8a29e",
+      color: C.meta,
       marginLeft: 6
     }
-  }, row.at ? ftime(new Date(row.at).toISOString()) : ""), " ", row.ok ? "✓" : "⚠", " ", row.msg))), /*#__PURE__*/React.createElement("div", {
+  }, row.at ? ftime(new Date(row.at).toISOString()) : ""), " ", row.ok ? /*#__PURE__*/React.createElement(Icon, {
+    n: "check",
+    s: 13,
     style: {
-      background: "#f0f9ff",
-      border: "1px solid #bae6fd",
-      borderRadius: 12,
+      display: "inline-block",
+      verticalAlign: "-2px",
+      color: C.okInk
+    }
+  }) : /*#__PURE__*/React.createElement(Icon, {
+    n: "alert",
+    s: 13,
+    style: {
+      display: "inline-block",
+      verticalAlign: "-2px",
+      color: C.errInk
+    }
+  }), " ", row.msg))), /*#__PURE__*/React.createElement("div", {
+    style: { ...S.row,
+      display: "block",
       padding: 14,
       marginBottom: 16
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: "#0369a1",
+      display: "flex",
+      alignItems: "center",
+      gap: 9,
       marginBottom: 6
     }
-  }, "📥 שחזור / ייבוא"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", {
+    style: chipStyle(C.primarySoft, C.primaryInk)
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "inbox",
+    s: 17
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      color: C.ink
+    }
+  }, "שחזור / ייבוא")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
-      color: "#374151",
+      color: C.body,
       marginBottom: 8
     }
   }, "בחר קובץ גיבוי מהמכשיר (מומלץ) או הדבק ידנית למטה"), /*#__PURE__*/React.createElement("label", {
@@ -227,7 +331,7 @@ function ImportData({
       marginBottom: 10,
       cursor: "pointer"
     }
-  }, "📂 בחר קובץ JSON", /*#__PURE__*/React.createElement("input", {
+  }, "בחר קובץ JSON", /*#__PURE__*/React.createElement("input", {
     type: "file",
     accept: ".json,application/json,text/plain",
     style: { display: "none" },
@@ -251,15 +355,21 @@ function ImportData({
   })), json.trim() && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
-      color: "#065f46",
-      background: "#f0fdf4",
+      color: C.okInk,
+      background: C.okSoft,
       border: "1px solid #bbf7d0",
       borderRadius: 8,
       padding: "8px 10px",
       marginBottom: 8,
-      fontWeight: 600
+      fontWeight: 600,
+      display: "flex",
+      alignItems: "center",
+      gap: 6
     }
-  }, "✓ נטענו " + (json.length / 1024).toFixed(0) + "KB — לחץ \"ייבא נתונים\" לאישור"), /*#__PURE__*/React.createElement("textarea", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "check",
+    s: 14
+  }), "נטענו " + (json.length / 1024).toFixed(0) + "KB — לחץ \"ייבא נתונים\" לאישור"), /*#__PURE__*/React.createElement("textarea", {
     style: {
       ...S.inp,
       height: 120,
@@ -280,18 +390,30 @@ function ImportData({
     style: {
       ...S.btnP,
       padding: "11px",
-      opacity: json.trim() ? 1 : 0.5
+      opacity: importing ? 0.7 : json.trim() ? 1 : 0.5,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7
     },
-    disabled: !json.trim(),
+    disabled: !json.trim() || importing,
     onClick: () => {
+      setImporting(true);
       try {
         JSON.parse(json);
         onImport(json);
       } catch {
         setErr("JSON לא תקין");
+        setImporting(false);
       }
     }
-  }, "📥 ייבא נתונים")), /*#__PURE__*/React.createElement("button", {
+  }, importing ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Spinner, {
+    s: 16,
+    style: {
+      borderTopColor: "#fff",
+      borderColor: "rgba(255,255,255,0.35)"
+    }
+  }), " מייבא…") : "ייבא נתונים")), /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnS,
       marginTop: 8,

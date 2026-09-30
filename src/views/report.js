@@ -9,7 +9,8 @@ function Report({
   cid,
   clients,
   sessions,
-  payments
+  payments,
+  go
 }) {
   const c = clients.find(x => x.id === cid);
   const now = new Date();
@@ -50,55 +51,55 @@ function Report({
   }, y)))), /*#__PURE__*/React.createElement("div", {
     style: S.rep
   }, /*#__PURE__*/React.createElement("div", {
-    style: S.repH
-  }, /*#__PURE__*/React.createElement("span", null, "📄 ", c === null || c === void 0 ? void 0 : c.name), /*#__PURE__*/React.createElement("span", null, MONTHS[mo], " ", yr)), ss.length === 0 && /*#__PURE__*/React.createElement("div", {
-    style: S.empty
-  }, "אין טעינות בחודש זה"), ss.map(s => /*#__PURE__*/React.createElement("div", {
+    style: { ...S.repH, alignItems: "center" }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { display: "inline-flex", alignItems: "center", gap: 8, color: C.primaryStrong }
+  }, /*#__PURE__*/React.createElement(Icon, { n: "chart", s: 20 }), /*#__PURE__*/React.createElement("span", { style: { color: C.ink } }, c === null || c === void 0 ? void 0 : c.name)), /*#__PURE__*/React.createElement("span", {
+    style: S.pill(C.primarySoft, C.primaryInk)
+  }, MONTHS[mo], " ", yr)), ss.length === 0 && /*#__PURE__*/React.createElement(EmptyState, {
+    icon: "chart",
+    title: "בחודש הזה עוד לא נרשמו טעינות",
+    sub: "אפשר להוסיף טעינה ידנית או לחכות לסנכרון מ-Wevo.",
+    actionLabel: "הוסף טעינה",
+    onAction: () => go && go("add-s")
+  }), ss.map(s => /*#__PURE__*/React.createElement("div", {
     key: s.id,
     style: S.repRow
-  }, /*#__PURE__*/React.createElement("span", null, fdate(s.date), " ", ftime(s.date)), /*#__PURE__*/React.createElement("span", null, s.kwhInflated, " קוט\"ש"), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", null, fdate(s.date), " ", ftime(s.date)), /*#__PURE__*/React.createElement("span", null, s.kwhInflated, " קוט״ש"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontWeight: 700
     }
   }, ils(s.amountBilled)))), ss.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { ...S.hero, marginTop: 12, marginBottom: 12 }
+  }, /*#__PURE__*/React.createElement("div", { style: S.heroLabel }, "סה״כ לתשלום"), /*#__PURE__*/React.createElement("div", { style: S.heroNum }, ils(total)), /*#__PURE__*/React.createElement("div", { style: { ...S.heroLabel, marginTop: 6 } }, ss.length, " טעינות · ", MONTHS[mo], " ", yr))), /*#__PURE__*/React.createElement("div", {
+    style: S.statusCard(bal > 0 ? C.err : C.ok)
+  }, /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 14, color: C.body } }, "יתרה נוכחית"), /*#__PURE__*/React.createElement("span", {
     style: {
-      ...S.repRow,
-      borderTop: "2px solid #e5e7eb",
-      fontWeight: 700,
-      marginTop: 4
-    }
-  }, /*#__PURE__*/React.createElement("span", null, "סהכ"), /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: "#0e7490",
-      fontSize: 17,
-      fontVariantNumeric: "tabular-nums"
-    }
-  }, ils(total)))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...S.repRow,
-      fontWeight: 700
-    }
-  }, /*#__PURE__*/React.createElement("span", null, "יתרה נוכחית"), /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: bal > 0 ? "#b91c1c" : "#047857",
-      fontSize: 15,
-      fontVariantNumeric: "tabular-nums"
+      ...S.num,
+      marginRight: "auto",
+      fontWeight: 800,
+      fontSize: 20,
+      color: bal > 0 ? C.err : C.ok
     }
   }, ils(bal))), ss.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: S.acts
   }, /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnP,
-      background: "#128c4b"
+      background: C.wa,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6
     },
     onClick: () => openWaDraft({
       phone: c === null || c === void 0 ? void 0 : c.phone,
       name: c === null || c === void 0 ? void 0 : c.name,
       text: reportText()
     })
-  }, "💬 טיוטה"), /*#__PURE__*/React.createElement("button", {
-    style: S.btnS,
+  }, /*#__PURE__*/React.createElement(Icon, { n: "send", s: 16 }), "טיוטה"), /*#__PURE__*/React.createElement("button", {
+    style: { ...S.btnS, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 },
     onClick: () => navigator.clipboard.writeText(reportText())
-  }, "📋 העתק")));
+  }, /*#__PURE__*/React.createElement(Icon, { n: "edit", s: 16 }), "העתק")));
 }
 

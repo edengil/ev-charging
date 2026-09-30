@@ -15,9 +15,10 @@ function EditPayment({
   const p = payment;
   if (!p) return /*#__PURE__*/React.createElement("main", {
     style: S.main
-  }, /*#__PURE__*/React.createElement("div", {
-    style: S.empty
-  }, "התשלום לא נמצא"));
+  }, /*#__PURE__*/React.createElement(EmptyState, {
+    icon: "alert",
+    title: "התשלום לא נמצא"
+  }));
   const cl = clients.find(x => x.id === p.clientId);
   const isDebt = p.method === "debt";
   const [amt, setAmt] = useState(String(Math.abs(p.amount)));
@@ -39,10 +40,10 @@ function EditPayment({
     style: S.cNameLg
   }, cl === null || cl === void 0 ? void 0 : cl.name), /*#__PURE__*/React.createElement("div", {
     style: {
-      color: "#6b7280",
+      color: C.meta,
       fontSize: 12
     }
-  }, "✏️ עריכת ", isDebt ? "חוב" : "תשלום", " · ", fdate(p.date)))), /*#__PURE__*/React.createElement(FG, {
+  }, /*#__PURE__*/React.createElement(Icon, { n: "edit", s: 12, style: { display: "inline-block", verticalAlign: "-1px", marginInlineEnd: 4 } }), "עריכת ", isDebt ? "חוב" : "תשלום", " · ", fdate(p.date)))), /*#__PURE__*/React.createElement(FG, {
     lbl: isDebt ? "סכום החוב" : "סכום ששולם"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
@@ -76,26 +77,26 @@ function EditPayment({
     style: S.pRow
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6b7280",
+      color: C.meta,
       fontSize: 13
     }
   }, "סכום קודם"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontWeight: 700,
-      color: "#9ca3af",
+      color: C.meta,
       fontSize: 15
     }
   }, ils(Math.abs(p.amount)))), /*#__PURE__*/React.createElement("div", {
     style: S.pRow
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6b7280",
+      color: C.meta,
       fontSize: 13
     }
   }, "סכום חדש"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontWeight: 700,
-      color: "#6366f1",
+      color: C.primaryStrong,
       fontSize: 15
     }
   }, ils(num)))), /*#__PURE__*/React.createElement("div", {
@@ -124,7 +125,7 @@ function EditPayment({
     }
   }, "למחוק את הרישום הזה?"), /*#__PURE__*/React.createElement("button", {
     style: {
-      background: "#ef4444",
+      background: C.errInk,
       color: "#fff",
       border: "none",
       borderRadius: 8,
@@ -136,8 +137,8 @@ function EditPayment({
     onClick: () => onDelete(p.id)
   }, "כן, מחק"), /*#__PURE__*/React.createElement("button", {
     style: {
-      background: "#f3f4f6",
-      color: "#374151",
+      background: C.errSoft,
+      color: C.errInk,
       border: "none",
       borderRadius: 8,
       padding: "8px 18px",
@@ -148,7 +149,7 @@ function EditPayment({
     style: {
       background: "none",
       border: "none",
-      color: "#ef4444",
+      color: C.err,
       fontSize: 13,
       cursor: "pointer",
       marginTop: 14,
@@ -156,6 +157,6 @@ function EditPayment({
       fontWeight: 600
     },
     onClick: () => setConfirmDel(true)
-  }, "🗑 מחק רישום")));
+  }, /*#__PURE__*/React.createElement(Icon, { n: "trash", s: 13, style: { display: "inline-block", verticalAlign: "-2px", marginInlineEnd: 5 } }), "מחק רישום")));
 }
 

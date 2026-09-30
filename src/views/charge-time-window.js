@@ -15,21 +15,21 @@ function ChargeTimelineBox({
   if (!pts.length) return null;
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#f8fafc",
-      border: "1px solid #e2e8f0",
+      background: C.bg,
+      border: `1px solid ${C.line}`,
       borderRadius: 10,
       padding: compact ? "8px 10px" : "10px 12px",
       marginBottom: compact ? 6 : 12,
       fontSize: compact ? 12 : 13,
       lineHeight: 1.55,
-      color: "#334155"
+      color: C.body
     },
     "data-testid": "charge-timeline"
   }, !compact && /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 700,
       fontSize: 12,
-      color: "#0f172a",
+      color: C.ink,
       marginBottom: 6
     }
   }, "חלון זמנים"), pts.map(p => {
@@ -43,9 +43,19 @@ function ChargeTimelineBox({
         gap: 8,
         padding: "2px 0",
         fontWeight: isBillStart || isBillEnd ? 700 : 400,
-        color: isBillStart ? "#0369a1" : isBillEnd ? "#b45309" : "#334155"
+        color: C.body
       }
-    }, /*#__PURE__*/React.createElement("span", null, p.label, isBillStart ? " · התחלת חיוב" : "", isBillEnd ? " · סיום חיוב" : ""), /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, p.label, isBillStart && /*#__PURE__*/React.createElement("span", {
+      style: S.pill(C.primarySoft, C.primaryInk)
+    }, "התחלת חיוב"), isBillEnd && /*#__PURE__*/React.createElement("span", {
+      style: S.pill(C.warnSoft, C.warnInk)
+    }, "סיום חיוב")), /*#__PURE__*/React.createElement("span", {
       style: {
         whiteSpace: "nowrap",
         fontVariantNumeric: "tabular-nums"

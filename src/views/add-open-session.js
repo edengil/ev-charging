@@ -20,17 +20,26 @@ function AddOpenSession({
   }, /*#__PURE__*/React.createElement("div", {
     style: S.form
   }, /*#__PURE__*/React.createElement("div", {
+    style: S.hero
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#e0f2fe",
-      border: "1px solid #bae6fd",
-      borderRadius: 10,
-      padding: "10px 12px",
-      marginBottom: 14,
-      fontSize: 13,
-      color: "#0369a1",
-      fontWeight: 600
+      display: "flex",
+      alignItems: "center",
+      gap: 12
     }
-  }, "⏳ טעינה פתוחה — תשלים את הנתונים בסיום"), /*#__PURE__*/React.createElement(FG, {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "plug",
+    s: 26
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 800
+    }
+  }, "פתיחת טעינה"), /*#__PURE__*/React.createElement("div", {
+    style: S.heroLabel
+  }, "טעינה פתוחה — תשלים נתונים בסיום")))), /*#__PURE__*/React.createElement("div", {
+    style: { ...S.chip(C.primarySoft, C.primaryInk), width: "100%", marginBottom: 14 }
+  }, /*#__PURE__*/React.createElement(Icon, { n: "clock", s: 13 }), "טעינה פתוחה — תשלים את הנתונים בסיום"), /*#__PURE__*/React.createElement(FG, {
     lbl: "לקוח"
   }, /*#__PURE__*/React.createElement("select", {
     style: S.inp,
@@ -70,7 +79,7 @@ function AddOpenSession({
       notes
     }),
     "data-testid": "open-start"
-  }, cid ? "⏳ התחל טעינה" : "בחר לקוח להתחלה"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(Icon, { n: "plug", s: 15, style: { display: "inline-block", verticalAlign: "-2px", marginInlineEnd: 6 } }), cid ? "התחל טעינה" : "בחר לקוח להתחלה"), /*#__PURE__*/React.createElement("button", {
     style: S.btnS,
     onClick: onCancel
   }, "ביטול"))));

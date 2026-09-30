@@ -42,14 +42,18 @@ function SessionFormFields({
     placeholder: "3:24 או 3h 24m או 204",
     value: durInput,
     onChange: e => setDurInput(e.target.value)
-  }), durMins > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
+  }), durMins > 0 && /*#__PURE__*/React.createElement("span", {
+    style: { ...S.chip(C.primarySoft, C.primaryInk),
+      minHeight: 0,
+      padding: "4px 10px",
       fontSize: 11,
-      color: "#6b7280",
-      marginTop: 3
+      marginTop: 6
     }
-  }, "= ", Math.floor(durMins / 60), "h ", durMins % 60, "m", edt ? ` | סיום: ${edt.slice(11, 16)}` : "")), /*#__PURE__*/React.createElement(FG, {
-    lbl: "קוט\"ש גולמי (מהעמדה)"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "clock",
+    s: 13
+  }), "= ", Math.floor(durMins / 60), " שעות ו־", durMins % 60, " דק׳", edt ? ` · סיום ${edt.slice(11, 16)}` : "")), /*#__PURE__*/React.createElement(FG, {
+    lbl: "קוט״ש גולמי (מהעמדה)"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
     type: "number",
@@ -73,7 +77,7 @@ function SessionFormFields({
     lbl: "תעריף"
   }, /*#__PURE__*/React.createElement("div", {
     style: S.rg
-  }, [["auto", "אוטומטי 🤖"], ["regular", `רגיל ₪${getConfig().rateRegular}`], ["premium", `פרימיום ₪${getConfig().ratePremium}`], ["custom", "מותאם ✍️"]].map(([v, l]) => /*#__PURE__*/React.createElement("label", {
+  }, [["auto", "אוטומטי", "cog"], ["regular", `רגיל ₪${getConfig().rateRegular}`, null], ["premium", `פרימיום ₪${getConfig().ratePremium}`, null], ["custom", "מותאם", "edit"]].map(([v, l, ic]) => /*#__PURE__*/React.createElement("label", {
     key: v,
     style: S.rlbl
   }, /*#__PURE__*/React.createElement("input", {
@@ -82,7 +86,10 @@ function SessionFormFields({
     value: v,
     checked: fr === v,
     onChange: () => setFr(v)
-  }), " ", l))), fr === "custom" && /*#__PURE__*/React.createElement("input", {
+  }), ic && /*#__PURE__*/React.createElement(Icon, {
+    n: ic,
+    s: 15
+  }), /*#__PURE__*/React.createElement("span", null, l)))), fr === "custom" && /*#__PURE__*/React.createElement("input", {
     style: {
       ...S.inp,
       marginTop: 8
@@ -90,7 +97,7 @@ function SessionFormFields({
     type: "number",
     step: "0.01",
     inputMode: "decimal",
-    placeholder: "מחיר לקוט\"ש, למשל 2.5",
+    placeholder: "מחיר לקוט״ש, למשל 2.5",
     value: customRate,
     onChange: e => setCustomRate(e.target.value)
   })), /*#__PURE__*/React.createElement(FG, {
@@ -102,13 +109,16 @@ function SessionFormFields({
     placeholder: "למשל: 10 תוספת או -5 הנחה",
     value: adjust,
     onChange: e => setAdjust(e.target.value)
-  }), adjust && parseFloat(adjust) !== 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: parseFloat(adjust) > 0 ? "#f59e0b" : "#10b981",
-      marginTop: 3
+  }), adjust && parseFloat(adjust) !== 0 && /*#__PURE__*/React.createElement("span", {
+    style: parseFloat(adjust) > 0 ? { ...S.pill(C.warnSoft, C.warnInk),
+      marginTop: 6
+    } : { ...S.pill(C.okSoft, C.okInk),
+      marginTop: 6
     }
-  }, parseFloat(adjust) > 0 ? `➕ תוספת ₪${parseFloat(adjust)}` : `➖ הנחה ₪${Math.abs(parseFloat(adjust))}`))), /*#__PURE__*/React.createElement(FG, {
+  }, parseFloat(adjust) > 0 ? /*#__PURE__*/React.createElement(Icon, {
+    n: "plus",
+    s: 12
+  }) : null, parseFloat(adjust) > 0 ? ` תוספת ₪${parseFloat(adjust)}` : `הנחה ₪${Math.abs(parseFloat(adjust))}`))), /*#__PURE__*/React.createElement(FG, {
     lbl: "הערות"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
@@ -120,20 +130,26 @@ function SessionFormFields({
     "data-testid": "session-preview"
   }, /*#__PURE__*/React.createElement("div", {
     style: S.prevTitle
-  }, "תצוגה מקדימה"), (isSelf ? [[`קוט"ש`, String(prev.kwhRaw), null], ["חיוב אשראי", ilsFull(prev.amountBilled), "#0ea5c6"], ["סטטוס", "אשראי ✓ · ללא חוב", "#0ea5c6"]] : [[`קוט"ש מנופח (${inflationPctLabel()})`, `${prev.kwhRaw} → ${prev.kwhInflated}`, null], ["תעריף", `₪${prev.rate} | ${prev.rateLabel}`, null], ["לחיוב (לפני תוספת)", ils(prev.amountBilled - (adjustVal || 0)), null], ...(adjustVal !== 0 ? [["תוספת/הנחה", `${adjustVal > 0 ? "+" : ""}${adjustVal}₪`, adjustVal > 0 ? "#f59e0b" : "#10b981"]] : []), ["סהכ לחיוב", ils(prev.amountBilled), "#6366f1"], ["עלות בפועל 🔒", `₪${(_prev$costToOwner = prev.costToOwner) === null || _prev$costToOwner === void 0 ? void 0 : _prev$costToOwner.toFixed(2)}`, "#9ca3af"], ["רווח", ilsFull(prev.profit), "#10b981"]]).map(([lbl, val, color]) => /*#__PURE__*/React.createElement("div", {
+  }, "תצוגה מקדימה"), (isSelf ? [[`קוט״ש`, String(prev.kwhRaw), null], ["חיוב אשראי", ilsFull(prev.amountBilled), C.primary], ["סטטוס", /*#__PURE__*/React.createElement("span", {
+    style: S.pill(C.primarySoft, C.primaryInk)
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "check",
+    s: 12
+  }), " אשראי · ללא חוב"), C.primary]] : [[`קוט״ש מנופח (${inflationPctLabel()})`, `${prev.kwhRaw} → ${prev.kwhInflated}`, null], ["תעריף", `₪${prev.rate} | ${prev.rateLabel}`, null], ["לחיוב (לפני תוספת)", ils(prev.amountBilled - (adjustVal || 0)), null], ...(adjustVal !== 0 ? [["תוספת/הנחה", `${adjustVal > 0 ? "+" : ""}${adjustVal}₪`, adjustVal > 0 ? C.warn : C.ok]] : []), ["סהכ לחיוב", ils(prev.amountBilled), C.primaryStrong], ["עלות בפועל 🔒", `₪${(_prev$costToOwner = prev.costToOwner) === null || _prev$costToOwner === void 0 ? void 0 : _prev$costToOwner.toFixed(2)}`, C.meta], ["רווח", ilsFull(prev.profit), C.okInk]]).map(([lbl, val, color]) => /*#__PURE__*/React.createElement("div", {
     key: lbl,
     style: S.pRow,
     "data-testid": lbl === "סהכ לחיוב" ? "session-preview-billed" : lbl === "עלות בפועל 🔒" ? "session-preview-cost" : undefined
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6b7280",
+      color: C.meta,
       fontSize: 13
     }
   }, lbl), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontWeight: color ? "700" : "400",
-      fontSize: color ? 15 : 13,
-      color: color || "#111827"
+      fontWeight: lbl === "סהכ לחיוב" ? "800" : color ? "700" : "400",
+      fontSize: lbl === "סהכ לחיוב" ? 18 : color ? 15 : 13,
+      color: color || C.ink,
+      fontVariantNumeric: "tabular-nums"
     }
   }, val)))));
 }

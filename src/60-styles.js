@@ -43,9 +43,29 @@ const C = {
     "button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{" +
     "outline:2px solid #0ea5c6;outline-offset:2px;border-radius:8px}" +
     "@keyframes evPulse{0%{transform:scale(1);opacity:1}50%{transform:scale(1.35);opacity:.55}100%{transform:scale(1);opacity:1}}" +
-    ".ev-live-dot{animation:evPulse 1.6s ease-in-out infinite}";
+    ".ev-live-dot{animation:evPulse 1.6s ease-in-out infinite}" +
+    "@keyframes evSpin{to{transform:rotate(360deg)}}" +
+    ".ev-spinner{animation:evSpin .9s linear infinite;display:block;flex-shrink:0}" +
+    "@keyframes evFadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}" +
+    ".ev-view{animation:evFadeUp .18s ease-out}" +
+    ".ev-stagger{animation:evFadeUp .24s ease-out backwards}" +
+    "@keyframes evSkel{0%,100%{opacity:.5}50%{opacity:1}}" +
+    ".ev-skel{animation:evSkel 1.4s ease-in-out infinite;background:#e8eef3;border-radius:8px}" +
+    ".ev-press{transition:transform .08s ease}" +
+    ".ev-press:active{transform:scale(.97)}" +
+    "@keyframes evToastIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}" +
+    ".ev-toast-in{animation:evToastIn .18s ease-out}" +
+    "@keyframes evBadgePop{0%{transform:scale(1)}40%{transform:scale(1.45)}100%{transform:scale(1)}}" +
+    ".ev-badge-pop{animation:evBadgePop .45s ease-out}";
   document.head.appendChild(el);
 })();
+
+// משכי טוסט אחידים (ms)
+const TOAST_MS = {
+  info: 3200,
+  ok: 3200,
+  err: 5000
+};
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 const S = {
@@ -525,5 +545,137 @@ const S = {
     fontWeight: 700,
     color: C.body,
     marginBottom: 10
+  },
+  // ── סבב 2: תג pill אחיד (999), כרטיס סטטוס, hero ─────────────────────────
+  pill(bg, ink) {
+    return {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 11,
+      fontWeight: 700,
+      padding: "5px 11px",
+      borderRadius: 999,
+      background: bg,
+      color: ink,
+      whiteSpace: "nowrap",
+      lineHeight: 1.3
+    };
+  },
+  // כרטיס סטטוס בסגנון ActiveChargeCards: לבן + פס צבעוני בצד
+  statusCard(accent) {
+    return {
+      background: C.card,
+      borderRadius: 12,
+      padding: "12px 14px",
+      boxShadow: C.shadowCard,
+      borderInlineStart: `4px solid ${accent}`,
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    };
+  },
+  hero: {
+    borderRadius: 16,
+    padding: "18px 18px",
+    background: "linear-gradient(135deg,#0e7490,#0ea5c6)",
+    color: "#fff",
+    boxShadow: C.shadowPop,
+    marginBottom: 16,
+    position: "relative",
+    overflow: "hidden"
+  },
+  heroErr: {
+    borderRadius: 16,
+    padding: "18px 18px",
+    background: "linear-gradient(135deg,#991b1b,#dc2626)",
+    color: "#fff",
+    boxShadow: C.shadowPop,
+    marginBottom: 16,
+    position: "relative",
+    overflow: "hidden"
+  },
+  heroNum: {
+    fontSize: 26,
+    fontWeight: 800,
+    letterSpacing: -0.5,
+    fontVariantNumeric: "tabular-nums",
+    lineHeight: 1.15
+  },
+  heroLabel: {
+    fontSize: 13,
+    opacity: 0.92,
+    marginTop: 2
+  },
+  // צ׳יפ תובנה בסגנון InsightsStrip
+  chip(bg, ink, onClick) {
+    return {
+      background: bg,
+      color: ink,
+      border: "none",
+      borderRadius: 999,
+      padding: "8px 12px",
+      fontSize: 12,
+      fontWeight: 700,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      whiteSpace: "nowrap",
+      cursor: onClick ? "pointer" : "default",
+      fontFamily: "inherit",
+      minHeight: 44,
+      lineHeight: 1.3
+    };
   }
 };
+
+// ── רכיבי עיצוב משותפים (סבב 2) ──────────────────────────────────────────
+// ספינר SVG ציאני
+function Spinner(props) {
+  const s = (props && props.s) || 18;
+  const st = (props && props.style) || {};
+  return React.createElement("span", {
+    className: "ev-spinner",
+    "aria-hidden": "true",
+    style: {
+      width: s,
+      height: s,
+      borderRadius: "50%",
+      border: "2.5px solid rgba(14,165,198,0.25)",
+      borderTopColor: C.primary,
+      ...st
+    }
+  });
+}
+
+// מצב ריק מעוצב: אייקון בעיגול + כותרת + הסבר + כפתור פעולה
+function EmptyState(props) {
+  const tone = props.tone || "primary";
+  const bg = tone === "ok" ? C.okSoft : tone === "err" ? C.errSoft : C.primarySoft;
+  const ink = tone === "ok" ? C.okInk : tone === "err" ? C.errInk : C.primaryStrong;
+  return React.createElement("div", {
+    style: { ...S.empty, padding: "28px 18px" },
+    "data-testid": props.testid || "empty-state"
+  },
+    React.createElement("div", {
+      style: {
+        width: 64, height: 64, borderRadius: "50%", background: bg,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        margin: "0 auto 12px", color: ink
+      }
+    }, React.createElement(Icon, { n: props.icon || "inbox", s: 30 })),
+    React.createElement("div", {
+      style: { fontWeight: 800, fontSize: 15, color: C.ink, marginBottom: 4 }
+    }, props.title),
+    props.sub && React.createElement("div", {
+      style: { fontSize: 13, color: C.meta, marginBottom: props.actionLabel ? 14 : 0, lineHeight: 1.55 }
+    }, props.sub),
+    props.actionLabel && React.createElement("button", {
+      type: "button",
+      onClick: props.onAction,
+      className: "ev-press",
+      style: { ...S.btnP, flex: "0 0 auto", display: "inline-block", minHeight: 44, fontSize: 14, padding: "10px 24px" }
+    }, props.actionLabel)
+  );
+}

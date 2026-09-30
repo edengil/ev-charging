@@ -105,56 +105,69 @@ function StatsView({
         }
       }, monthKeys.map(({ y, m }) => h("option", { key: `${y}-${m}`, value: `${y}-${m}` }, MONTHS[m], " ", y)))
     ),
+    h("div", { style: S.hero },
+      h("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 } },
+        h(Icon, { n: "chart", s: 20 }),
+        h("span", { style: { fontWeight: 800, fontSize: 15 } }, MONTHS[selMo], " ", selYr),
+        h("span", { style: { fontSize: 11, color: "rgba(255,255,255,.88)" } }, "· לקוחות בלבד")),
+      h("div", { style: { display: "flex", gap: 22 } },
+        h("div", null,
+          h("div", { style: { ...S.heroNum, fontSize: 20 } }, ils(cur.income)),
+          h("div", { style: S.heroLabel }, "הכנסות")),
+        h("div", null,
+          h("div", { style: { ...S.heroNum, fontSize: 20 } }, ilsFull(cur.expense)),
+          h("div", { style: S.heroLabel }, "הוצאות")),
+        h("div", null,
+          h("div", { style: { ...S.heroNum, fontSize: 20 } }, ilsFull(cur.profit)),
+          h("div", { style: S.heroLabel }, "רווח"),
+          profitDelta !== null && h("div", {
+            style: {
+              display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11,
+              marginTop: 5, color: "rgba(255,255,255,.95)",
+              background: "rgba(255,255,255,.18)", borderRadius: 999, padding: "2px 8px"
+            }
+          },
+            h(Icon, { n: "chevD", s: 11, style: { transform: profitDelta >= 0 ? "rotate(180deg)" : "none" } }),
+            Math.abs(profitDelta), "% מחודש קודם")))),
+    h("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 6 } },
+      h("span", { style: S.chip(C.primarySoft, C.primaryInk) },
+        h(Icon, { n: "clock", s: 15 }),
+        (isCurMonth ? `קצב עד היום (יום ${paceDay})` : `קצב עד יום ${paceDay}`), ": ", ilsFull(profitMTD),
+        paceDelta != null && h("span", { style: { display: "inline-flex", alignItems: "center", gap: 2, marginRight: 6 } },
+          h(Icon, { n: "chevD", s: 12, style: { transform: paceDelta >= 0 ? "rotate(180deg)" : "none" } }),
+          Math.abs(paceDelta), "%"))),
+    h("div", { style: { fontSize: 11, color: C.meta, marginBottom: 14 } },
+      profitPrevMTD === 0 && profitMTD === 0
+        ? "אין נתונים להשוואה"
+        : `חודש שעבר עד יום ${paceDay}: ${ilsFull(profitPrevMTD)}`),
     h("div", { style: S.statBox },
-      h("div", { style: S.statTitle }, "📊 ", MONTHS[selMo], " ", selYr, h("span", {
-        style: { fontWeight: 500, fontSize: 11, color: "#9ca3af", marginRight: 8 }
-      }, "· לקוחות בלבד")),
-      h("div", { style: S.pRow }, h("span", { style: { color: "#6b7280", fontSize: 13 } }, "הכנסות"), h("span", { style: { fontWeight: 700, color: "#6366f1" } }, ils(cur.income))),
-      h("div", { style: S.pRow }, h("span", { style: { color: "#6b7280", fontSize: 13 } }, "הוצאות (עלות חשמל) 🔒"), h("span", { style: { fontWeight: 700, color: "#ef4444" } }, ilsFull(cur.expense))),
-      h("div", { style: S.pRow }, h("span", { style: { color: "#6b7280", fontSize: 13 } }, "רווח"), h("span", { style: { fontWeight: 800, color: "#10b981", fontSize: 16 } },
-        ilsFull(cur.profit),
-        profitDelta !== null && h("span", { style: { fontSize: 11, marginRight: 6, color: profitDelta >= 0 ? "#10b981" : "#ef4444" } },
-          profitDelta >= 0 ? "▲" : "▼", " ", Math.abs(profitDelta), "% מחודש קודם (מלא)")
-      )),
-      h("div", { style: { ...S.pRow, background: "#f0fdf4", margin: "6px -4px", padding: "8px 10px", borderRadius: 10, alignItems: "flex-start" } },
-        h("span", { style: { color: "#065f46", fontSize: 13, fontWeight: 600, lineHeight: 1.35 } },
-          isCurMonth ? `קצב עד היום (יום ${paceDay})` : `קצב עד יום ${paceDay}`),
-        h("span", { style: { fontWeight: 800, color: "#059669", fontSize: 14, textAlign: "left", lineHeight: 1.35 } },
-          ilsFull(profitMTD),
-          h("div", { style: { fontSize: 11, fontWeight: 600, color: paceDelta == null ? "#6b7280" : paceDelta >= 0 ? "#10b981" : "#ef4444" } },
-            profitPrevMTD === 0 && profitMTD === 0
-              ? "אין נתונים להשוואה"
-              : `חודש שעבר עד יום ${paceDay}: ${ilsFull(profitPrevMTD)}${paceDelta != null ? ` · ${paceDelta >= 0 ? "▲" : "▼"}${Math.abs(paceDelta)}%` : ""}`
-          )
-        )
-      ),
-      h("div", { style: S.pRow }, h("span", { style: { color: "#6b7280", fontSize: 13 } }, "טעינות לקוחות"), h("span", { style: { fontWeight: 700 } },
+      h("div", { style: S.pRow }, h("span", { style: { color: C.meta, fontSize: 13 } }, "טעינות לקוחות"), h("span", { style: { fontWeight: 700 } },
         cur.count,
-        cur.selfCount > 0 ? h("span", { style: { color: "#9ca3af", fontSize: 11, fontWeight: 500, marginRight: 6 } }, "+ ", cur.selfCount, " עצמי") : null
+        cur.selfCount > 0 ? h("span", { style: { color: C.meta, fontSize: 11, fontWeight: 500, marginRight: 6 } }, "+ ", cur.selfCount, " עצמי") : null
       )),
-      h("div", { style: S.pRow }, h("span", { style: { color: "#6b7280", fontSize: 13 } }, "סה״כ קוט\"ש (לקוחות)"), h("span", { style: { fontWeight: 700 } }, cur.kwh)),
+      h("div", { style: S.pRow }, h("span", { style: { color: C.meta, fontSize: 13 } }, "סה״כ קוט״ש (לקוחות)"), h("span", { style: { fontWeight: 700 } }, cur.kwh)),
       cur.count > 0 && h(React.Fragment, null,
-        h("div", { style: S.pRow }, h("span", { style: { color: "#6b7280", fontSize: 13 } }, "ממוצע קוט\"ש לטעינה"), h("span", null, Math.round(cur.kwh / cur.count))),
-        h("div", { style: S.pRow }, h("span", { style: { color: "#6b7280", fontSize: 13 } }, "ממוצע רווח לטעינה"), h("span", { style: { color: "#10b981" } }, ilsFull(cur.profit / cur.count)))
+        h("div", { style: S.pRow }, h("span", { style: { color: C.meta, fontSize: 13 } }, "ממוצע קוט״ש לטעינה"), h("span", null, Math.round(cur.kwh / cur.count))),
+        h("div", { style: S.pRow }, h("span", { style: { color: C.meta, fontSize: 13 } }, "ממוצע רווח לטעינה"), h("span", { style: { color: C.ok } }, ilsFull(cur.profit / cur.count)))
       )
     ),
     byClient.length > 0 && h("div", { style: S.statBox },
-      h("div", { style: S.statTitle }, "👥 פירוט לפי לקוח"),
+      h("div", { style: { ...S.statTitle, display: "flex", alignItems: "center", gap: 8 } }, h(Icon, { n: "userPlus", s: 18 }), "פירוט לפי לקוח"),
       byClient.map(c => h("div", { key: c.id, style: S.pRow },
-        h("span", { style: { fontSize: 13, color: c.isSelf ? "#0ea5c6" : undefined } },
+        h("span", { style: { fontSize: 13, color: c.isSelf ? C.primary : undefined } },
           c.name, c.isSelf ? " · עצמי" : "", " ",
-          h("span", { style: { color: "#9ca3af", fontSize: 11 } }, "(", c.count, ")")
+          h("span", { style: { color: C.meta, fontSize: 11 } }, "(", c.count, ")")
         ),
         h("span", { style: { fontSize: 13 } },
-          h("span", { style: { fontWeight: 700, color: c.isSelf ? "#0ea5c6" : "#6366f1" } },
+          h("span", { style: { fontWeight: 700, color: c.isSelf ? C.primary : C.primaryStrong } },
             c.isSelf ? `${ilsFull(c.billed)} עלות` : ils(c.billed)
           ),
-          !c.isSelf && h("span", { style: { color: "#10b981", fontSize: 11, marginRight: 6 } }, "רווח ", ilsFull(c.profit))
+          !c.isSelf && h("span", { style: { color: C.ok, fontSize: 11, marginRight: 6 } }, "רווח ", ilsFull(c.profit))
         )
       ))
     ),
     h("div", { style: S.statBox },
-      h("div", { style: S.statTitle }, "📈 רווח לפי חודש (לקוחות)"),
+      h("div", { style: { ...S.statTitle, display: "flex", alignItems: "center", gap: 8 } }, h(Icon, { n: "chart", s: 18 }), "רווח לפי חודש (לקוחות)"),
       graphMonths.map(gm => h("div", {
         key: `${gm.y}-${gm.m}`,
         style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }
@@ -162,7 +175,7 @@ function StatsView({
         h("span", {
           style: {
             width: 64, fontSize: 11,
-            color: gm.y === selYr && gm.m === selMo ? "#6366f1" : "#6b7280",
+            color: gm.y === selYr && gm.m === selMo ? C.primaryStrong : C.meta,
             fontWeight: gm.y === selYr && gm.m === selMo ? 700 : 400
           }
         }, MONTHS[gm.m].slice(0, 4), " ", String(gm.y).slice(2)),
@@ -170,21 +183,21 @@ function StatsView({
           h("div", {
             style: {
               width: `${gm.pct}%`,
-              background: gm.profit >= 0 ? "#10b981" : "#ef4444",
+              background: gm.profit >= 0 ? C.ok : C.err,
               height: "100%", borderRadius: 6,
               minWidth: gm.profit !== 0 ? 4 : 0
             }
           })
         ),
-        h("span", { style: { width: 72, fontSize: 11, fontWeight: 700, textAlign: "left", color: "#374151" } }, ilsFull(gm.profit))
+        h("span", { style: { width: 72, fontSize: 11, fontWeight: 700, textAlign: "left", color: C.body } }, ilsFull(gm.profit))
       ))
     ),
-    h("div", { style: { ...S.statBox, borderTop: "3px solid #6366f1" } },
-      h("div", { style: S.statTitle }, "🏆 סך הכל (לקוחות, כל הזמנים)"),
-      h("div", { style: S.pRow }, h("span", { style: { color: "#6b7280", fontSize: 13 } }, "הכנסות"), h("span", { style: { fontWeight: 700, color: "#6366f1" } }, ils(allIncome))),
-      h("div", { style: S.pRow }, h("span", { style: { color: "#6b7280", fontSize: 13 } }, "הוצאות 🔒"), h("span", { style: { fontWeight: 700, color: "#ef4444" } }, ilsFull(allExpense))),
-      h("div", { style: S.pRow }, h("span", { style: { color: "#6b7280", fontSize: 13 } }, "רווח כולל"), h("span", { style: { fontWeight: 800, color: "#10b981", fontSize: 16 } }, ilsFull(allProfit))),
-      h("div", { style: S.pRow }, h("span", { style: { color: "#6b7280", fontSize: 13 } }, "טעינות לקוחות"), h("span", { style: { fontWeight: 700 } }, bizAll.length))
+    h("div", { style: { ...S.statBox, borderTop: "3px solid " + C.primaryStrong } },
+      h("div", { style: { ...S.statTitle, display: "flex", alignItems: "center", gap: 8 } }, h(Icon, { n: "card", s: 18 }), "סך הכל (לקוחות, כל הזמנים)"),
+      h("div", { style: S.pRow }, h("span", { style: { color: C.meta, fontSize: 13 } }, "הכנסות"), h("span", { style: { fontWeight: 700, color: C.primaryStrong } }, ils(allIncome))),
+      h("div", { style: S.pRow }, h("span", { style: { color: C.meta, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 } }, "הוצאות", h(Icon, { n: "plug", s: 13 })), h("span", { style: { fontWeight: 700, color: C.err } }, ilsFull(allExpense))),
+      h("div", { style: S.pRow }, h("span", { style: { color: C.meta, fontSize: 13 } }, "רווח כולל"), h("span", { style: { fontWeight: 800, color: C.ok, fontSize: 16 } }, ilsFull(allProfit))),
+      h("div", { style: S.pRow }, h("span", { style: { color: C.meta, fontSize: 13 } }, "טעינות לקוחות"), h("span", { style: { fontWeight: 700 } }, bizAll.length))
     )
   );
 }

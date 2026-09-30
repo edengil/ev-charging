@@ -413,6 +413,8 @@ function WaDraftSheet() {
       inset: 0,
       zIndex: 80,
       background: "rgba(15, 23, 42, 0.45)",
+      backdropFilter: "blur(3px)",
+      WebkitBackdropFilter: "blur(3px)",
       display: "flex",
       alignItems: "flex-end",
       justifyContent: "center",
@@ -430,9 +432,17 @@ function WaDraftSheet() {
     },
     onClick: e => e.stopPropagation()
   }, /*#__PURE__*/React.createElement("div", {
-    style: { fontWeight: 800, fontSize: 16, marginBottom: 4 }
+    style: {
+      width: 40,
+      height: 4,
+      borderRadius: 999,
+      background: C.line,
+      margin: "0 auto 10px"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 800, fontSize: 16, marginBottom: 4, color: C.ink }
   }, "טיוטה", draft.name ? ` · ${draft.name}` : ""), /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 13, color: "#64748b", lineHeight: 1.45, marginBottom: 10 }
+    style: { fontSize: 13, color: C.meta, lineHeight: 1.45, marginBottom: 10 }
   }, "כלום לא נשלח. אפשר לערוך, להעתיק, ורק אם מחליטים לפתוח וואטסאפ — השליחה נשארת אצלך."), /*#__PURE__*/React.createElement("textarea", {
     "data-testid": "wa-draft-text",
     value: draft.text,
@@ -441,7 +451,7 @@ function WaDraftSheet() {
     style: {
       width: "100%",
       boxSizing: "border-box",
-      border: "1.5px solid #cbd5e1",
+      border: "1.5px solid " + C.line,
       borderRadius: 12,
       padding: 12,
       fontSize: 15,
@@ -460,8 +470,8 @@ function WaDraftSheet() {
     },
     style: {
       flex: 1,
-      background: copied ? "#d1fae5" : "#0f766e",
-      color: copied ? "#047857" : "#fff",
+      background: copied ? C.okSoft : "#0f766e",
+      color: copied ? C.okInk : "#fff",
       border: "none",
       borderRadius: 10,
       padding: "11px",
@@ -479,9 +489,9 @@ function WaDraftSheet() {
     },
     style: {
       flex: 1,
-      background: hasPhone ? "#ecfdf5" : "#f1f5f9",
-      color: hasPhone ? "#047857" : "#94a3b8",
-      border: hasPhone ? "1.5px solid #6ee7b7" : "1.5px solid #e2e8f0",
+      background: hasPhone ? C.okSoft : C.bg,
+      color: hasPhone ? C.okInk : C.meta,
+      border: hasPhone ? "1.5px solid #6ee7b7" : "1.5px solid " + C.line,
       borderRadius: 10,
       padding: "11px",
       fontWeight: 800,
@@ -495,9 +505,9 @@ function WaDraftSheet() {
     style: {
       width: "100%",
       marginTop: 8,
-      background: "#f8fafc",
-      color: "#334155",
-      border: "1.5px solid #e2e8f0",
+      background: C.bg,
+      color: C.body,
+      border: "1.5px solid " + C.line,
       borderRadius: 10,
       padding: "10px",
       fontWeight: 700,

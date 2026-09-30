@@ -25,6 +25,20 @@ function UncataloguedView({
   const [clientPick, setClientPick] = useState({});
   const [dupWarn, setDupWarn] = useState({});
   const [dupOk, setDupOk] = useState({});
+  const [assignBusy, setAssignBusy] = useState({});
+  const [showHint, setShowHint] = useState(() => {
+    try {
+      return !localStorage.getItem("ev_uncat_hint");
+    } catch (e) {
+      return true;
+    }
+  });
+  const dismissHint = () => {
+    try {
+      localStorage.setItem("ev_uncat_hint", "1");
+    } catch (e) {}
+    setShowHint(false);
+  };
   const clearDup = tid => {
     setDupWarn(prev => {
       const n = { ...prev };
@@ -92,21 +106,37 @@ function UncataloguedView({
       return "";
     }
   })();
+  const showEmpty = !error && !loading && list.length === 0;
+  const lastCheckSub = (() => {
+    try {
+      const ts = Number(localStorage.getItem("ev_uncat_ts"));
+      if (!ts) return "נבדק מול Wevo";
+      const m = Math.round((Date.now() - ts) / 60000);
+      if (m < 1) return "נבדק מול Wevo ממש עכשיו";
+      return `נבדק מול Wevo לפני ${m} דקות`;
+    } catch (e) {
+      return "נבדק מול Wevo";
+    }
+  })();
   return /*#__PURE__*/React.createElement("main", {
     style: S.main
   }, /*#__PURE__*/React.createElement("div", {
     style: S.form
-  }, /*#__PURE__*/React.createElement("div", {
-    style: S.cHeader
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: S.cNameLg
-  }, "טעינות לא מקוטלגות"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#64748b",
-      fontWeight: 600
+  }, !showEmpty && /*#__PURE__*/React.createElement("div", {
+    style: { ...S.hero,
+      padding: "14px 16px"
     }
-  }, "השוואת היסטוריית Wevo מול האפליקציה · החל מ־", sinceLabel))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.heroNum
+  }, loading ? "…" : String(list.length)), /*#__PURE__*/React.createElement("div", {
+    style: S.heroLabel
+  }, "טעינות ממתינות לשיוך"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      opacity: 0.85,
+      marginTop: 6
+    }
+  }, "השוואת היסטוריית Wevo מול האפליקציה · החל מ־", sinceLabel)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -114,38 +144,81 @@ function UncataloguedView({
     }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    style: S.btnS,
+    style: { ...S.btnS,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6
+    },
     onClick: load,
     disabled: loading,
     "data-testid": "uncatalogued-refresh"
-  }, loading ? "שולף מ-Wevo…" : "🔄 רענן מ-Wevo"), onBack && /*#__PURE__*/React.createElement("button", {
+  }, loading ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Spinner, {
+    s: 14
+  }), " שולף מ-Wevo…") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Icon, {
+    n: "refresh",
+    s: 15
+  }), " רענן מ-Wevo")), onBack && /*#__PURE__*/React.createElement("button", {
     type: "button",
     style: S.btnS,
     onClick: onBack
-  }, "← חזרה")), error && /*#__PURE__*/React.createElement("div", {
+  }, "← חזרה")), showHint && /*#__PURE__*/React.createElement("div", {
+    style: { ...S.statusCard(C.primary),
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "inbox",
+    s: 20,
     style: {
-      background: "#fef2f2",
+      color: C.primaryStrong
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      fontSize: 13,
+      color: C.body,
+      lineHeight: 1.5
+    }
+  }, "כאן מופיעות טעינות מ-Wevo שעוד לא שויכו לאף לקוח. בחר לקוח לכל טעינה — החיוב נוצר אוטומטית."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: dismissHint,
+    "aria-label": "סגור",
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: C.meta,
+      fontSize: 18,
+      lineHeight: 1,
+      padding: 4,
+      minWidth: 32,
+      minHeight: 32
+    }
+  }, "×")), error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.errSoft,
       border: "1.5px solid #fecaca",
       borderRadius: 10,
       padding: "10px 12px",
       marginBottom: 14,
       fontSize: 13,
-      color: "#991b1b",
+      color: C.errInk,
       lineHeight: 1.45
     }
-  }, error), !error && !loading && list.length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, error), showEmpty && /*#__PURE__*/React.createElement(EmptyState, {
+    icon: "check",
+    tone: "ok",
+    title: "כל הטעינות מקוטלגות — אין מה להשלים",
+    sub: lastCheckSub,
+    testid: "uncatalogued-empty"
+  }), loading && [0, 1, 2].map(i => /*#__PURE__*/React.createElement("div", {
+    key: "skel-" + i,
+    className: "ev-skel",
     style: {
-      background: "#f0fdf4",
-      border: "1.5px solid #86efac",
-      borderRadius: 10,
-      padding: "12px",
-      fontSize: 14,
-      color: "#166534",
-      fontWeight: 600,
-      textAlign: "center"
-    },
-    "data-testid": "uncatalogued-empty"
-  }, "✅ כל הטעינות מקוטלגות — אין מה להשלים"), list.map(tx => {
+      height: 92,
+      marginBottom: 10
+    }
+  })), list.map((tx, i) => {
     const tid = uncataloguedTxKey(tx);
     const pick = clientPick[tid] || "";
     const kwh = Number(tx.totalEnergyKwh);
@@ -161,16 +234,18 @@ function UncataloguedView({
         return;
       }
       clearDup(tid);
+      setAssignBusy(prev => ({ ...prev,
+        [tid]: true
+      }));
       onAssign(tx, pick);
     };
     return /*#__PURE__*/React.createElement("div", {
       key: tid,
-      style: {
-        background: "#fff",
-        border: "1.5px solid #e2e8f0",
-        borderRadius: 12,
-        padding: "12px",
-        marginBottom: 10
+      className: "ev-stagger",
+      style: { ...S.row,
+        display: "block",
+        padding: "12px 14px",
+        animationDelay: Math.min(i * 45, 360) + "ms"
       },
       "data-testid": "uncatalogued-row-" + tid
     }, /*#__PURE__*/React.createElement("div", {
@@ -183,18 +258,27 @@ function UncataloguedView({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 7,
         fontWeight: 700,
         fontSize: 14,
-        color: "#0f172a"
+        color: C.ink
       }
-    }, "🔌 ", fmtTxTime(tx)), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(Icon, {
+      n: "plug",
+      s: 16,
+      style: {
+        color: C.primaryStrong
+      }
+    }), fmtTxTime(tx)), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 13,
-        color: "#475569",
+        color: C.body,
         fontWeight: 600,
         whiteSpace: "nowrap"
       }
-    }, Number.isFinite(kwh) ? kwh.toFixed(2) + ' קוט"ש' : "", cost != null && Number.isFinite(cost) ? " · ₪" + cost.toFixed(2) : "")), /*#__PURE__*/React.createElement("div", {
+    }, Number.isFinite(kwh) ? kwh.toFixed(2) + " קוט״ש" : "", cost != null && Number.isFinite(cost) ? " · ₪" + cost.toFixed(2) : "")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 8
@@ -218,38 +302,62 @@ function UncataloguedView({
       value: c.id
     }, c.name))), /*#__PURE__*/React.createElement("button", {
       type: "button",
+      className: "ev-press",
       style: { ...S.btnP,
         whiteSpace: "nowrap",
-        opacity: pick ? 1 : 0.5
+        opacity: assignBusy[tid] ? 0.7 : pick ? 1 : 0.5,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6
       },
-      disabled: !pick,
+      disabled: !pick || !!assignBusy[tid],
       onClick: tryAssign,
       "data-testid": "uncatalogued-assign-" + tid
-    }, "שייך וחייב"), onArchive && /*#__PURE__*/React.createElement("button", {
+    }, assignBusy[tid] ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Spinner, {
+      s: 14,
+      style: {
+        borderTopColor: "#fff",
+        borderColor: "rgba(255,255,255,0.35)"
+      }
+    }), " שומר…") : "שייך וחייב"), onArchive && /*#__PURE__*/React.createElement("button", {
       type: "button",
       style: { ...S.btnS,
-        whiteSpace: "nowrap"
+        whiteSpace: "nowrap",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6
       },
       onClick: () => onArchive(tx),
       "data-testid": "uncatalogued-archive-" + tid
-    }, "📦 ארכב")), warn && /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(Icon, {
+      n: "archive",
+      s: 15
+    }), " ארכב")), warn && /*#__PURE__*/React.createElement("div", {
       style: {
-        background: "#fffbeb",
+        background: C.warnSoft,
         border: "1.5px solid #fcd34d",
         borderRadius: 10,
         padding: "10px 12px",
         marginTop: 8,
         fontSize: 13,
-        color: "#92400e",
+        color: C.warnInk,
         lineHeight: 1.5
       },
       "data-testid": "uncatalogued-dupwarn-" + tid
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontWeight: 800,
-        marginBottom: 8
+        marginBottom: 8,
+        display: "flex",
+        alignItems: "center",
+        gap: 6
       }
-    }, "⚠️ נראה ככפילות של טעינה קיימת: ", duplicateSuspectLabel(warn)), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(Icon, {
+      n: "alert",
+      s: 15
+    }), "נראה ככפילות של טעינה קיימת: ", duplicateSuspectLabel(warn)), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 8
@@ -257,7 +365,7 @@ function UncataloguedView({
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
       style: { ...S.btnP,
-        background: "#b45309",
+        background: C.warn,
         whiteSpace: "nowrap"
       },
       onClick: () => {
@@ -269,6 +377,9 @@ function UncataloguedView({
           delete n[tid];
           return n;
         });
+        setAssignBusy(prev => ({ ...prev,
+          [tid]: true
+        }));
         if (onAssign) onAssign(tx, pick);
       },
       "data-testid": "uncatalogued-dupconfirm-" + tid

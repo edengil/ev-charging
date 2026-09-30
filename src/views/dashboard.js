@@ -77,6 +77,16 @@ function Dashboard({
     }, 0);
   });
   const maxWeekKwh = Math.max(1, ...weekKwh);
+  // ── שיא חודשי: האם החודש הנוכחי הוא שיא הקוט״ש בכל הזמנים ──
+  const kwhByMonth = {};
+  sessions.forEach(s => {
+    if (!isNeighborSession(s, selfIdsHero)) return;
+    const d = new Date(s.date);
+    const k = d.getFullYear() + "-" + d.getMonth();
+    kwhByMonth[k] = (kwhByMonth[k] || 0) + (Number(s.kwhInflated) || 0);
+  });
+  const curMonthKey = now.getFullYear() + "-" + now.getMonth();
+  const isRecordKwh = moKwh > 0 && Object.keys(kwhByMonth).every(k => k === curMonthKey || kwhByMonth[k] <= moKwh);
   // ── insights strip ──
   const debtCount = stats.filter(c => !c.isSelf && !c.hidden && hasDebt(c.balance)).length;
   const uncatCount = (() => {
@@ -120,29 +130,30 @@ function Dashboard({
     debtCount: debtCount,
     uncatCount: uncatCount,
     openCount: openCards.length,
+    recordKwh: isRecordKwh ? moKwh : 0,
     go: go
   }), /*#__PURE__*/React.createElement("div", {
     style: S.sumRow
   }, /*#__PURE__*/React.createElement(SumCard, {
     lbl: "חובות פתוחים",
     val: ils(totBal),
-    color: "#f59e0b",
-    icon: "💰"
+    color: C.warn,
+    icon: "card"
   }), totCredit > 0.01 && /*#__PURE__*/React.createElement(SumCard, {
     lbl: "יתרות זכות",
     val: ils(totCredit),
-    color: "#059669",
-    icon: "💚"
+    color: C.ok,
+    icon: "check"
   }), /*#__PURE__*/React.createElement(SumCard, {
     lbl: "רווח החודש",
     val: ilsFull(totMoP),
-    color: "#10b981",
-    icon: "📈"
+    color: C.ok,
+    icon: "chart"
   }), /*#__PURE__*/React.createElement(SumCard, {
     lbl: "רווח כולל",
     val: ilsFull(totAllP),
-    color: "#6366f1",
-    icon: "⚡"
+    color: C.primaryStrong,
+    icon: "zap"
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       background: paceDelta == null ? "#f8fafc" : paceDelta >= 0 ? "#f0fdf4" : "#fef2f2",
@@ -239,24 +250,31 @@ function Dashboard({
     type: "button",
     onClick: () => go("archive"),
     style: {
-      border: "1.5px solid #e5e7eb",
+      border: "1.5px solid " + C.line,
       borderRadius: 8,
-      padding: "5px 10px",
+      padding: "8px 12px",
       fontSize: 12,
-      background: archivedCount ? "#f8fafc" : "#fff",
-      color: "#64748b",
+      background: archivedCount ? C.bg : "#fff",
+      color: C.meta,
       cursor: "pointer",
-      fontWeight: 600
+      fontWeight: 600,
+      minHeight: 44,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      fontFamily: "inherit"
     },
     "data-testid": "nav-archive"
-  }, "📦 ארכיון", archivedCount ? ` (${archivedCount})` : ""), /*#__PURE__*/React.createElement("select", {
+  }, /*#__PURE__*/React.createElement(Icon, { n: "archive", s: 16 }), "ארכיון", archivedCount ? ` (${archivedCount})` : ""), /*#__PURE__*/React.createElement("select", {
     style: {
-      border: "1.5px solid #e5e7eb",
+      border: "1.5px solid " + C.line,
       borderRadius: 8,
-      padding: "5px 8px",
+      padding: "8px 10px",
       fontSize: 12,
       background: "#fff",
-      color: "#6b7280"
+      color: C.meta,
+      minHeight: 44,
+      fontFamily: "inherit"
     },
     value: sortBy,
     onChange: e => setSortBy(e.target.value)
@@ -272,11 +290,22 @@ function Dashboard({
     value: "last"
   }, "מיון: טעינה אחרונה")))), /*#__PURE__*/React.createElement("div", {
     style: S.cGrid
-  }, sorted.length === 0 && /*#__PURE__*/React.createElement("div", {
-    style: S.empty
-  }, archivedCount > 0 ? "כל הלא פעילים בארכיון — לחץ «ארכיון» למעלה" : "אין לקוחות — הוסף לקוח חדש"), sorted.map(c => /*#__PURE__*/React.createElement("div", {
+  }, sorted.length === 0 && (archivedCount > 0 ? /*#__PURE__*/React.createElement(EmptyState, {
+    icon: "archive",
+    title: "כל הלקוחות בארכיון",
+    sub: "לחץ «ארכיון» למעלה כדי לצפות בהם או לשחזר.",
+    actionLabel: "פתח ארכיון",
+    onAction: () => go("archive")
+  }) : /*#__PURE__*/React.createElement(EmptyState, {
+    icon: "userPlus",
+    title: "עוד לא הוספת לקוחות",
+    sub: "הוסף את השכנים שמטעינים בעמדה — כל טעינה תירשם אוטומטית בכרטיס שלהם.",
+    actionLabel: "הוסף לקוח ראשון",
+    onAction: () => go("add-c")
+  })), sorted.map((c, i) => /*#__PURE__*/React.createElement("div", {
     key: c.id,
-    style: S.cCard,
+    className: "ev-stagger",
+    style: { ...S.cCard, animationDelay: Math.min(i * 40, 400) + "ms" },
     onClick: () => go("client", c.id),
     "data-testid": `client-card-${c.id}`
   }, /*#__PURE__*/React.createElement("div", {
@@ -360,14 +389,25 @@ function Dashboard({
       marginTop: 8,
       padding: "9px 10px",
       borderRadius: 10,
-      border: preAuthIntent && preAuthIntent.clientId === c.id ? "1.5px solid #6ee7b7" : "1.5px solid #bae6fd",
-      background: preAuthIntent && preAuthIntent.clientId === c.id ? "#ecfdf5" : "#f0f9ff",
-      color: preAuthIntent && preAuthIntent.clientId === c.id ? "#047857" : "#0369a1",
+      border: "1.5px solid",
+      borderColor: preAuthIntent && preAuthIntent.clientId === c.id ? C.ok : "#bae6fd",
+      background: preAuthIntent && preAuthIntent.clientId === c.id ? C.okSoft : C.primarySoft,
+      color: preAuthIntent && preAuthIntent.clientId === c.id ? C.okInk : C.primaryInk,
       fontWeight: 700,
       fontSize: 12,
-      cursor: "pointer"
+      cursor: "pointer",
+      minHeight: 44,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      fontFamily: "inherit"
     }
-  }, preAuthIntent && preAuthIntent.clientId === c.id ? "✓ ממתין לחיבור · בטל אישור מראש" : "🌙 אישור מראש · כשיתחבר"))), archivedCount > 0 && /*#__PURE__*/React.createElement("button", {
+  }, preAuthIntent && preAuthIntent.clientId === c.id ? [/*#__PURE__*/React.createElement("span", {
+    key: "dot",
+    className: "ev-live-dot",
+    style: { width: 8, height: 8, borderRadius: "50%", background: C.ok, display: "inline-block" }
+  }), "ממתין לחיבור · בטל אישור מראש"] : [/*#__PURE__*/React.createElement(Icon, { key: "ic", n: "clock", s: 15 }), "אישור מראש · כשיתחבר"]))), archivedCount > 0 && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => go("archive"),
     style: {
@@ -381,9 +421,15 @@ function Dashboard({
       fontSize: 13,
       color: "#64748b",
       cursor: "pointer",
-      fontWeight: 600
+      fontWeight: 600,
+      minHeight: 44,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      fontFamily: "inherit"
     }
-  }, "📦 יש ", archivedCount, " בארכיון (לא פעילים / הועברו) — לחץ לפתיחה"), /*#__PURE__*/React.createElement("footer", {
+  }, /*#__PURE__*/React.createElement(Icon, { n: "archive", s: 16 }), "יש ", archivedCount, " בארכיון (לא פעילים / הועברו) — לחץ לפתיחה"), /*#__PURE__*/React.createElement("footer", {
     style: {
       marginTop: 28,
       paddingTop: 20,
@@ -467,17 +513,22 @@ function ArchiveView({
       fontWeight: 800,
       fontSize: 16,
       color: "#334155",
-      marginBottom: 6
+      marginBottom: 6,
+      display: "flex",
+      alignItems: "center",
+      gap: 8
     }
-  }, "📦 ארכיון לקוחות"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Icon, { n: "archive", s: 20 }), "ארכיון לקוחות"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       color: "#64748b",
       lineHeight: 1.45
     }
-  }, "לקוחות שלא טענו מעל חודש מוסתרים אוטומטית מהדשבורד. אפשר גם להעביר ידנית ולהחזיר בכל רגע.")), list.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: S.empty
-  }, "הארכיון ריק — אין לקוחות מוסתרים") : list.map(c => /*#__PURE__*/React.createElement("div", {
+  }, "לקוחות שלא טענו מעל חודש מוסתרים אוטומטית מהדשבורד. אפשר גם להעביר ידנית ולהחזיר בכל רגע.")), list.length === 0 ? /*#__PURE__*/React.createElement(EmptyState, {
+    icon: "archive",
+    title: "הארכיון ריק",
+    sub: "לקוחות שלא טענו מעל חודש יועברו לכאן אוטומטית."
+  }) : list.map(c => /*#__PURE__*/React.createElement("div", {
     key: c.id,
     style: {
       ...S.cCard,
@@ -554,7 +605,7 @@ function ArchiveView({
     style: S.cName
   }, e.plugInTime ? fdate(e.plugInTime) : "—"), /*#__PURE__*/React.createElement("div", {
     style: S.cMeta
-  }, e.kwh != null ? Number(e.kwh).toFixed(2) + ' קוט"ש' : "", e.cost != null ? " · ₪" + Number(e.cost).toFixed(2) : "", e.transactionId ? " · txn#" + e.transactionId : "")), /*#__PURE__*/React.createElement("button", {
+  }, e.kwh != null ? Number(e.kwh).toFixed(2) + ' קוט״ש' : "", e.cost != null ? " · ₪" + Number(e.cost).toFixed(2) : "", e.transactionId ? " · txn#" + e.transactionId : "")), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => go("client", e.assignedTo),
     style: {
@@ -562,7 +613,7 @@ function ArchiveView({
       padding: "8px",
       fontSize: 13,
       fontWeight: 700,
-      color: "#0e7490"
+      color: C.primaryStrong
     },
     "data-testid": "archive-assigned-client-" + e.key
   }, "שויכה ל־" + (e.assignedName || "לקוח")))))), uncatPlain.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -588,7 +639,7 @@ function ArchiveView({
     style: S.cName
   }, e.plugInTime ? fdate(e.plugInTime) : "—"), /*#__PURE__*/React.createElement("div", {
     style: S.cMeta
-  }, e.kwh != null ? Number(e.kwh).toFixed(2) + ' קוט"ש' : "", e.cost != null ? " · ₪" + Number(e.cost).toFixed(2) : "", e.transactionId ? " · txn#" + e.transactionId : ""))), /*#__PURE__*/React.createElement("div", {
+  }, e.kwh != null ? Number(e.kwh).toFixed(2) + ' קוט״ש' : "", e.cost != null ? " · ₪" + Number(e.cost).toFixed(2) : "", e.transactionId ? " · txn#" + e.transactionId : ""))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -625,6 +676,15 @@ function WevoMiniLog() {
   const log = getWevoLog().slice(0, 5);
   void tick;
   if (!log.length) return null;
+  // כשהכול תקין — pill שקט במקום קופסת לוג
+  if (log.every(row => row.ok)) {
+    const ago = fmtElapsed(Date.now() - new Date(log[0].at).getTime());
+    return /*#__PURE__*/React.createElement("div", {
+      style: { marginBottom: 14 }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: S.pill(C.okSoft, C.okInk)
+    }, /*#__PURE__*/React.createElement(Icon, { n: "check", s: 14 }), `Wevo תקין · סונכרן לפני ${ago}`));
+  }
   return /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#fff7ed",
@@ -697,7 +757,7 @@ function ActiveChargeCards({ openCards, clients, onComplete, onDelOpen }) {
       style: { ...S.num, fontSize: 13, color: C.meta, marginRight: "auto", display: "flex", alignItems: "center", gap: 4 }
     }, /*#__PURE__*/React.createElement(Icon, { n: "clock", s: 14 }), elapsed)), o.liveKwh != null && /*#__PURE__*/React.createElement("div", {
       style: { ...S.num, fontSize: 13, color: C.body, marginTop: 6, fontWeight: 700 }
-    }, Number(o.liveKwh).toFixed(2), ' קוט"ש'), /*#__PURE__*/React.createElement("button", {
+    }, Number(o.liveKwh).toFixed(2), ' קוט״ש'), /*#__PURE__*/React.createElement("button", {
       onClick: () => onComplete(o.id, o.clientId),
       style: { ...S.btnP, marginTop: 10 },
       "data-testid": `open-complete-${o.id}`
@@ -726,17 +786,17 @@ function MonthHero({ moKwh, moRev, weekKwh, maxWeekKwh }) {
       color: "#fff"
     }
   }, /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 12, color: "rgba(255,255,255,.75)", fontWeight: 700, marginBottom: 8 }
+    style: { fontSize: 12, color: "rgba(255,255,255,.88)", fontWeight: 700, marginBottom: 8, textShadow: "0 1px 2px rgba(0,0,0,.25)" }
   }, "החודש הזה"), /*#__PURE__*/React.createElement("div", {
     style: { display: "flex", gap: 22, marginBottom: 14 }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: { ...S.num, fontSize: 22, fontWeight: 800 }
   }, Number(moKwh).toFixed(1)), /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 12, color: "rgba(255,255,255,.75)" }
-  }, 'קוט"ש')), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12, color: "rgba(255,255,255,.88)", textShadow: "0 1px 2px rgba(0,0,0,.25)" }
+  }, 'קוט״ש')), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: { ...S.num, fontSize: 22, fontWeight: 800 }
   }, ils(moRev)), /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: 12, color: "rgba(255,255,255,.75)" }
+    style: { fontSize: 12, color: "rgba(255,255,255,.88)", textShadow: "0 1px 2px rgba(0,0,0,.25)" }
   }, "הכנסות"))), /*#__PURE__*/React.createElement("div", {
     style: { display: "flex", alignItems: "flex-end", height: 56, gap: 6 }
   }, weekKwh.map((w, i) => {
@@ -753,14 +813,15 @@ function MonthHero({ moKwh, moRev, weekKwh, maxWeekKwh }) {
         background: i === 3 ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.45)"
       }
     }), /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 11, color: "rgba(255,255,255,.7)", marginTop: 4 }
+      style: { fontSize: 11, color: "rgba(255,255,255,.88)", marginTop: 4, textShadow: "0 1px 2px rgba(0,0,0,.25)" }
     }, labels[i]));
   })));
 }
 
 // ── שורת תובנות ──
-function InsightsStrip({ debtCount, uncatCount, openCount, go }) {
+function InsightsStrip({ debtCount, uncatCount, openCount, recordKwh, go }) {
   const chips = [];
+  if (recordKwh > 0) chips.push({ icon: "zap", text: `שיא חודשי: ${Math.round(recordKwh)} קוט״ש`, onClick: null });
   if (debtCount > 0) chips.push({ icon: "alert", text: `${debtCount} לקוחות עם חוב`, onClick: () => go("debts") });
   if (uncatCount > 0) chips.push({ icon: "alert", text: `${uncatCount} טעינות לא מקוטלגות`, onClick: () => go("uncatalogued") });
   if (openCount > 0) chips.push({ icon: "clock", text: `${openCount} טעינות פתוחות`, onClick: null });
@@ -802,8 +863,8 @@ function SumCard({
       borderTop: `3px solid ${color}`
     }
   }, /*#__PURE__*/React.createElement("span", {
-    style: S.sumIcon
-  }, icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: { ...S.sumIcon, color: color, display: "inline-flex" }
+  }, /*#__PURE__*/React.createElement(Icon, { n: icon, s: 20 })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       ...S.sumVal,
       color

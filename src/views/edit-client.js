@@ -37,27 +37,16 @@ function EditClient({
   };
   if (!client) return /*#__PURE__*/React.createElement("main", {
     style: S.main
-  }, /*#__PURE__*/React.createElement("div", {
-    style: S.empty
-  }, "הלקוח לא נמצא"));
+  }, /*#__PURE__*/React.createElement(EmptyState, {
+    icon: "alert",
+    title: "הלקוח לא נמצא"
+  }));
   return /*#__PURE__*/React.createElement("main", {
     style: S.main
   }, /*#__PURE__*/React.createElement("div", {
     style: S.form
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#eff6ff",
-      border: "1px solid #bfdbfe",
-      borderRadius: 10,
-      padding: "10px 12px",
-      marginBottom: 14,
-      fontSize: 13,
-      color: "#1e40af",
-      fontWeight: 600,
-      display: "flex",
-      alignItems: "center",
-      gap: 10
-    }
+    style: S.statusCard(C.primary)
   }, /*#__PURE__*/React.createElement(ClientAvatar, {
     client: {
       ...client,
@@ -67,7 +56,7 @@ function EditClient({
     },
     size: 40,
     fontSize: 16
-  }), "✏️ עריכת לקוח", isSelfClient(client) ? " · עצמי (אשראי)" : ""), /*#__PURE__*/React.createElement(FG, {
+  }), /*#__PURE__*/React.createElement(Icon, { n: "edit", s: 14, style: { display: "inline-block", verticalAlign: "-2px", marginInlineEnd: 5 } }), "עריכת לקוח", isSelfClient(client) ? " · עצמי (אשראי)" : ""), /*#__PURE__*/React.createElement(FG, {
     lbl: "שם לקוח"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
@@ -116,7 +105,7 @@ function EditClient({
     style: {
       marginTop: 6,
       fontSize: 12,
-      color: "#0f766e",
+      color: C.primaryStrong,
       fontWeight: 600
     }
   }, "סמל: ", inferred.label)), /*#__PURE__*/React.createElement(FG, {

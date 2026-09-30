@@ -141,12 +141,21 @@ function WevoSyncView({
       fontWeight: 800,
       fontSize: 18,
       marginBottom: 8,
-      color: "#0ea5c6"
+      color: C.primary
     }
-  }, "🔄 סנכרון מ-Wevo"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "refresh",
+    s: 20
+  }), "סנכרון מ-Wevo")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
-      color: "#6b7280",
+      color: C.body,
       marginBottom: 16,
       lineHeight: 1.5
     }
@@ -186,12 +195,12 @@ function WevoSyncView({
     style: S.errMsg
   }, err), info && /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#f0fdf4",
+      background: C.okSoft,
       border: "1px solid #bbf7d0",
       borderRadius: 10,
       padding: 10,
       fontSize: 13,
-      color: "#065f46",
+      color: C.okInk,
       marginBottom: 12
     }
   }, info), /*#__PURE__*/React.createElement("button", {
@@ -199,20 +208,63 @@ function WevoSyncView({
       ...S.btnP,
       background: busy ? "#93c5fd" : "#0ea5c6",
       padding: "12px",
-      opacity: busy ? 0.8 : 1
+      opacity: busy ? 0.8 : 1,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7,
+      width: "100%"
     },
     disabled: busy,
     onClick: runSync
-  }, busy ? "⏳ מתחבר ומושך..." : "🔄 התחבר וסנכרן"), /*#__PURE__*/React.createElement("button", {
+  }, busy ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Spinner, {
+    s: 16,
+    style: {
+      borderTopColor: "#fff",
+      borderColor: "rgba(255,255,255,0.35)"
+    }
+  }), " מתחבר ומושך...") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Icon, {
+    n: "refresh",
+    s: 16
+  }), " התחבר וסנכרן")), /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnP,
       background: busy ? "#cbd5e1" : "#0f766e",
       padding: "12px",
-      marginTop: 8
+      marginTop: 8,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7,
+      width: "100%"
     },
     disabled: busy,
     onClick: runInspect
-  }, busy ? "⏳ בודק..." : "🔎 בדוק זיהוי רכב / RFID"), inspectReport && /*#__PURE__*/React.createElement("div", {
+  }, busy ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Spinner, {
+    s: 16,
+    style: {
+      borderTopColor: "#fff",
+      borderColor: "rgba(255,255,255,0.35)"
+    }
+  }), " בודק...") : "בדוק זיהוי רכב / RFID"), busy && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("style", null, "@keyframes evIndBar{0%{transform:translateX(-110%)}100%{transform:translateX(280%)}}"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 6,
+      borderRadius: 999,
+      background: C.line,
+      overflow: "hidden",
+      marginTop: 10
+    },
+    role: "progressbar",
+    "aria-label": "מסנכרן מ-Wevo"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: "100%",
+      width: "36%",
+      borderRadius: 999,
+      background: C.primary,
+      animation: "evIndBar 1.2s ease-in-out infinite"
+    }
+  }))), inspectReport && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 12,
       background: "#f8fafc",
@@ -251,7 +303,7 @@ function WevoSyncView({
     style: {
       marginTop: 14,
       fontSize: 11,
-      color: "#9ca3af",
+      color: C.meta,
       lineHeight: 1.4
     }
   }, "הסיסמה נשלחת רק לפונקציית הסנכרון שלך ולא נשמרת בשרתי Wevo מעבר להתחברות.")));

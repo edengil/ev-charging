@@ -6,6 +6,19 @@
  */
 // ── APP ────────────────────────────────────────────────────────────────────
 function BottomNav({ view, go }) {
+  const uncatCount = (() => {
+    try {
+      return Number(window.localStorage.getItem("ev_uncat_count")) || 0;
+    } catch {
+      return 0;
+    }
+  })();
+  const prevCountRef = useRef(0);
+  const [popKey, setPopKey] = useState(0);
+  useEffect(() => {
+    if (uncatCount > prevCountRef.current) setPopKey(k => k + 1);
+    prevCountRef.current = uncatCount;
+  }, [uncatCount]);
   const items = [{
     key: "home",
     label: "בית",
@@ -76,11 +89,8 @@ function BottomNav({ view, go }) {
   }, items.map(it => {
     const active = it.views.includes(view);
     let badge = null;
-    if (it.key === "uncatalogued") {
-      try {
-        const c = Number(window.localStorage.getItem("ev_uncat_count")) || 0;
-        if (c > 0) badge = c > 99 ? "99+" : String(c);
-      } catch {}
+    if (it.key === "uncatalogued" && uncatCount > 0) {
+      badge = uncatCount > 99 ? "99+" : String(uncatCount);
     }
     return /*#__PURE__*/React.createElement("button", {
       key: it.key,
@@ -111,6 +121,8 @@ function BottomNav({ view, go }) {
       n: it.icon,
       s: 22
     }), badge && /*#__PURE__*/React.createElement("span", {
+      key: "badge-" + popKey,
+      className: popKey > 0 ? "ev-badge-pop" : undefined,
       style: {
         position: "absolute",
         top: -7,
@@ -118,7 +130,7 @@ function BottomNav({ view, go }) {
         minWidth: 18,
         height: 18,
         borderRadius: 999,
-        background: "#dc2626",
+        background: C.err,
         color: "#fff",
         fontSize: 11,
         fontWeight: 800,
@@ -194,7 +206,7 @@ function App() {
       if ((o || []).some((item, i) => item !== localOpen[i])) DB.set("ev_open", localOpen);
       if (deduped.removed > 0) {
         try {
-          setTimeout(() => appAlert(`הוסרו ${deduped.removed} תשלומים כפולים ✓`, "ok", 4500), 800);
+          setTimeout(() => appAlert(`הוסרו ${deduped.removed} תשלומים כפולים`, "ok", 4500), 800);
         } catch {}
       }
       await loadConfigFromStorage();
@@ -256,7 +268,7 @@ function App() {
                 // דוחף חזרה לענן את התשלומים ששוחזרו מהמכשיר
                 scheduleCloudSave();
                 try {
-                  appAlert("שוחזרו תשלומים מקומיים שלא היו בענן ✓", "ok", 5000);
+                  appAlert("שוחזרו תשלומים מקומיים שלא היו בענן", "ok", 5000);
                 } catch {}
               }
             }
@@ -278,12 +290,23 @@ function App() {
   const [sid, setSid] = useState(null); // session being edited
   const [pid, setPid] = useState(null); // payment being edited
   const [toast, setToast] = useState(null);
-  const toast$ = (msg, t = "ok", ms = 3200) => {
-    setToast({
+  const toastTimerRef = useRef(null);
+  const toast$ = (msg, t = "ok", ms) => {
+    // תומך גם באובייקט: toast$({msg, details, action:{label,onTap}, t, ms})
+    const o = msg && typeof msg === "object" ? msg : {
       msg,
-      t
+      t,
+      ms
+    };
+    const type = o.t || t || "ok";
+    setToast({
+      msg: o.msg,
+      t: type,
+      details: o.details || null,
+      action: o.action || null
     });
-    setTimeout(() => setToast(null), ms);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), o.ms || ms || TOAST_MS[type] || 3200);
   };
   const [cloudStatus, setCloudStatusUi] = useState(() => getCloudStatus());
   const clientsRef = useRef(clients);
@@ -372,7 +395,7 @@ function App() {
         lastErr: null,
         lastErrAt: null
       });
-      toast$("הנתונים שוחזרו מהענן ✓");
+      toast$("הנתונים שוחזרו מהענן");
       scheduleCloudSave();
     } catch (e) {
       setCloudErr(e.message || "התחברות נכשלה");
@@ -422,7 +445,7 @@ function App() {
         lastErr: null,
         lastErrAt: null
       });
-      toast$("גיבוי ענן הוגדר ✓");
+      toast$("גיבוי ענן הוגדר");
       scheduleCloudSave();
     } catch (e) {
       setCloudErr(e.message || "הגדרה נכשלה");
@@ -584,7 +607,10 @@ function App() {
     sessionsRef.current = n;
     setSessions(n);
     DB.set("ev_sessions", n);
-    toast$(isSelfClient(cl) ? "טעינה נשמרה — עלות בפועל (אשראי) ✓" : "טעינה נשמרה ✓");
+    toast$({
+      msg: isSelfClient(cl) ? "טעינה נשמרה — עלות בפועל (אשראי)" : "טעינה נשמרה",
+      details: `${Number(s.kwhRaw || s.kwh || 0).toFixed(2)} קוט״ש · ${ils(s.amountBilled || 0)} לחיוב`
+    });
   };
   const savePayment = p => {
     const check = canSaveNewPayment(payments, p);
@@ -608,11 +634,12 @@ function App() {
     DB.set("ev_payments", n);
     const cl = clients.find(c => c.id === fixed.clientId);
     const bal = clientBalance(cl, sessions, n);
-    if (cl && !isSelfClient(cl) && hasCredit(bal)) {
-      toast$(`תשלום נרשם — יתרת זכות ${ils(Math.abs(bal))} ✓`, "ok", 4200);
-    } else {
-      toast$("תשלום נרשם ✓");
-    }
+    const credit = cl && !isSelfClient(cl) && hasCredit(bal);
+    toast$({
+      msg: "תשלום נרשם",
+      details: `${ils(fixed.amount)} · ${credit ? "יתרת זכות " + ils(Math.abs(bal)) : "יתרה: " + ils(bal)}`,
+      action: cl && !isSelfClient(cl) ? { label: "צפה בכרטיס", onTap: () => go("client", fixed.clientId) } : null
+    }, "ok", 4200);
     return true;
   };
   const saveClient = c => {
@@ -630,7 +657,11 @@ function App() {
     clientsRef.current = n;
     setClients(n);
     DB.set("ev_clients", n);
-    toast$("לקוח נוסף ✓");
+    toast$({
+      msg: "לקוח נוסף",
+      details: `${name} · אפשר להתחיל לרשום טעינות`,
+      action: { label: "צפה בכרטיס", onTap: () => go("client", row.id) }
+    });
     return true;
   };
   const updateClient = (id, data) => {
@@ -649,14 +680,14 @@ function App() {
     } : c);
     setClients(n);
     DB.set("ev_clients", n);
-    toast$("לקוח עודכן ✓");
+    toast$("לקוח עודכן");
     return true;
   };
   const saveOpen = o => {
     const n = [o, ...openSess];
     setOpenSess(n);
     DB.set("ev_open", n);
-    toast$("טעינה פתוחה נרשמה ✓");
+    toast$("טעינה פתוחה נרשמה");
   };
   const upsertWevoOpen = (o, opts = {}) => {
     const silent = !!(opts && opts.silent);
@@ -700,7 +731,7 @@ function App() {
             ...o,
             id: o.id || uid()
           }, ...prev];
-          if (!silent) setTimeout(() => toast$("טעינה פתוחה נפתחה ✓"), 0);
+          if (!silent) setTimeout(() => toast$("טעינה פתוחה נפתחה"), 0);
         } else {
           n = prev.map(x => x.id === existing.id ? {
             ...existing,
@@ -711,14 +742,14 @@ function App() {
             plugInAt: o.plugInAt || existing.plugInAt || existing.startDate,
             wevoTxnId: o.wevoTxnId != null ? o.wevoTxnId : existing.wevoTxnId
           } : x);
-          if (!silent) setTimeout(() => toast$("שיוך טעינה עודכן ✓"), 0);
+          if (!silent) setTimeout(() => toast$("שיוך טעינה עודכן"), 0);
         }
       } else {
         n = [{
           ...o,
           id: o.id || uid()
         }, ...prev];
-        if (!silent) setTimeout(() => toast$("טעינה פתוחה נפתחה ✓"), 0);
+        if (!silent) setTimeout(() => toast$("טעינה פתוחה נפתחה"), 0);
       }
       DB.set("ev_open", n);
       openSessRef.current = n;
@@ -813,7 +844,7 @@ function App() {
     paymentsRef.current = n;
     setPayments(n);
     DB.set("ev_payments", n);
-    toast$("תשלום עודכן ✓");
+    toast$("תשלום עודכן");
   };
   const delPayment = id => {
     const n = payments.filter(p => p.id !== id);
@@ -836,7 +867,7 @@ function App() {
     });
     setSessions(n);
     DB.set("ev_sessions", n);
-    toast$("טעינה עודכנה ✓");
+    toast$("טעינה עודכנה");
   };
   const delClient = id => {
     const nc = clients.filter(c => c.id !== id),
@@ -860,7 +891,7 @@ function App() {
       config: getConfig(),
       exportedAt: new Date().toISOString()
     };
-    navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(() => toast$("נתונים הועתקו ✓"), () => toast$("שגיאה בהעתקה", "err"));
+    navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(() => toast$("נתונים הועתקו"), () => toast$("שגיאה בהעתקה", "err"));
   };
   const downloadData = () => {
     try {
@@ -885,7 +916,7 @@ function App() {
       a.click();
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast$("קובץ גיבוי ירד ✓");
+      toast$("קובץ גיבוי ירד");
     } catch (e) {
       toast$("שגיאה בהורדה: " + e.message, "err");
     }
@@ -922,7 +953,7 @@ function App() {
       if (d.config) {
         persistConfig(d.config);
       }
-      toast$("נתונים יובאו בהצלחה ✓");
+      toast$("נתונים יובאו בהצלחה");
     } catch (e) {
       toast$("שגיאה בייבוא: " + e.message, "err");
     }
@@ -970,7 +1001,7 @@ function App() {
     } : c);
     setClients(n);
     DB.set("ev_clients", n);
-    toast$(archived ? "הועבר לארכיון ✓" : "שוחזר מהארכיון ✓");
+    toast$(archived ? "הועבר לארכיון" : "שוחזר מהארכיון");
   };
   const archiveUncatalogued = tx => {
     const key = uncataloguedTxKey(tx);
@@ -988,7 +1019,7 @@ function App() {
       DB.set("ev_archived_uncat", n);
       return n;
     });
-    toast$("הועבר לארכיון ✓");
+    toast$("הועבר לארכיון");
   };
   const unarchiveUncatalogued = key => {
     setArchivedUncat(prev => {
@@ -996,17 +1027,49 @@ function App() {
       DB.set("ev_archived_uncat", n);
       return n;
     });
-    toast$("שוחזר מהארכיון ✓");
+    toast$("שוחזר מהארכיון");
   };
   if (!ready) {
     return /*#__PURE__*/React.createElement("div", {
-      style: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3fafc", fontFamily: "'Heebo', sans-serif", color: "#0ea5c6", fontWeight: 700, fontSize: 15 }
+      style: {
+        minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", gap: 18, background: C.bg, fontFamily: "'Heebo', sans-serif"
+      }
     }, /*#__PURE__*/React.createElement(BrandLogo, {
-      size: 44,
-      subtitle: "טוען..."
-    }));
+      size: 56,
+      subtitle: "EV Charge"
+    }), /*#__PURE__*/React.createElement(Spinner, {
+      s: 26
+    }), /*#__PURE__*/React.createElement("div", {
+      style: { color: C.meta, fontWeight: 600, fontSize: 14 }
+    }, "טוען נתונים…"));
   }
-  const pageSubtitle = view === "wevo-sync" ? "Wevo Sync" : view === "archive" ? "ארכיון" : view === "debts" ? "חובות" : view === "dash" ? "EV Charge" : null;
+  const subtitleClient = view === "client" || view === "report" ? (clients.find(c => String(c.id) === String(cid)) || {}).name : null;
+  const pageSubtitle = (() => {
+    switch (view) {
+      case "dash": return "EV Charge";
+      case "stats": return "דוח חודשי";
+      case "debts": return "חובות";
+      case "archive": return "ארכיון";
+      case "uncatalogued": return "טעינות יתומות";
+      case "settings": return "הגדרות";
+      case "client": return subtitleClient || "לקוח";
+      case "report": return subtitleClient ? `דוח · ${subtitleClient}` : "דוח חודשי";
+      case "add-s": return "טעינה חדשה";
+      case "add-open": return "פתיחת טעינה";
+      case "add-p": return "רישום תשלום";
+      case "add-debt": return "חוב ידני";
+      case "add-c": return "לקוח חדש";
+      case "complete": return "השלמת טעינה";
+      case "edit-s": return "עריכת טעינה";
+      case "edit-p": return "עריכת תשלום";
+      case "edit-c": return "עריכת לקוח";
+      case "import": return "גיבוי ושחזור";
+      case "wevo-sync": return "סנכרון Wevo";
+      case "wevo": return "היסטוריית Wevo";
+      default: return null;
+    }
+  })();
   const hideAppChrome = view === "wevo" || view === "wevo-bill";
   return /*#__PURE__*/React.createElement("div", {
     style: hideAppChrome ? {
@@ -1047,10 +1110,44 @@ function App() {
     style: S.backBtn,
     onClick: goBack,
     "data-testid": "nav-dash"
-  }, "← חזרה"))), /*#__PURE__*/React.createElement(WaDraftSheet, null), toast && /*#__PURE__*/React.createElement("div", {
+  }), view !== "dash" && /*#__PURE__*/React.createElement("button", {
+    style: { ...S.backBtn, display: "inline-flex", alignItems: "center", gap: 4 },
+    onClick: goBack,
+    "data-testid": "nav-dash"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "chevR",
+    s: 18
+  }), "חזרה"))), /*#__PURE__*/React.createElement(WaDraftSheet, null), toast && /*#__PURE__*/React.createElement("div", {
     style: S.toast(toast.t),
+    className: "ev-toast-in",
     "data-testid": "app-toast"
-  }, toast.msg), view === "dash" && /*#__PURE__*/React.createElement(Dashboard, {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { display: "inline-flex" }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: toast.t === "ok" ? "check" : toast.t === "err" ? "x" : "alert",
+    s: 18
+  })), /*#__PURE__*/React.createElement("span", null, toast.msg)), toast.details && /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12, fontWeight: 500, opacity: 0.92, marginTop: 4 }
+  }, toast.details), toast.action && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      const a = toast.action;
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      setToast(null);
+      if (a && a.onTap) a.onTap();
+    },
+    className: "ev-press",
+    style: {
+      marginTop: 9, background: "rgba(255,255,255,0.20)", border: "1px solid rgba(255,255,255,0.55)",
+      color: "#fff", borderRadius: 999, padding: "7px 18px", fontSize: 13, fontWeight: 700,
+      cursor: "pointer", fontFamily: "inherit", minHeight: 38
+    }
+  }, toast.action.label)), /*#__PURE__*/React.createElement("div", {
+    key: "view-" + view + "-" + (cid || ""),
+    className: "ev-view"
+  }, view === "dash" && /*#__PURE__*/React.createElement(Dashboard, {
     stats: stats,
     go: go,
     openSess: openSess,
@@ -1089,7 +1186,7 @@ function App() {
     onBack: goBack
   }), view === "settings" && /*#__PURE__*/React.createElement(SettingsView, {
     onSaved: () => {
-      toast$("תעריפים נשמרו ✓");
+      toast$("תעריפים נשמרו");
       go("dash");
     },
     onCancel: goBack
@@ -1192,7 +1289,8 @@ function App() {
     cid: cid,
     clients: clients,
     sessions: sessions,
-    payments: payments
+    payments: payments,
+    go: go
   }), view === "edit-p" && /*#__PURE__*/React.createElement(EditPayment, {
     payment: payments.find(p => p.id === pid),
     clients: clients,
@@ -1256,7 +1354,7 @@ function App() {
     onAssign: assignUncatalogued,
     onArchive: archiveUncatalogued,
     onBack: goBack
-  }), !hideAppChrome && /*#__PURE__*/React.createElement(BottomNav, {
+  })), !hideAppChrome && /*#__PURE__*/React.createElement(BottomNav, {
     view: view,
     go: go
   }));
@@ -1335,18 +1433,28 @@ function DebtsSendView({
   const list = stats
     .filter(c => !c.isSelf && !c.hidden && hasDebt(c.balance))
     .sort((a, b) => b.balance - a.balance);
+  const totalDebt = list.reduce((a, c) => a + c.balance, 0);
   return /*#__PURE__*/React.createElement("main", {
     style: S.main
-  }, /*#__PURE__*/React.createElement("p", {
-    style: S.secTitle
-  }, "מי חייב"), /*#__PURE__*/React.createElement("div", {
+  }, list.length ? /*#__PURE__*/React.createElement("div", {
+    style: S.hero
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { ...S.num, ...S.heroNum }
+  }, ils(totalDebt)), /*#__PURE__*/React.createElement("div", {
+    style: S.heroLabel
+  }, `סך חובות פתוחים · ${list.length} חייבים`)) : /*#__PURE__*/React.createElement(EmptyState, {
+    icon: "check",
+    tone: "ok",
+    title: "כל החובות שולמו",
+    sub: "אין חובות פתוחים כרגע. אפשר לנשום."
+  }), list.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
-      color: "#64748b",
+      color: C.meta,
       marginBottom: 12,
       lineHeight: 1.45
     }
-  }, list.length ? `${list.length} לקוחות עם חוב. כל כפתור פותח טיוטה. כלום לא נשלח עד שאתה מחליט.` : "אין חובות פתוחים."), list.map(c => {
+  }, "כל כפתור פותח טיוטה. כלום לא נשלח עד שאתה מחליט."), list.map(c => {
     const lastAmt = c.last ? c.last.amountBilled : 0;
     return /*#__PURE__*/React.createElement("div", {
       key: c.id,

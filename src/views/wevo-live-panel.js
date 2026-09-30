@@ -218,11 +218,11 @@ function WevoLivePanel({
       if (phase !== lastPhaseRef.current) {
         if (phase === "wait-auth" || phase === "connected" && lastPhaseRef.current === "idle") {
           pushWevoLog("connect", "רכב מחובר — ממתין לאישור", true);
-          appAlert("🔌 רכב מחובר — ממתין לאישור טעינה", "info", 5000);
+          appAlert("רכב מחובר — ממתין לאישור טעינה", "info", 5000);
           notifyPhone("רכב התחבר", "ממתין לאישור טעינה", st && st.transactionId ? `ev-connect-${st.transactionId}` : "ev-connect");
         } else if (phase === "charging" && (lastPhaseRef.current === "wait-auth" || lastPhaseRef.current === "connected")) {
           pushWevoLog("charge", "טעינה התחילה", true);
-          appAlert("⚡ הטעינה התחילה", "ok", 4000);
+          appAlert("הטעינה התחילה", "ok", 4000);
         }
         lastPhaseRef.current = phase;
       }
@@ -339,7 +339,7 @@ function WevoLivePanel({
             alertedReadyRef.current.add(existing.id);
             const cl = (clientsRef.current || []).find(c => c.id === existing.clientId);
             pushWevoLog("ready", `${cl && cl.name || "לקוח"}: מוכן לאישור`, true);
-            appAlert(`✓ טעינה הסתיימה — מוכן לאישור (${cl && cl.name || "לקוח"})`, "ok", 6000);
+            appAlert(`טעינה הסתיימה — מוכן לאישור (${cl && cl.name || "לקוח"})`, "ok", 6000);
             notifyPhone("הטעינה נגמרה", cl && cl.name || "לקוח", `ev-end-${existing.id}`);
           }
           }
@@ -393,7 +393,7 @@ function WevoLivePanel({
         clearAuthIntent("אישור ראשון הושלם · ממתין להוראה ליקר או לזול");
         setErr("");
         pushWevoLog("authorize", "אישור ראשון (חיבור) הושלם — בלי תעריף יקר", true);
-        appAlert("✓ חיבור אושר — לאישור תעריף יקר או המתנה לזול לחץ על הכפתור", "ok", 6000);
+        appAlert("חיבור אושר — לאישור תעריף יקר או המתנה לזול לחץ על הכפתור", "ok", 6000);
         return "first-done";
       }
       if (offPeakMode && isOffPeakPreauthQueuedOk(finalState, isOwnerPeakNow())) {
@@ -409,7 +409,7 @@ function WevoLivePanel({
         }
         setErr("");
         pushWevoLog("authorize", "אושר מראש — ממתין לסיום תעריף יקר", true);
-        appAlert("⏳ אושר לתור זול — יתחיל כשהתעריף היקר ייגמר", "ok", 5500);
+        appAlert("אושר לתור זול — יתחיל כשהתעריף היקר ייגמר", "ok", 5500);
         return "queued";
       }
       if (finalState && isWaitingForAuthorize(finalState)) {
@@ -708,21 +708,37 @@ function WevoLivePanel({
         color: "#0369a1",
         marginBottom: 6
       }
-    }, "🔌 מטען Wevo — מצב חי"), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 7
+      }
+    }, /*#__PURE__*/React.createElement(Icon, {
+      n: "plug",
+      s: 17
+    }), "מטען Wevo — מצב חי")), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 13,
         color: "#374151",
         marginBottom: 10
       }
     }, "כדי לראות חיבור בזמן אמת ולאשר טעינה — התחבר פעם אחת עם סיסמה שמורה."), /*#__PURE__*/React.createElement("button", {
+      onClick: () => go("wevo-sync"),
+      "data-testid": "wevo-connect",
       style: {
         ...S.btnP,
         background: "#0ea5c6",
-        padding: "10px"
-      },
-      onClick: () => go("wevo-sync"),
-      "data-testid": "wevo-connect"
-    }, "🔄 התחבר ל-Wevo"));
+        padding: "10px",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 7
+      }
+    }, /*#__PURE__*/React.createElement(Icon, {
+      n: "refresh",
+      s: 16
+    }), " התחבר ל-Wevo"));
   }
 
   const st = state || {};
@@ -760,10 +776,17 @@ function WevoLivePanel({
   const alreadyAuthorized = chargingNow;
   const approveNowPrimary = vehicleNow;
   const authBtnLabel = authBusy
-    ? peakNow ? "⏳ מאשר פרימיום ב-Wevo..." : "⏳ מאשר..."
-    : peakNow
-      ? "✅ אשר טעינת פרימיום ⚡"
-      : "✅ אשר טעינה (Wevo)";
+    ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Spinner, {
+      s: 15,
+      style: {
+        borderTopColor: "#fff",
+        borderColor: "rgba(255,255,255,0.35)"
+      }
+    }), peakNow ? " מאשר פרימיום ב-Wevo..." : " מאשר...")
+    : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Icon, {
+      n: "check",
+      s: 16
+    }), peakNow ? " אשר טעינת פרימיום" : " אשר טעינה (Wevo)");
 
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -787,10 +810,25 @@ function WevoLivePanel({
     style: {
       fontWeight: 800,
       fontSize: 15,
-      color
+      color,
+      display: "flex",
+      alignItems: "center",
+      gap: 7
     },
     "data-testid": "wevo-panel-state"
-  }, vehicleNow ? "🔌 מטען — " + wevoStateLabel(st.state) + (peakNow ? " · ⚡ שיא" : "") : "אין רכב בעמדה"), /*#__PURE__*/React.createElement("button", {
+  }, vehicleNow && /*#__PURE__*/React.createElement(Icon, {
+    n: "plug",
+    s: 17
+  }), chargingNow && /*#__PURE__*/React.createElement("span", {
+    className: "ev-live-dot",
+    style: {
+      width: 9,
+      height: 9,
+      borderRadius: 999,
+      background: C.ok,
+      flexShrink: 0
+    }
+  }), vehicleNow ? "מטען — " + wevoStateLabel(st.state) + (peakNow ? " · שיא" : "") : "אין רכב בעמדה"), /*#__PURE__*/React.createElement("button", {
     onClick: refresh,
     disabled: busy,
     "data-testid": "wevo-refresh",
@@ -802,9 +840,18 @@ function WevoLivePanel({
       fontSize: 12,
       cursor: "pointer",
       color: "#475569",
-      fontWeight: 600
+      fontWeight: 600,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 5
     }
-  }, busy ? "..." : "רענן")), err && /*#__PURE__*/React.createElement("div", {
+  }, busy ? /*#__PURE__*/React.createElement(Spinner, {
+    s: 13
+  }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Icon, {
+    n: "refresh",
+    s: 13
+  }), " רענן"))), err && /*#__PURE__*/React.createElement("div", {
     style: {
       ...S.errMsg,
       marginBottom: 8
@@ -842,7 +889,7 @@ function WevoLivePanel({
       padding: "4px 8px",
       fontWeight: 800
     }
-  }, Number(st.totalEnergyKwh).toFixed(2), ' קוט"ש'), st.rateKw != null && /*#__PURE__*/React.createElement("span", {
+  }, Number(st.totalEnergyKwh).toFixed(2), ' קוט״ש'), st.rateKw != null && /*#__PURE__*/React.createElement("span", {
     style: {
       background: "#fff",
       border: "1px solid #e2e8f0",
@@ -888,95 +935,23 @@ function WevoLivePanel({
       marginBottom: 6
     }
   }, st.inWindow === true && /*#__PURE__*/React.createElement("span", {
-    style: {
-      background: "#ecfdf5",
-      border: "1px solid #a7f3d0",
-      borderRadius: 999,
-      padding: "3px 8px",
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#047857"
-    }
+    style: S.pill("#ecfdf5", "#047857")
   }, "בחלון תעריף"), st.inWindow === false && /*#__PURE__*/React.createElement("span", {
-    style: {
-      background: "#fff7ed",
-      border: "1px solid #fed7aa",
-      borderRadius: 999,
-      padding: "3px 8px",
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#c2410c"
-    }
+    style: S.pill("#fff7ed", "#c2410c")
   }, "מחוץ לחלון"), st.offPeakStartTime != null && st.offPeakEndTime != null && /*#__PURE__*/React.createElement("span", {
-    style: {
-      background: "#f8fafc",
-      border: "1px solid #e2e8f0",
-      borderRadius: 999,
-      padding: "3px 8px",
-      fontSize: 11,
-      fontWeight: 600,
-      color: "#64748b"
-    }
+    style: S.pill("#f8fafc", "#64748b")
   }, "Off-peak ", secsToHm(st.offPeakStartTime), "–", secsToHm(st.offPeakEndTime)), st.delayCharge && /*#__PURE__*/React.createElement("span", {
-    style: {
-      background: "#fef3c7",
-      border: "1px solid #fde68a",
-      borderRadius: 999,
-      padding: "3px 8px",
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#92400e"
-    }
+    style: S.pill("#fef3c7", "#92400e")
   }, st.delayCharge ? powerKw < 0.2 && (phase === "suspended" || phase === "preparing" || phase === "finishing") ? "מושהה כרגע" : "תזמון Wevo" : null), st.manageCharge && /*#__PURE__*/React.createElement("span", {
-    style: {
-      background: "#eff6ff",
-      border: "1px solid #bfdbfe",
-      borderRadius: 999,
-      padding: "3px 8px",
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#1d4ed8"
-    }
+    style: S.pill("#eff6ff", "#1d4ed8")
   }, "ניהול טעינה"), st.isWaitingAllocation && /*#__PURE__*/React.createElement("span", {
-    style: {
-      background: "#fef2f2",
-      border: "1px solid #fecaca",
-      borderRadius: 999,
-      padding: "3px 8px",
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#b91c1c"
-    }
+    style: S.pill("#fef2f2", "#b91c1c")
   }, "ממתין להקצאה"), st.isBoost && /*#__PURE__*/React.createElement("span", {
-    style: {
-      background: "#faf5ff",
-      border: "1px solid #e9d5ff",
-      borderRadius: 999,
-      padding: "3px 8px",
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#7e22ce"
-    }
+    style: S.pill("#faf5ff", "#7e22ce")
   }, "Boost"), st.solarChargingType && /*#__PURE__*/React.createElement("span", {
-    style: {
-      background: "#f0fdf4",
-      border: "1px solid #bbf7d0",
-      borderRadius: 999,
-      padding: "3px 8px",
-      fontSize: 11,
-      fontWeight: 600,
-      color: "#166534"
-    }
+    style: S.pill("#f0fdf4", "#166534")
   }, wevoSolarHe(st.solarChargingType)), st.didCompleteFull && /*#__PURE__*/React.createElement("span", {
-    style: {
-      background: "#ecfeff",
-      border: "1px solid #a5f3fc",
-      borderRadius: 999,
-      padding: "3px 8px",
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#0e7490"
-    }
+    style: S.pill("#ecfeff", "#0e7490")
   }, "טעינה מלאה")), (st.plugInTime || linkedOpen) && isChargeTimelineRelevant({
     isSelf: isSelfSelected || isSelfClient(clients.find(c => linkedOpen && c.id === linkedOpen.clientId)),
     plugInAt: linkedOpen && linkedOpen.plugInAt || st.plugInTime,
@@ -1160,7 +1135,7 @@ function WevoLivePanel({
       color: "#94a3b8",
       marginBottom: 2
     }
-  }, 'קוט"ש'), /*#__PURE__*/React.createElement("div", {
+  }, ' קוט״ש'), /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 800,
       fontSize: 16
@@ -1205,7 +1180,7 @@ function WevoLivePanel({
       color: "#64748b",
       marginTop: 2
     }
-  }, est.calc.kwhInflated, ' קוט"ש מנופח · ₪', est.calc.rate, " · ", est.calc.rateLabel)), /*#__PURE__*/React.createElement("div", {
+  }, est.calc.kwhInflated, ' קוט״ש מנופח · ₪', est.calc.rate, " · ", est.calc.rateLabel)), /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#ecfdf5",
       borderRadius: 10,
@@ -1265,7 +1240,7 @@ function WevoLivePanel({
     },
     "data-testid": "wevo-auto-auth-status"
   }, authBusy
-    ? noPremiumIntent ? "⏳ מאשר חיבור (בלי תעריף יקר)..." : peakNow ? "⏳ לוחץ אישור פרימיום ב-Wevo..." : "⏳ מאשר ב-Wevo..."
+    ? noPremiumIntent ? "מאשר חיבור (בלי תעריף יקר)..." : peakNow ? "לוחץ אישור פרימיום ב-Wevo..." : "מאשר ב-Wevo..."
     : isFirstAuthIntent
       ? `מאשר חיבור אוטומטית${authAttemptsUi ? ` · ${authAttemptsUi}` : ""}`
       : isOffPeakIntent
@@ -1277,7 +1252,11 @@ function WevoLivePanel({
       ...S.btnP,
       background: authBusy ? "#93c5fd" : peakNow ? "#ea580c" : "#0ea5c6",
       padding: "11px 12px",
-      flex: "1 1 160px"
+      flex: "1 1 160px",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7
     },
     disabled: authBusy || busy || !cid && isSelfSelected,
     onClick: requestAuthorize,
@@ -1305,7 +1284,7 @@ function WevoLivePanel({
     },
     disabled: !(st.connected || st.charging || st.transactionId) || !cid,
     onClick: () => assignOpen()
-  }, linkedOpen ? "💾 עדכן שיוך" : "⏳ פתח טעינה פתוחה"), lastAt && /*#__PURE__*/React.createElement("div", {
+  }, linkedOpen ? "עדכן שיוך" : "פתח טעינה פתוחה"), lastAt && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: "#94a3b8",

@@ -37,6 +37,7 @@ function CompleteSession({
   const [manualStart, setManualStart] = useState("");
   const [manualEnd, setManualEnd] = useState("");
   const [timelineOverride, setTimelineOverride] = useState(null);
+  const [saving, setSaving] = useState(false);
   const adjVal = isSelf ? 0 : parseFloat(adjust) || 0;
   const startDt = (_openSession$startDat = openSession === null || openSession === void 0 ? void 0 : openSession.startDate) !== null && _openSession$startDat !== void 0 ? _openSession$startDat : "";
   const [startEdit, setStartEdit] = useState(startDt);
@@ -337,38 +338,87 @@ function CompleteSession({
   }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: S.cNameLg
   }, c === null || c === void 0 ? void 0 : c.name), /*#__PURE__*/React.createElement("div", {
+    style: filledOk ? S.pill(C.okSoft, C.okInk) : S.pill(C.bg, C.meta)
+  }, filledOk && /*#__PURE__*/React.createElement(Icon, {
+    n: "check",
+    s: 12
+  }), "השלמת טעינה פתוחה", filledOk ? " · מוכן לאישור" : ""))), (isWevoLinked || readyFromWevo) && /*#__PURE__*/React.createElement("div", {
+    style: S.statusCard(filledOk ? C.ok : wevoFetch === "err" ? C.err : C.warn)
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
-      color: "#0ea5e9",
-      fontWeight: 600
-    }
-  }, "השלמת טעינה פתוחה", filledOk ? " · מוכן לאישור" : ""))), (isWevoLinked || readyFromWevo) && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: filledOk ? "#f0fdf4" : wevoFetch === "err" ? "#fef2f2" : "#fff7ed",
-      border: filledOk ? "1.5px solid #86efac" : wevoFetch === "err" ? "1.5px solid #fecaca" : "1.5px solid #fdba74",
-      borderRadius: 10,
-      padding: "10px 12px",
-      marginBottom: 14,
+      flex: 1,
       fontSize: 13,
-      color: filledOk ? "#166534" : wevoFetch === "err" ? "#991b1b" : "#9a3412",
-      lineHeight: 1.45
+      lineHeight: 1.5,
+      color: C.body
     }
-  }, wevoFetch === "loading" ? "⏳ שולף מ-Wevo שעת סיום טעינה וקוט״ש סופי..." : filledOk ? /*#__PURE__*/React.createElement(React.Fragment, null, timelineRelevant ? "✅ הנתונים מולאו מ-Wevo — בחר נקודות לחיוב מתוך חלון הזמנים (מעבר בין יקרות לרגיל)." : "✅ הנתונים מולאו מ-Wevo — אין מעבר בין שעות יקרות/רגילות, חיוב לפי חיבור→סיום.") : /*#__PURE__*/React.createElement(React.Fragment, null, wevoFetchErr || "🔌 מושך נתוני סיום מ-Wevo…", openSession.wevoTxnId && /*#__PURE__*/React.createElement("span", null, " txn#", openSession.wevoTxnId)), /*#__PURE__*/React.createElement("button", {
-    type: "button",
+  }, wevoFetch === "loading" ? /*#__PURE__*/React.createElement("span", {
     style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "ev-live-dot",
+    style: {
+      width: 9,
+      height: 9,
+      borderRadius: "50%",
+      background: C.warn,
+      display: "inline-block"
+    }
+  }), /*#__PURE__*/React.createElement(Spinner, {
+    s: 15
+  }), "שולף מ-Wevo שעת סיום טעינה וקוט״ש סופי...") : filledOk ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 7,
+      color: C.okInk,
+      fontWeight: 700
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "check",
+    s: 16
+  }), timelineRelevant ? "הנתונים מולאו מ-Wevo — בחר נקודות לחיוב מתוך חלון הזמנים (מעבר בין יקרות לרגיל)." : "הנתונים מולאו מ-Wevo — אין מעבר בין שעות יקרות/רגילות, חיוב לפי חיבור→סיום.") : /*#__PURE__*/React.createElement(React.Fragment, null, wevoFetchErr ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.errInk,
+      fontWeight: 700
+    }
+  }, wevoFetchErr) : /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 7
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "plug",
+    s: 16
+  }), "מושך נתוני סיום מ-Wevo…"), openSession.wevoTxnId && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.faint,
+      fontSize: 11,
+      marginRight: 6
+    }
+  }, "txn#", openSession.wevoTxnId)), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "ev-press",
+    style: { ...S.btnS,
       marginTop: 8,
-      background: "#fff",
-      border: "1px solid #cbd5e1",
-      borderRadius: 8,
-      padding: "6px 10px",
-      fontSize: 12,
-      fontWeight: 700,
-      cursor: "pointer",
-      color: "#0f766e"
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      minHeight: 40,
+      fontSize: 13,
+      flex: "0 0 auto"
     },
     disabled: wevoFetch === "loading",
     onClick: pullWevoFinal
-  }, wevoFetch === "loading" ? "שולף..." : "🔄 רענן מ-Wevo")), timelineRelevant && tlPoints.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ChargeTimelineBox, {
+  }, wevoFetch === "loading" ? /*#__PURE__*/React.createElement(Spinner, {
+    s: 14
+  }) : /*#__PURE__*/React.createElement(Icon, {
+    n: "refresh",
+    s: 14
+  }), wevoFetch === "loading" ? " שולף..." : " רענן מ-Wevo"))), timelineRelevant && tlPoints.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ChargeTimelineBox, {
     timeline: sessionTimeline,
     billStartKey: billStartKey,
     billEndKey: billEndKey
@@ -437,7 +487,7 @@ function CompleteSession({
   }), billStartKey === "manual" && manualStart && !parseManualTimeHHMM(manualStart) && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
-      color: "#b91c1c",
+      color: C.err,
       marginTop: 4,
       fontWeight: 600
     }
@@ -465,7 +515,7 @@ function CompleteSession({
   }), billEndKey === "manual" && manualEnd && !parseManualTimeHHMM(manualEnd) && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
-      color: "#b91c1c",
+      color: C.err,
       marginTop: 4,
       fontWeight: 600
     }
@@ -493,14 +543,17 @@ function CompleteSession({
       onDurChange(e.target.value);
     },
     "data-testid": "complete-duration"
-  }), durMins > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#0f766e",
-      marginTop: 4,
-      fontWeight: 600
+  }), durMins > 0 && /*#__PURE__*/React.createElement("span", {
+    style: { ...S.chip(C.primarySoft, C.primaryInk),
+      minHeight: 0,
+      padding: "4px 10px",
+      fontSize: 11,
+      marginTop: 6
     }
-  }, "= ", Math.floor(durMins / 60), " שעות ו־", durMins % 60, " דק׳", edt ? ` · סיום ${edt.slice(11, 16)}` : ""))), !isWevoLinked && !readyFromWevo && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "clock",
+    s: 13
+  }), "= ", Math.floor(durMins / 60), " שעות ו־", durMins % 60, " דק׳", edt ? ` · סיום ${edt.slice(11, 16)}` : ""))), !isWevoLinked && !readyFromWevo && /*#__PURE__*/React.createElement("div", {
     style: {
       ...S.rg,
       marginBottom: 8,
@@ -529,7 +582,7 @@ function CompleteSession({
       onEndChange(e.target.value);
     }
   })), /*#__PURE__*/React.createElement(FG, {
-    lbl: isWevoLinked ? 'קוט"ש בפועל (מהעמדה / Wevo)' : 'קוט"ש גולמי (מהעמדה)'
+    lbl: isWevoLinked ? 'קוט״ש בפועל (מהעמדה / Wevo)' : 'קוט״ש גולמי (מהעמדה)'
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
     type: "number",
@@ -539,29 +592,35 @@ function CompleteSession({
     value: kwh,
     onChange: e => setKwh(e.target.value),
     "data-testid": "complete-kwh"
-  }), Number(openSession.liveKwh) > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
+  }), Number(openSession.liveKwh) > 0 && /*#__PURE__*/React.createElement("span", {
+    style: { ...S.chip(C.primarySoft, C.primaryInk),
+      minHeight: 0,
+      padding: "4px 10px",
       fontSize: 11,
-      color: "#0f766e",
-      marginTop: 4,
-      fontWeight: 600
+      marginTop: 6
     }
-  }, "מ-Wevo: ", Number(openSession.liveKwh).toFixed(2), ' קוט"ש')), isSelf ? /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "plug",
+    s: 13
+  }), "מ-Wevo: ", Number(openSession.liveKwh).toFixed(2), " קוט״ש")), isSelf ? /*#__PURE__*/React.createElement("div", {
+    style: S.statusCard(C.primary)
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "card",
+    s: 20,
     style: {
-      background: "#ecfeff",
-      border: "1.5px solid #a5f3fc",
-      borderRadius: 10,
-      padding: "10px 12px",
-      marginBottom: 14,
+      color: C.primaryStrong
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
       fontSize: 13,
-      color: "#0e7490",
+      color: C.primaryInk,
       lineHeight: 1.45
     }
-  }, "💳 טעינה עצמית — רק ", /*#__PURE__*/React.createElement("strong", null, "עלות בפועל"), " (בלי ניפוח / פרימיום / תוספות). יורד באשראי, בלי חוב.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FG, {
+  }, "טעינה עצמית — רק ", /*#__PURE__*/React.createElement("strong", null, "עלות בפועל"), " (בלי ניפוח / פרימיום / תוספות). יורד באשראי, בלי חוב.")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FG, {
     lbl: "תעריף"
   }, /*#__PURE__*/React.createElement("div", {
     style: S.rg
-  }, [["auto", "אוטומטי 🤖"], ["regular", `רגיל ₪${getConfig().rateRegular}`], ["premium", `פרימיום ₪${getConfig().ratePremium}`], ["custom", "מותאם ✏️"]].map(([v, l]) => /*#__PURE__*/React.createElement("label", {
+  }, [["auto", "אוטומטי", "cog"], ["regular", `רגיל ₪${getConfig().rateRegular}`, null], ["premium", `פרימיום ₪${getConfig().ratePremium}`, null], ["custom", "מותאם", "edit"]].map(([v, l, ic]) => /*#__PURE__*/React.createElement("label", {
     key: v,
     style: S.rlbl
   }, /*#__PURE__*/React.createElement("input", {
@@ -570,7 +629,10 @@ function CompleteSession({
     value: v,
     checked: fr === v,
     onChange: () => setFr(v)
-  }), " ", l))), fr === "custom" && /*#__PURE__*/React.createElement("input", {
+  }), ic && /*#__PURE__*/React.createElement(Icon, {
+    n: ic,
+    s: 15
+  }), /*#__PURE__*/React.createElement("span", null, l)))), fr === "custom" && /*#__PURE__*/React.createElement("input", {
     style: {
       ...S.inp,
       marginTop: 8
@@ -594,29 +656,78 @@ function CompleteSession({
     style: S.prev
   }, /*#__PURE__*/React.createElement("div", {
     style: S.prevTitle
-  }, "תצוגה מקדימה"), (isSelf ? [[`קוט"ש`, String(prev.kwhRaw), null], ["חיוב אשראי (עלות בפועל)", ilsFull(prev.amountBilled), "#0ea5c6"], ["סטטוס", "אשראי ✓ · ללא חוב", "#0ea5c6"]] : [[`קוט"ש מנופח`, `${prev.kwhRaw} → ${prev.kwhInflated}`, null], ["תעריף", `₪${prev.rate} | ${prev.rateLabel}`, null], ["לחיוב (לפני תוספת)", ils(prev.amountBilled - adjVal), null], ...(adjVal !== 0 ? [["תוספת/הנחה", `${adjVal > 0 ? "+" : ""}${adjVal}₪`, adjVal > 0 ? "#f59e0b" : "#10b981"]] : []), ["סהכ לחיוב", ils(prev.amountBilled), "#6366f1"], ["עלות בפועל 🔒", `₪${(_prev$costToOwner2 = prev.costToOwner) === null || _prev$costToOwner2 === void 0 ? void 0 : _prev$costToOwner2.toFixed(2)}`, "#9ca3af"], ["רווח", ilsFull(prev.profit), "#10b981"]]).map(([lbl, val, color]) => /*#__PURE__*/React.createElement("div", {
+  }, "תצוגה מקדימה"), (isSelf ? [[`קוט״ש`, String(prev.kwhRaw), null], ["חיוב אשראי (עלות בפועל)", ilsFull(prev.amountBilled), C.primary], ["סטטוס", /*#__PURE__*/React.createElement("span", {
+    style: S.pill(C.primarySoft, C.primaryInk)
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "check",
+    s: 12
+  }), " אשראי · ללא חוב"), C.primary]] : [[`קוט״ש מנופח`, `${prev.kwhRaw} → ${prev.kwhInflated}`, null], ["תעריף", `₪${prev.rate} | ${prev.rateLabel}`, null], ["לחיוב (לפני תוספת)", ils(prev.amountBilled - adjVal), null], ...(adjVal !== 0 ? [["תוספת/הנחה", `${adjVal > 0 ? "+" : ""}${adjVal}₪`, adjVal > 0 ? C.warn : C.ok]] : []), ["סהכ לחיוב", ils(prev.amountBilled), C.primaryStrong], ["עלות בפועל 🔒", `₪${(_prev$costToOwner2 = prev.costToOwner) === null || _prev$costToOwner2 === void 0 ? void 0 : _prev$costToOwner2.toFixed(2)}`, C.meta], ["רווח", ilsFull(prev.profit), C.okInk]]).map(([lbl, val, color]) => /*#__PURE__*/React.createElement("div", {
     key: lbl,
     style: S.pRow
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6b7280",
+      color: C.meta,
       fontSize: 13
     }
   }, lbl), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontWeight: color ? "700" : "400",
-      fontSize: color ? 15 : 13,
-      color: color || "#111827"
+      fontWeight: lbl === "סהכ לחיוב" ? "800" : color ? "700" : "400",
+      fontSize: lbl === "סהכ לחיוב" ? 18 : color ? 15 : 13,
+      color: color || C.ink,
+      fontVariantNumeric: "tabular-nums"
     }
-  }, val)))), /*#__PURE__*/React.createElement("div", {
+  }, val))), prev && /*#__PURE__*/React.createElement("div", {
+    style: { ...S.statusCard(C.primary),
+      display: "block",
+      textAlign: "center",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 26,
+      fontWeight: 800,
+      color: C.ink,
+      fontVariantNumeric: "tabular-nums",
+      lineHeight: 1.2
+    }
+  }, Number(prev.kwhInflated).toFixed(2), " קוט״ש"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 20,
+      fontWeight: 800,
+      color: C.primaryStrong,
+      marginTop: 2,
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, ils(prev.amountBilled), " לחיוב"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      justifyContent: "center",
+      flexWrap: "wrap",
+      marginTop: 8
+    }
+  }, !isSelf && (prev.isMixed ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    style: S.pill(C.warnSoft, C.warnInk)
+  }, (Number(prev.kwhInflated) * Number(prev.premiumRatio || 0)).toFixed(1), " קוט״ש שיא"), /*#__PURE__*/React.createElement("span", {
+    style: S.pill(C.primarySoft, C.primaryInk)
+  }, (Number(prev.kwhInflated) * (1 - Number(prev.premiumRatio || 0))).toFixed(1), " קוט״ש רגיל")) : /*#__PURE__*/React.createElement("span", {
+    style: S.pill(Number(prev.premiumRatio) >= 1 ? C.warnSoft : C.primarySoft, Number(prev.premiumRatio) >= 1 ? C.warnInk : C.primaryInk)
+  }, Number(prev.premiumRatio) >= 1 ? "תעריף שיא" : "תעריף רגיל")), prev.durMin > 0 && /*#__PURE__*/React.createElement("span", {
+    style: S.pill(C.bg, C.meta)
+  }, "משך: ", formatDurMins(prev.durMin))))), /*#__PURE__*/React.createElement("div", {
     style: S.acts
   }, /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnP,
-      opacity: prev ? 1 : 0.5
+      opacity: saving ? 0.7 : prev ? 1 : 0.5,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8
     },
-    disabled: !prev || !(Number(kwh) > 0),
+    disabled: !prev || !(Number(kwh) > 0) || saving,
     onClick: () => {
+      setSaving(true);
       if (!(Number(kwh) > 0)) {
         appAlert("אין קוט״ש — לא נשמר חיוב. אפשר למחוק את הטעינה הריקה.", "err", 6500);
         return;
@@ -653,11 +764,17 @@ function CompleteSession({
     });
     },
     "data-testid": "complete-save"
-  }, !(Number(kwh) > 0) ? "אין קוט״ש — לא לשמור" : isSelf ? "שמור עלות אשראי" : filledOk ? "אשר ושמור טעינה" : "שמור טעינה"), !(Number(kwh) > 0) && onDelete && /*#__PURE__*/React.createElement("button", {
+  }, saving ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Spinner, {
+    s: 16,
+    style: {
+      borderTopColor: "#fff",
+      borderColor: "rgba(255,255,255,0.35)"
+    }
+  }), " שומר…") : !(Number(kwh) > 0) ? "אין קוט״ש — לא לשמור" : isSelf ? "שמור עלות אשראי" : filledOk ? "אשר ושמור טעינה" : "שמור טעינה"), !(Number(kwh) > 0) && onDelete && /*#__PURE__*/React.createElement("button", {
     type: "button",
     style: {
       ...S.btnS,
-      color: "#b91c1c",
+      color: C.err,
       borderColor: "#fecaca"
     },
     "data-testid": "complete-delete-empty",

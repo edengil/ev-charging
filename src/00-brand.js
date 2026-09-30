@@ -24,7 +24,7 @@ function BrandMark({
     style: {
       flexShrink: 0,
       display: "block",
-      filter: "drop-shadow(0 2px 8px rgba(15, 118, 110, 0.28))"
+      filter: "drop-shadow(0 2px 8px rgba(14, 116, 144, 0.28))"
     }
   }, /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("linearGradient", {
     id: ink,
@@ -34,13 +34,13 @@ function BrandMark({
     y2: "60",
     gradientUnits: "userSpaceOnUse"
   }, /*#__PURE__*/React.createElement("stop", {
-    stopColor: "#0f766e"
+    stopColor: "#0ea5c6"
   }), /*#__PURE__*/React.createElement("stop", {
     offset: "0.55",
-    stopColor: "#115e59"
+    stopColor: "#0e9dbd"
   }), /*#__PURE__*/React.createElement("stop", {
     offset: "1",
-    stopColor: "#134e4a"
+    stopColor: "#0e7490"
   }))), /*#__PURE__*/React.createElement("circle", {
     cx: "32",
     cy: "32",
@@ -95,7 +95,7 @@ function BrandLogo({
       fontWeight: 800,
       fontSize: titleSize,
       letterSpacing: "-0.04em",
-      color: "#134e4a"
+      color: "#164e63"
     }
   }, "Eden Gil"), /*#__PURE__*/React.createElement("div", {
     style: {

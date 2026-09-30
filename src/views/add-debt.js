@@ -19,30 +19,32 @@ function AddDebt({
   }, /*#__PURE__*/React.createElement("div", {
     style: S.form
   }, /*#__PURE__*/React.createElement("div", {
-    style: S.cHeader
+    style: S.heroErr
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12
+    }
   }, /*#__PURE__*/React.createElement(ClientAvatar, {
     client: c,
     size: 48,
     fontSize: 20
-  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: S.cNameLg
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 800
+    }
   }, c === null || c === void 0 ? void 0 : c.name), /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#dc2626",
-      fontSize: 13,
-      fontWeight: 600
-    }
-  }, "הוספת חוב ידני"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fef2f2",
-      border: "1px solid #fecaca",
-      borderRadius: 10,
-      padding: "10px 12px",
-      marginBottom: 14,
-      fontSize: 13,
-      color: "#991b1b"
-    }
-  }, "💡 מוסיף לסכום שהלקוח חייב (לא תשלום)"), /*#__PURE__*/React.createElement(FG, {
+    style: S.heroLabel
+  }, "הוספת חוב ידני")))), /*#__PURE__*/React.createElement("div", {
+    style: { ...S.chip(C.errSoft, C.errInk), marginBottom: 14 }
+  }, /*#__PURE__*/React.createElement(Icon, { n: "alert", s: 13 }), "מוסיף לסכום שהלקוח חייב (לא תשלום)"), /*#__PURE__*/React.createElement(FG, {
     lbl: "סכום החוב (₪)"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
@@ -63,7 +65,7 @@ function AddDebt({
   }, /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnP,
-      background: "#dc2626",
+      background: C.err,
       opacity: !amount || parseFloat(amount) <= 0 ? 0.5 : 1
     },
     disabled: !amount || parseFloat(amount) <= 0,

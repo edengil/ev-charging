@@ -641,7 +641,7 @@ function WevoHistoryView({
       fontSize: 18,
       fontWeight: 700
     }
-  }, 'קוט"ש'))), h("div", {
+  }, 'קוט״ש'))), h("div", {
     style: {
       textAlign: "left",
       direction: "ltr",
@@ -725,17 +725,17 @@ function WevoHistoryView({
       gap: 14,
       flexWrap: "wrap"
     }
-  }, h("span", null, "Total ", h("b", {
+  }, h("span", null, "סה״כ ", h("b", {
     style: {
       color: WEVO.text,
       fontWeight: 800
     }
-  }, monthStats.totalKwh.toFixed(1), ' קוט"ש')), h("span", null, "Avg ", h("b", {
+  }, monthStats.totalKwh.toFixed(1), " קוט״ש")), h("span", null, "ממוצע ", h("b", {
     style: {
       color: WEVO.text,
       fontWeight: 800
     }
-  }, monthStats.avg.toFixed(1), ' קוט"ש')), h("span", null, isBilling ? "חיוב " : "עלות ", h("b", {
+  }, monthStats.avg.toFixed(1), " קוט״ש")), h("span", null, isBilling ? "חיוב " : "עלות ", h("b", {
     style: {
       color: WEVO.text,
       fontWeight: 800
@@ -882,7 +882,10 @@ function WevoHistoryView({
     style: {
       fontSize: 15
     }
-  }, "📄"), "View payments history", h("span", {
+  }, h(Icon, {
+    n: "chart",
+    s: 15
+  })), "הצג היסטוריית תשלומים", h("span", {
     style: {
       fontSize: 14
     }
@@ -952,7 +955,7 @@ function WevoHistoryView({
         direction: "rtl",
         textAlign: "left"
       }
-    }, s.kwh.toFixed(2), ' קוט"ש', dur ? `  ${dur}` : "")));
+    }, s.kwh.toFixed(2), ' קוט״ש', dur ? `  ${dur}` : "")));
   }),
 
   // Bottom nav — RTL: first item = rightmost = המטען שלי
@@ -1039,7 +1042,7 @@ function WevoHistoryView({
     style: {
       direction: "ltr"
     }
-  }, "₪", Number(rate).toFixed(2), '/קוט"ש')))), h("div", {
+  }, "₪", Number(rate).toFixed(2), '/קוט״ש')))), h("div", {
     style: {
       textAlign: "right",
       color: WEVO.muted,

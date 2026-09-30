@@ -85,20 +85,12 @@ function EditSession({
   }, c === null || c === void 0 ? void 0 : c.name), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
-      color: "#3b82f6",
+      color: C.primaryStrong,
       fontWeight: 600
     }
-  }, "✏️ עריכת טעינה"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: fieldsDirty ? "#fff7ed" : "#eff6ff",
-      border: fieldsDirty ? "1px solid #fed7aa" : "1px solid #bfdbfe",
-      borderRadius: 10,
-      padding: "10px 12px",
-      marginBottom: 14,
-      fontSize: 12,
-      color: fieldsDirty ? "#9a3412" : "#1e40af"
-    }
-  }, fieldsDirty
+  }, /*#__PURE__*/React.createElement(Icon, { n: "edit", s: 12, style: { display: "inline-block", verticalAlign: "-1px", marginInlineEnd: 4 } }), "עריכת טעינה"))), /*#__PURE__*/React.createElement("div", {
+    style: { ...S.chip(fieldsDirty ? C.warnSoft : C.primarySoft, fieldsDirty ? C.warnInk : C.primaryInk), width: "100%", whiteSpace: "normal", borderRadius: 10, marginBottom: 14 }
+  }, /*#__PURE__*/React.createElement(Icon, { n: fieldsDirty ? "alert" : "clock", s: 13 }), fieldsDirty
     ? "שינית שדות — החיוב מחושב מחדש. חיוב מקורי היה: "
     : "מוצגים הסכומים השמורים של הטעינה. שינוי קוט״ש/תעריף/זמן יחשב מחדש. חיוב שמור: ", ils(session.amountBilled)), /*#__PURE__*/React.createElement(SessionFormFields, {
     dt: dt,

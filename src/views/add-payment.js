@@ -49,19 +49,36 @@ function AddPayment({
   }, /*#__PURE__*/React.createElement("div", {
     style: S.form
   }, /*#__PURE__*/React.createElement("div", {
-    style: S.cHeader
+    style: S.hero
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12
+    }
   }, /*#__PURE__*/React.createElement(ClientAvatar, {
     client: c,
     size: 48,
     fontSize: 20
-  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: S.cNameLg
-  }, c === null || c === void 0 ? void 0 : c.name), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
-      color: balanceColor(bal, false),
-      fontWeight: 700
+      flex: 1,
+      minWidth: 0
     }
-  }, formatBalanceText(bal))))), /*#__PURE__*/React.createElement(FG, {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 800
+    }
+  }, c === null || c === void 0 ? void 0 : c.name), /*#__PURE__*/React.createElement("div", {
+    style: S.heroLabel
+  }, hasDebt(bal) ? "יתרת חוב" : hasCredit(bal) ? "יתרת זכות" : "יתרה"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...S.heroNum,
+      fontSize: 22,
+      marginTop: 8
+    }
+  }, formatBalanceText(bal)))), /*#__PURE__*/React.createElement(FG, {
     lbl: "סכום ששולם"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
@@ -97,13 +114,15 @@ function AddPayment({
     onChange: e => setNotes(e.target.value),
     placeholder: bal <= 0.01 ? "למשל: שולם מראש / מזומן מראש" : "אופציונלי"
   })), amt ? /*#__PURE__*/React.createElement("div", {
-    style: S.prev,
+    style: S.statusCard(C.primary),
     "data-testid": "payment-preview"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { flex: 1 }
   }, /*#__PURE__*/React.createElement("div", {
     style: S.pRow
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6b7280",
+      color: C.meta,
       fontSize: 13
     }
   }, hasCredit(afterBal) ? "יתרת זכות לאחר תשלום" : hasDebt(afterBal) ? "חוב לאחר תשלום" : "יתרה לאחר תשלום"), /*#__PURE__*/React.createElement("span", {
@@ -113,16 +132,11 @@ function AddPayment({
       fontSize: 15
     }
   }, hasCredit(afterBal) ? ils(Math.abs(afterBal)) : ils(afterBal))), hasCredit(afterBal) && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#047857",
-      marginTop: 6,
-      fontWeight: 600
-    }
-  }, "שולם מראש — הטעינות הבאות ינוכו מיתרת הזכות")) : null, dupWarn && /*#__PURE__*/React.createElement("div", {
+    style: { ...S.chip(C.okSoft, C.okInk), marginTop: 6 }
+  }, /*#__PURE__*/React.createElement(Icon, { n: "check", s: 13 }), "שולם מראש — הטעינות הבאות ינוכו מיתרת הזכות"))) : null, dupWarn && /*#__PURE__*/React.createElement("div", {
       style: {
         background: "#fffbeb",
-        border: "1.5px solid #fcd34d",
+        border: `1.5px solid ${C.warn}`,
         borderRadius: 10,
         padding: "10px 12px",
         marginTop: 10,
@@ -132,11 +146,8 @@ function AddPayment({
       },
       "data-testid": "payment-dupwarn"
     }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontWeight: 800,
-        marginBottom: 8
-      }
-    }, "⚠️ נראה שכבר נרשם היום תשלום דומה: ", ils(Number(dupWarn.amount) || 0), " (", METHODS[dupWarn.method] || dupWarn.method || "", ", ", new Date(dupWarn.date).toLocaleTimeString("he-IL", {
+      style: { ...S.chip(C.warnSoft, C.warnInk), marginBottom: 8 }
+    }, /*#__PURE__*/React.createElement(Icon, { n: "alert", s: 13 }), "נראה שכבר נרשם היום תשלום דומה: ", ils(Number(dupWarn.amount) || 0), " (", METHODS[dupWarn.method] || dupWarn.method || "", ", ", new Date(dupWarn.date).toLocaleTimeString("he-IL", {
       hour: "2-digit",
       minute: "2-digit"
     }), "). זו כפילות?"), /*#__PURE__*/React.createElement("div", {

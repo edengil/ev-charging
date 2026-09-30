@@ -77,13 +77,13 @@ function AddSession({
   }, /*#__PURE__*/React.createElement("button", {
     style: S.tab(mode === "manual"),
     onClick: () => setMode("manual")
-  }, "✍️ ידנית"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(Icon, { n: "edit", s: 14, style: { display: "inline-block", verticalAlign: "-2px", marginInlineEnd: 5 } }), "ידנית"), /*#__PURE__*/React.createElement("button", {
     style: S.tab(mode === "quick"),
     onClick: () => setMode("quick")
-  }, "⚡ מהיר"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(Icon, { n: "zap", s: 14, style: { display: "inline-block", verticalAlign: "-2px", marginInlineEnd: 5 } }), "מהיר"), /*#__PURE__*/React.createElement("button", {
     style: S.tab(mode === "paste"),
     onClick: () => setMode("paste")
-  }, "📋 הדבק")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Icon, { n: "inbox", s: 14, style: { display: "inline-block", verticalAlign: "-2px", marginInlineEnd: 5 } }), "הדבק")), /*#__PURE__*/React.createElement("div", {
     style: S.form
   }, /*#__PURE__*/React.createElement(FG, {
     lbl: "לקוח"
@@ -98,7 +98,7 @@ function AddSession({
     key: c.id,
     value: c.id
   }, c.name)))), mode === "quick" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FG, {
-    lbl: "קוט\"ש גולמי"
+    lbl: "קוט״ש גולמי"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
     type: "number",
@@ -110,7 +110,7 @@ function AddSession({
     autoFocus: true,
     "data-testid": "session-kwh-quick"
   })), /*#__PURE__*/React.createElement(FG, {
-    lbl: "מחיר לקוט\"ש (ריק = אוטומטי לפי השעה)"
+    lbl: "מחיר לקוט״ש (ריק = אוטומטי לפי השעה)"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
     type: "number",
@@ -125,25 +125,25 @@ function AddSession({
     style: S.pRow
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6b7280",
+      color: C.meta,
       fontSize: 13
     }
   }, "לחיוב"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontWeight: 700,
-      color: "#6366f1",
+      color: C.primaryStrong,
       fontSize: 15
     }
   }, ils(qPrev.amountBilled))), /*#__PURE__*/React.createElement("div", {
     style: S.pRow
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6b7280",
+      color: C.meta,
       fontSize: 13
     }
   }, "רווח"), /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#10b981",
+      color: C.ok,
       fontWeight: 600
     }
   }, ilsFull(qPrev.profit)))), /*#__PURE__*/React.createElement("div", {
@@ -162,7 +162,7 @@ function AddSession({
       source: "quick",
       notes: ""
     })
-  }, "⚡ שמור מהיר"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(Icon, { n: "zap", s: 15, style: { display: "inline-block", verticalAlign: "-2px", marginInlineEnd: 6 } }), "שמור מהיר"), /*#__PURE__*/React.createElement("button", {
     style: S.btnS,
     onClick: onCancel
   }, "ביטול"))), mode === "paste" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FG, {
@@ -175,7 +175,7 @@ function AddSession({
       fontFamily: "monospace",
       fontSize: 13
     },
-    placeholder: "לדוגמה:\nיום ה' 28 מאי, 5:52 אחה\"צ\n35.41 קוט\"ש  3h 24m  ₪30.47",
+    placeholder: "לדוגמה:\nיום ה' 28 מאי, 5:52 אחה\"צ\n35.41 קוט״ש  3h 24m  ₪30.47",
     value: ocrText,
     onChange: e => handleOcrChange(e.target.value)
   })), ocrErr && /*#__PURE__*/React.createElement("div", {
@@ -187,11 +187,11 @@ function AddSession({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: S.prevTitle
-  }, "✅ זוהה"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Icon, { n: "check", s: 14, style: { display: "inline-block", verticalAlign: "-2px", marginInlineEnd: 5 } }), "זוהה"), /*#__PURE__*/React.createElement("div", {
     style: S.pRow
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6b7280",
+      color: C.meta,
       fontSize: 13
     }
   }, "שעת התחלה"), /*#__PURE__*/React.createElement("span", {
@@ -202,7 +202,7 @@ function AddSession({
     style: S.pRow
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6b7280",
+      color: C.meta,
       fontSize: 13
     }
   }, "משך"), /*#__PURE__*/React.createElement("span", {
@@ -213,10 +213,10 @@ function AddSession({
     style: S.pRow
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6b7280",
+      color: C.meta,
       fontSize: 13
     }
-  }, "קוט\"ש"), /*#__PURE__*/React.createElement("span", {
+  }, "קוט״ש"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontWeight: 700,
       fontSize: 13
@@ -225,7 +225,7 @@ function AddSession({
     style: S.pRow
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6b7280",
+      color: C.meta,
       fontSize: 13
     }
   }, "סכום אפליקציה"), /*#__PURE__*/React.createElement("span", {
@@ -239,7 +239,7 @@ function AddSession({
       padding: "10px"
     },
     onClick: applyOcr
-  }, "✓ אשר ועבור להזנה"))), mode === "manual" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SessionFormFields, {
+  }, /*#__PURE__*/React.createElement(Icon, { n: "check", s: 14, style: { display: "inline-block", verticalAlign: "-2px", marginInlineEnd: 5 } }), "אשר ועבור להזנה"))), mode === "manual" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SessionFormFields, {
     dt: dt,
     setDt: setDt,
     durInput: durInput,
@@ -276,7 +276,7 @@ function AddSession({
       notes
     }),
     "data-testid": "session-save"
-  }, prev && cid ? isSelfAdd ? "שמור עלות אשראי" : "שמור טעינה" : !cid ? "בחר לקוח לשמירה" : !kwh ? `⚠️ הכנס קוט"ש` : "מחשב..."), /*#__PURE__*/React.createElement("button", {
+  }, prev && cid ? isSelfAdd ? "שמור עלות אשראי" : "שמור טעינה" : !cid ? "בחר לקוח לשמירה" : !kwh ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Icon, { n: "alert", s: 15, style: { display: "inline-block", verticalAlign: "-2px", marginInlineEnd: 6 } }), "הכנס קוט״ש") : "מחשב..."), /*#__PURE__*/React.createElement("button", {
     style: S.btnS,
     onClick: onCancel
   }, "ביטול")))));

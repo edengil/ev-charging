@@ -24,26 +24,44 @@ function SettingsView({
     style: {
       fontWeight: 800,
       fontSize: 17,
-      marginBottom: 4
+      marginBottom: 4,
+      color: C.ink
     }
-  }, "⚙️ תעריפים"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "cog",
+    s: 19,
+    style: {
+      color: C.primaryStrong
+    }
+  }), "תעריפים")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
-      color: "#9ca3af",
+      color: C.meta,
       marginBottom: 16
     }
   }, "מתעדכן כל רבעון — שינוי משפיע על טעינות חדשות בלבד"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#eef2ff",
-      border: "1px solid #c7d2fe",
-      borderRadius: 10,
-      padding: "10px 12px",
-      marginBottom: 14,
-      fontSize: 12,
-      color: "#3730a3",
-      fontWeight: 600
+    style: { ...S.statusCard(C.primary),
+      marginBottom: 14
     }
-  }, "💰 גביה מלקוחות"), /*#__PURE__*/React.createElement(FG, {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "card",
+    s: 18,
+    style: {
+      color: C.primaryStrong
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: C.primaryInk
+    }
+  }, "גביה מלקוחות")), /*#__PURE__*/React.createElement(FG, {
     lbl: "תעריף פרימיום (16:00–23:00) ₪/קוט״ש"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
@@ -77,22 +95,27 @@ function SettingsView({
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
-      color: "#9ca3af",
+      color: C.meta,
       marginTop: -8,
       marginBottom: 14
     }
   }, "לדוגמה: 1.21 = ניפוח של 21% על הקוט״ש לפני חיוב. משפיע על טעינות חדשות בלבד."), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fef9c3",
-      border: "1px solid #fde68a",
-      borderRadius: 10,
-      padding: "10px 12px",
-      marginBottom: 14,
-      fontSize: 12,
-      color: "#854d0e",
-      fontWeight: 600
+    style: { ...S.statusCard(C.warn),
+      marginBottom: 14
     }
-  }, "🔒 עלות בעלים (מה שאתה משלם)"), /*#__PURE__*/React.createElement(FG, {
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "zap",
+    s: 18,
+    style: {
+      color: C.warnInk
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: C.warnInk
+    }
+  }, "עלות בעלים (מה שאתה משלם)")), /*#__PURE__*/React.createElement(FG, {
     lbl: "עלות פיק (17:00–23:00, ימי חול) ₪/קוט״ש"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,

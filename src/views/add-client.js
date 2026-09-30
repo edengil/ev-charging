@@ -28,7 +28,25 @@ function AddClient({
     style: S.main
   }, /*#__PURE__*/React.createElement("div", {
     style: S.form
-  }, /*#__PURE__*/React.createElement(FG, {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.hero
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "userPlus",
+    s: 26
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 800
+    }
+  }, "לקוח חדש"), /*#__PURE__*/React.createElement("div", {
+    style: S.heroLabel
+  }, "הוספת לקוח למערכת")))), /*#__PURE__*/React.createElement(FG, {
     lbl: "שם לקוח"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
@@ -37,21 +55,9 @@ function AddClient({
     placeholder: "ישראל ישראלי",
     "data-testid": "client-name"
   })), dupName && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fef3c7",
-      color: "#92400e",
-      borderRadius: 8,
-      padding: "8px 12px",
-      fontSize: 13,
-      fontWeight: 600,
-      marginTop: -8,
-      marginBottom: 14,
-      display: "flex",
-      alignItems: "center",
-      gap: 6
-    },
+    style: { ...S.chip(C.warnSoft, C.warnInk), width: "100%", marginTop: -8, marginBottom: 14 },
     "data-testid": "client-dup-warn"
-  }, "⚠️ לקוח בשם זה כבר קיים — בדוק שלא מדובר בכפילות"), /*#__PURE__*/React.createElement(FG, {
+  }, /*#__PURE__*/React.createElement(Icon, { n: "alert", s: 13 }), "לקוח בשם זה כבר קיים — בדוק שלא מדובר בכפילות"), /*#__PURE__*/React.createElement(FG, {
     lbl: "טלפון"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
@@ -95,7 +101,7 @@ function AddClient({
       alignItems: "center",
       gap: 10,
       fontSize: 12,
-      color: "#475569"
+      color: C.meta
     }
   }, /*#__PURE__*/React.createElement(ClientAvatar, {
     client: {
