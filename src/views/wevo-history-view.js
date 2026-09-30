@@ -536,7 +536,7 @@ function WevoHistoryView({
       cursor: "pointer",
       fontFamily: "'Heebo', sans-serif"
     }
-  }, "← חזרה")),
+  }, "→ חזרה")),
 
   // Header: logo left, title right (LTR row)
   h("div", {

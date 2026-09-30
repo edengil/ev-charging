@@ -24,7 +24,7 @@ function CompleteSession({
     return src ? asLocalDT(src) : "";
   });
   const [useEnd, setUseEnd] = useState(!!(isWevoLinked || readyFromWevo || (openSession && (openSession.chargeEndedAt || openSession.endDate))));
-  const [kwh, setKwh] = useState(() => openSession && openSession.liveKwh != null && Number(openSession.liveKwh) > 0 ? String(Number(openSession.liveKwh)) : "");
+  const [kwh, setKwh] = useState(() => openSession && openSession.liveKwh != null && Number(openSession.liveKwh) > 0 ? Number(openSession.liveKwh).toFixed(2) : "");
   const [fr, setFr] = useState("auto");
   const [customRate, setCustomRate] = useState("");
   const [prev, setPrev] = useState(null);
@@ -142,7 +142,7 @@ function CompleteSession({
   };
   const applyWevoFields = fields => {
     if (!fields) return;
-    if (fields.kwh > 0) setKwh(String(Number(fields.kwh)));
+    if (fields.kwh > 0) setKwh(Number(fields.kwh).toFixed(2));
     const tl = fields.timeline || resolveChargeTimeline({}, {
       plugInAt: fields.plugInAt || fields.start,
       chargeStartedAt: fields.chargeStartAt,
@@ -224,7 +224,7 @@ function CompleteSession({
   };
   useEffect(() => {
     if (!openSession) return;
-    if (openSession.liveKwh != null && Number(openSession.liveKwh) > 0) setKwh(String(Number(openSession.liveKwh)));
+    if (openSession.liveKwh != null && Number(openSession.liveKwh) > 0) setKwh(Number(openSession.liveKwh).toFixed(2));
     const tl = resolveChargeTimeline({}, {
       plugInAt: openSession.plugInAt || openSession.startDate,
       chargeStartedAt: openSession.chargeStartedAt,

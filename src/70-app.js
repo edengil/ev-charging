@@ -140,7 +140,12 @@ function BottomNav({ view, go }) {
         padding: "0 4px",
         lineHeight: 1
       }
-    }, badge)), /*#__PURE__*/React.createElement("span", null, it.label), active && /*#__PURE__*/React.createElement("span", {
+    }, badge)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        whiteSpace: "nowrap",
+        fontSize: 10
+      }
+    }, it.label), active && /*#__PURE__*/React.createElement("span", {
       style: {
         width: 18,
         height: 3,
@@ -1078,7 +1083,7 @@ function App() {
       padding: 0,
       maxWidth: "100%"
     } : { ...S.app,
-      paddingBottom: 84
+      paddingBottom: 104
     }
   }, /*#__PURE__*/React.createElement(WevoOpenLiveSync, {
     openSess: openSess,

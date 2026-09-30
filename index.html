@@ -4682,7 +4682,12 @@ function BottomNav({ view, go }) {
         padding: "0 4px",
         lineHeight: 1
       }
-    }, badge)), /*#__PURE__*/React.createElement("span", null, it.label), active && /*#__PURE__*/React.createElement("span", {
+    }, badge)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        whiteSpace: "nowrap",
+        fontSize: 10
+      }
+    }, it.label), active && /*#__PURE__*/React.createElement("span", {
       style: {
         width: 18,
         height: 3,
@@ -5620,7 +5625,7 @@ function App() {
       padding: 0,
       maxWidth: "100%"
     } : { ...S.app,
-      paddingBottom: 84
+      paddingBottom: 104
     }
   }, /*#__PURE__*/React.createElement(WevoOpenLiveSync, {
     openSess: openSess,
@@ -6706,7 +6711,7 @@ function ArchiveView({
       width: "100%"
     },
     "data-testid": "nav-dash"
-  }, "← חזרה")));
+  }, "→ חזרה")));
 }
 
 
@@ -9661,7 +9666,7 @@ function WevoHistoryView({
       cursor: "pointer",
       fontFamily: "'Heebo', sans-serif"
     }
-  }, "← חזרה")),
+  }, "→ חזרה")),
 
   // Header: logo left, title right (LTR row)
   h("div", {
@@ -10356,7 +10361,7 @@ function UncataloguedView({
     type: "button",
     style: S.btnS,
     onClick: onBack
-  }, "← חזרה")), showHint && /*#__PURE__*/React.createElement("div", {
+  }, "→ חזרה")), showHint && /*#__PURE__*/React.createElement("div", {
     style: { ...S.statusCard(C.primary),
       marginBottom: 12
     }
@@ -10528,7 +10533,7 @@ function UncataloguedView({
     }, /*#__PURE__*/React.createElement(Icon, {
       n: "archive",
       s: 15
-    }), " ארכב")), warn && /*#__PURE__*/React.createElement("div", {
+    }), " העבר לארכיון")), warn && /*#__PURE__*/React.createElement("div", {
       style: {
         background: C.warnSoft,
         border: "1.5px solid #fcd34d",
@@ -12264,7 +12269,7 @@ function CompleteSession({
     return src ? asLocalDT(src) : "";
   });
   const [useEnd, setUseEnd] = useState(!!(isWevoLinked || readyFromWevo || (openSession && (openSession.chargeEndedAt || openSession.endDate))));
-  const [kwh, setKwh] = useState(() => openSession && openSession.liveKwh != null && Number(openSession.liveKwh) > 0 ? String(Number(openSession.liveKwh)) : "");
+  const [kwh, setKwh] = useState(() => openSession && openSession.liveKwh != null && Number(openSession.liveKwh) > 0 ? Number(openSession.liveKwh).toFixed(2) : "");
   const [fr, setFr] = useState("auto");
   const [customRate, setCustomRate] = useState("");
   const [prev, setPrev] = useState(null);
@@ -12382,7 +12387,7 @@ function CompleteSession({
   };
   const applyWevoFields = fields => {
     if (!fields) return;
-    if (fields.kwh > 0) setKwh(String(Number(fields.kwh)));
+    if (fields.kwh > 0) setKwh(Number(fields.kwh).toFixed(2));
     const tl = fields.timeline || resolveChargeTimeline({}, {
       plugInAt: fields.plugInAt || fields.start,
       chargeStartedAt: fields.chargeStartAt,
@@ -12464,7 +12469,7 @@ function CompleteSession({
   };
   useEffect(() => {
     if (!openSession) return;
-    if (openSession.liveKwh != null && Number(openSession.liveKwh) > 0) setKwh(String(Number(openSession.liveKwh)));
+    if (openSession.liveKwh != null && Number(openSession.liveKwh) > 0) setKwh(Number(openSession.liveKwh).toFixed(2));
     const tl = resolveChargeTimeline({}, {
       plugInAt: openSession.plugInAt || openSession.startDate,
       chargeStartedAt: openSession.chargeStartedAt,

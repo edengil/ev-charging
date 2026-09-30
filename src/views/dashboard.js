@@ -663,7 +663,7 @@ function ArchiveView({
       width: "100%"
     },
     "data-testid": "nav-dash"
-  }, "← חזרה")));
+  }, "→ חזרה")));
 }
 
 

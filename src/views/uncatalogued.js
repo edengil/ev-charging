@@ -162,7 +162,7 @@ function UncataloguedView({
     type: "button",
     style: S.btnS,
     onClick: onBack
-  }, "← חזרה")), showHint && /*#__PURE__*/React.createElement("div", {
+  }, "→ חזרה")), showHint && /*#__PURE__*/React.createElement("div", {
     style: { ...S.statusCard(C.primary),
       marginBottom: 12
     }
@@ -334,7 +334,7 @@ function UncataloguedView({
     }, /*#__PURE__*/React.createElement(Icon, {
       n: "archive",
       s: 15
-    }), " ארכב")), warn && /*#__PURE__*/React.createElement("div", {
+    }), " העבר לארכיון")), warn && /*#__PURE__*/React.createElement("div", {
       style: {
         background: C.warnSoft,
         border: "1.5px solid #fcd34d",
