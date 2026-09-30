@@ -5201,7 +5201,7 @@ function App() {
     DB.set("ev_clients", n);
     toast$({
       msg: "לקוח נוסף",
-      details: `${name} · אפשר להתחיל לרשום טעינות`,
+      details: "אפשר להתחיל לרשום טעינות ותשלומים",
       action: { label: "צפה בכרטיס", onTap: () => go("client", row.id) }
     });
     return true;
@@ -5648,10 +5648,6 @@ function App() {
   }, /*#__PURE__*/React.createElement(BrandLogo, {
     size: 40,
     subtitle: pageSubtitle
-  }), view !== "dash" && /*#__PURE__*/React.createElement("button", {
-    style: S.backBtn,
-    onClick: goBack,
-    "data-testid": "nav-dash"
   }), view !== "dash" && /*#__PURE__*/React.createElement("button", {
     style: { ...S.backBtn, display: "inline-flex", alignItems: "center", gap: 4 },
     onClick: goBack,
