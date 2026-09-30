@@ -1,6 +1,7 @@
 {
   "order": [
     "src/00-brand.js",
+    "src/05-icons.js",
     "src/10-pricing.js",
     "src/20-storage.js",
     "src/30-utils.js",

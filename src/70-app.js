@@ -9,37 +9,43 @@ function BottomNav({ view, go }) {
   const items = [{
     key: "home",
     label: "בית",
-    icon: "🏠",
+    icon: "home",
     views: ["dash"],
     onTap: () => go("dash")
   }, {
     key: "charge",
     label: "טעינה חדשה",
-    icon: "⚡",
+    icon: "zap",
     views: ["add-s"],
     onTap: () => go("add-s", null)
   }, {
     key: "report",
     label: "דוח חודשי",
-    icon: "📊",
+    icon: "chart",
     views: ["stats"],
     onTap: () => go("stats")
   }, {
     key: "debts",
     label: "חובות",
-    icon: "💰",
+    icon: "card",
     views: ["debts"],
     onTap: () => go("debts")
   }, {
+    key: "uncatalogued",
+    label: "טעינות יתומות",
+    icon: "inbox",
+    views: ["uncatalogued"],
+    onTap: () => go("uncatalogued")
+  }, {
     key: "client",
     label: "לקוח חדש",
-    icon: "👤",
+    icon: "userPlus",
     views: ["add-c"],
     onTap: () => go("add-c")
   }, {
     key: "settings",
     label: "הגדרות",
-    icon: "⚙️",
+    icon: "cog",
     views: ["settings"],
     onTap: () => go("settings")
   }];
@@ -52,7 +58,9 @@ function BottomNav({ view, go }) {
       transform: "translateX(-50%)",
       width: "calc(100% - 24px)",
       maxWidth: 476,
-      background: "#ffffff",
+      background: "rgba(255,255,255,0.88)",
+      backdropFilter: "blur(14px)",
+      WebkitBackdropFilter: "blur(14px)",
       border: "1px solid #e2e8f0",
       borderRadius: 22,
       boxShadow: "0 8px 28px rgba(15, 23, 42, 0.14)",
@@ -67,6 +75,13 @@ function BottomNav({ view, go }) {
     }
   }, items.map(it => {
     const active = it.views.includes(view);
+    let badge = null;
+    if (it.key === "uncatalogued") {
+      try {
+        const c = Number(window.localStorage.getItem("ev_uncat_count")) || 0;
+        if (c > 0) badge = c > 99 ? "99+" : String(c);
+      } catch {}
+    }
     return /*#__PURE__*/React.createElement("button", {
       key: it.key,
       type: "button",
@@ -82,14 +97,38 @@ function BottomNav({ view, go }) {
         flexDirection: "column",
         alignItems: "center",
         gap: 2,
-        color: active ? "#0ea5c6" : "#64748b",
+        color: active ? "#0e7490" : "#64748b",
         fontFamily: "'Heebo', sans-serif",
-        fontSize: 10.5,
+        fontSize: 11,
         fontWeight: active ? 800 : 600
       }
     }, /*#__PURE__*/React.createElement("span", {
-      style: { fontSize: 21, lineHeight: 1 }
-    }, it.icon), /*#__PURE__*/React.createElement("span", null, it.label), active && /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: "relative",
+        display: "inline-flex"
+      }
+    }, /*#__PURE__*/React.createElement(Icon, {
+      n: it.icon,
+      s: 22
+    }), badge && /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: "absolute",
+        top: -7,
+        insetInlineEnd: -11,
+        minWidth: 18,
+        height: 18,
+        borderRadius: 999,
+        background: "#dc2626",
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: 800,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "0 4px",
+        lineHeight: 1
+      }
+    }, badge)), /*#__PURE__*/React.createElement("span", null, it.label), active && /*#__PURE__*/React.createElement("span", {
       style: {
         width: 18,
         height: 3,
@@ -692,11 +731,38 @@ function App() {
       toast$("לא נשמר — אין קוט״ש בטעינה", "err", 5000);
       return;
     }
+    const dropOpen = () => {
+      const n = openSess.filter(o => o.id !== id);
+      openSessRef.current = n;
+      setOpenSess(n);
+      DB.set("ev_open", n);
+    };
+    // שומר אפס־כפילויות: אם כבר נשמרה טעינה תואמת — מסירים את הפתוחה בלי ליצור שנייה
+    const dup = (sessionsRef.current || []).find(s => s && savedSessionMatchesCharge(s, sd));
+    if (dup) {
+      dropOpen();
+      toast$("הטעינה הזו כבר נשמרה — לא נוצרה כפילות", "ok");
+      return;
+    }
     saveSession(sd);
-    const n = openSess.filter(o => o.id !== id);
-    openSessRef.current = n;
-    setOpenSess(n);
-    DB.set("ev_open", n);
+    // שיוך מ-Wevo נשמר גם בארכיון (עם שם הלקוח) — בנוסף לטעינה בכרטיס הלקוח
+    const tid = sd && sd.wevoTxnId != null && String(sd.wevoTxnId) !== "" ? String(sd.wevoTxnId) : null;
+    if (tid) {
+      const cl = (clientsRef.current || []).find(c => c && String(c.id) === String(sd.clientId));
+      const entry = assignedChargeArchiveEntry({
+        transactionId: tid,
+        plugInTime: (sd && (sd.plugInAt || sd.startDate)) || null,
+        totalEnergyKwh: sd.kwhRaw,
+        totalCost: sd.costToOwner
+      }, sd.clientId, cl && cl.name);
+      setArchivedUncat(prev => {
+        if ((prev || []).some(e => e && String(e.transactionId) === tid && e.assignedTo)) return prev;
+        const n = [...(prev || []), entry];
+        DB.set("ev_archived_uncat", n);
+        return n;
+      });
+    }
+    dropOpen();
   };
   // שיוך טעינה לא מקוטלגת ללקוח: פותח אותה בכרטיס הסיום עם חיוב מלא ואפשרויות שעה.
   // אם כבר נפתחה טיוטה לאותה עסקה — חוזרים אליה במקום ליצור כפילות.
@@ -1109,6 +1175,7 @@ function App() {
     },
     onCancel: goBack
   }), view === "add-c" && /*#__PURE__*/React.createElement(AddClient, {
+    clients: clients,
     onSave: c => {
       if (!saveClient(c)) return;
       go("dash");
@@ -1124,7 +1191,8 @@ function App() {
   }), view === "report" && /*#__PURE__*/React.createElement(Report, {
     cid: cid,
     clients: clients,
-    sessions: sessions
+    sessions: sessions,
+    payments: payments
   }), view === "edit-p" && /*#__PURE__*/React.createElement(EditPayment, {
     payment: payments.find(p => p.id === pid),
     clients: clients,
@@ -1183,6 +1251,7 @@ function App() {
   }), view === "uncatalogued" && /*#__PURE__*/React.createElement(UncataloguedView, {
     sessions: sessions,
     clients: clients,
+    opens: openSess,
     archivedKeys: archivedUncat.map(e => e.key),
     onAssign: assignUncatalogued,
     onArchive: archiveUncatalogued,
@@ -1282,21 +1351,35 @@ function DebtsSendView({
     return /*#__PURE__*/React.createElement("div", {
       key: c.id,
       style: {
-        ...S.row,
-        marginBottom: 8,
-        border: "1.5px solid #fde68a",
-        background: "#fffbeb"
+        background: "#fff",
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 10,
+        boxShadow: C.shadowCard,
+        display: "flex",
+        alignItems: "center",
+        gap: 12
       },
       "data-testid": `debt-row-${c.id}`
     }, /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, minWidth: 140 }
+      style: S.ava(40, 16)
+    }, String(c.name || "?").trim().charAt(0) || "?"), /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, minWidth: 0 }
     }, /*#__PURE__*/React.createElement("div", {
-      style: { fontWeight: 800, fontSize: 15 }
+      onClick: () => go("client", c.id),
+      style: { fontSize: 15, fontWeight: 800, color: C.primaryStrong, cursor: "pointer" }
     }, c.name), /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: 13, color: "#b45309", fontWeight: 700, marginTop: 2 }
-    }, formatBalanceText(c.balance)), c.phone ? null : /*#__PURE__*/React.createElement("div", {
+      style: { ...S.num, fontSize: 22, fontWeight: 800, color: c.balance > 0 ? C.err : C.ok, marginTop: 2 }
+    }, ils(c.balance)), c.phone ? null : /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 12, color: "#94a3b8", marginTop: 2 }
-    }, "אין טלפון בכרטיס")), /*#__PURE__*/React.createElement("button", {
+    }, "אין טלפון בכרטיס")), /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", flexDirection: "column", gap: 6 }
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      "data-testid": `debt-pay-${c.id}`,
+      onClick: () => go("add-p", c.id),
+      style: S.btnXS(C.primaryStrong, "#fff")
+    }, "רשום תשלום"), /*#__PURE__*/React.createElement("button", {
       type: "button",
       "data-testid": `debt-send-${c.id}`,
       onClick: () => {
@@ -1306,17 +1389,8 @@ function DebtsSendView({
           text: waDebtPing(c.balance, lastAmt)
         });
       },
-      style: {
-        background: "#fff",
-        color: "#0f766e",
-        border: "1.5px solid #99f6e4",
-        borderRadius: 10,
-        padding: "10px 12px",
-        fontWeight: 800,
-        fontSize: 13,
-        cursor: "pointer"
-      }
-    }, "טיוטה"));
+      style: { ...S.btnXS("#fff", C.body), border: "1px solid #e2e8f0" }
+    }, "תזכורת")));
   }));
 }
 

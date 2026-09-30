@@ -13,6 +13,7 @@
 function UncataloguedView({
   sessions,
   clients,
+  opens,
   archivedKeys,
   onAssign,
   onArchive,
@@ -55,11 +56,17 @@ function UncataloguedView({
   const archivedSet = useMemo(() => new Set(archivedKeys || []), [archivedKeys]);
   const list = useMemo(() => {
     try {
-      return findUncataloguedCharges(txs, sessions).filter(tx => !archivedSet.has(uncataloguedTxKey(tx)));
+      return findUncataloguedCharges(txs, sessions, undefined, opens).filter(tx => !archivedSet.has(uncataloguedTxKey(tx)));
     } catch (e) {
       return [];
     }
-  }, [txs, sessions, archivedSet]);
+  }, [txs, sessions, opens, archivedSet]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("ev_uncat_count", String(list.length));
+      localStorage.setItem("ev_uncat_ts", String(Date.now()));
+    } catch (e) {}
+  }, [list]);
   const fmtTxTime = tx => {
     const ms = wevoTxTimeMs(tx);
     if (!ms) return "—";

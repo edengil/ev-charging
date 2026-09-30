@@ -81,6 +81,7 @@ ${body}
     findDuplicateSuspect: findDuplicateSuspect,
     duplicateSuspectLabel: duplicateSuspectLabel,
     duplicateAssignDecision: duplicateAssignDecision,
+    assignedChargeArchiveEntry: assignedChargeArchiveEntry,
     waChargeMessage: waChargeMessage,
     waDebtPing: waDebtPing,
     fictionalBilledDisplay: fictionalBilledDisplay
@@ -149,6 +150,7 @@ var wevoTxToOpenSession = __EV_MONEY__.wevoTxToOpenSession;
 var findDuplicateSuspect = __EV_MONEY__.findDuplicateSuspect;
 var duplicateSuspectLabel = __EV_MONEY__.duplicateSuspectLabel;
 var duplicateAssignDecision = __EV_MONEY__.duplicateAssignDecision;
+var assignedChargeArchiveEntry = __EV_MONEY__.assignedChargeArchiveEntry;
 var waChargeMessage = __EV_MONEY__.waChargeMessage;
 var waDebtPing = __EV_MONEY__.waDebtPing;
 var fictionalBilledDisplay = __EV_MONEY__.fictionalBilledDisplay;

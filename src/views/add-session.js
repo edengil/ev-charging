@@ -13,7 +13,7 @@ function AddSession({
 }) {
   var _ref, _clients$, _ocrParsed$startDt;
   const [mode, setMode] = useState("manual");
-  const [cid, setCid] = useState((_ref = defaultCid !== null && defaultCid !== void 0 ? defaultCid : (_clients$ = clients[0]) === null || _clients$ === void 0 ? void 0 : _clients$.id) !== null && _ref !== void 0 ? _ref : "");
+  const [cid, setCid] = useState(defaultCid != null ? defaultCid : "");
   const [dt, setDt] = useState(toLocalDT(new Date()));
   const [durInput, setDurInput] = useState("");
   const [kwh, setKwh] = useState("");
@@ -92,7 +92,9 @@ function AddSession({
     value: cid,
     onChange: e => setCid(e.target.value),
     "data-testid": "session-client"
-  }, clients.map(c => /*#__PURE__*/React.createElement("option", {
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "בחר לקוח\u2026"), clients.map(c => /*#__PURE__*/React.createElement("option", {
     key: c.id,
     value: c.id
   }, c.name)))), mode === "quick" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FG, {
@@ -262,9 +264,9 @@ function AddSession({
   }, /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnP,
-      opacity: prev ? 1 : 0.5
+      opacity: prev && cid ? 1 : 0.5
     },
-    disabled: !prev,
+    disabled: !prev || !cid,
     onClick: () => onSave({
       id: uid(),
       clientId: cid,
@@ -274,7 +276,7 @@ function AddSession({
       notes
     }),
     "data-testid": "session-save"
-  }, prev ? isSelfAdd ? "שמור עלות אשראי" : "שמור טעינה" : !kwh ? `⚠️ הכנס קוט"ש` : "מחשב..."), /*#__PURE__*/React.createElement("button", {
+  }, prev && cid ? isSelfAdd ? "שמור עלות אשראי" : "שמור טעינה" : !cid ? "בחר לקוח לשמירה" : !kwh ? `⚠️ הכנס קוט"ש` : "מחשב..."), /*#__PURE__*/React.createElement("button", {
     style: S.btnS,
     onClick: onCancel
   }, "ביטול")))));

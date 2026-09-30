@@ -6,6 +6,7 @@
  */
 // ── AddClient ──────────────────────────────────────────────────────────────
 function AddClient({
+  clients,
   onSave,
   onCancel
 }) {
@@ -15,6 +16,8 @@ function AddClient({
   const [carPlate, setCarPlate] = useState("");
   const [carBrand, setCarBrand] = useState("");
   const [carModel, setCarModel] = useState("");
+  const nameTrim = String(name || "").trim();
+  const dupName = nameTrim && (clients || []).some(c => String(c.name || "").trim() === nameTrim);
   const inferred = findCarBrand(carBrand) || findCarBrand(carModel);
   const onModelChange = val => {
     setCarModel(val);
@@ -33,7 +36,22 @@ function AddClient({
     onChange: e => setName(e.target.value),
     placeholder: "ישראל ישראלי",
     "data-testid": "client-name"
-  })), /*#__PURE__*/React.createElement(FG, {
+  })), dupName && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fef3c7",
+      color: "#92400e",
+      borderRadius: 8,
+      padding: "8px 12px",
+      fontSize: 13,
+      fontWeight: 600,
+      marginTop: -8,
+      marginBottom: 14,
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    },
+    "data-testid": "client-dup-warn"
+  }, "⚠️ לקוח בשם זה כבר קיים — בדוק שלא מדובר בכפילות"), /*#__PURE__*/React.createElement(FG, {
     lbl: "טלפון"
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
@@ -112,7 +130,7 @@ function AddClient({
       carModel: carModel.trim()
     }),
     "data-testid": "client-save"
-  }, "הוסף לקוח"), /*#__PURE__*/React.createElement("button", {
+  }, dupName ? "שמור בכל זאת" : "הוסף לקוח"), /*#__PURE__*/React.createElement("button", {
     style: S.btnS,
     onClick: onCancel
   }, "ביטול"))));

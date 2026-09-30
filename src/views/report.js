@@ -8,7 +8,8 @@
 function Report({
   cid,
   clients,
-  sessions
+  sessions,
+  payments
 }) {
   const c = clients.find(x => x.id === cid);
   const now = new Date();
@@ -19,7 +20,11 @@ function Report({
     return s.clientId === cid && d.getMonth() === mo && d.getFullYear() === yr;
   }).sort((a, b) => new Date(a.date) - new Date(b.date));
   const total = ss.reduce((a, s) => a + s.amountBilled, 0);
-  const reportText = () => [`דוח טעינות – ${c === null || c === void 0 ? void 0 : c.name}`, `חודש: ${MONTHS[mo]} ${yr}`, "─────────────────", ...ss.map(s => `${fdate(s.date)} ${ftime(s.date)} | ${s.kwhInflated} קוט"ש | ${ils(s.amountBilled)}`), "─────────────────", `סה"כ לתשלום: ${ils(total)}`].join("\n");
+  const bal = clientBalance(c, sessions, payments);
+  const minYr = Math.min(now.getFullYear(), ...sessions.map(s => new Date(s.date).getFullYear()).filter(y => !isNaN(y)));
+  const yrs = [];
+  for (let y = minYr; y <= now.getFullYear(); y++) yrs.push(y);
+  const reportText = () => [`דוח טעינות – ${c === null || c === void 0 ? void 0 : c.name}`, `חודש: ${MONTHS[mo]} ${yr}`, "─────────────────", ...ss.map(s => `${fdate(s.date)} ${ftime(s.date)} | ${s.kwhInflated} קוט"ש | ${ils(s.amountBilled)}`), "─────────────────", `סה"כ לתשלום: ${ils(total)}`, `יתרה נוכחית: ${ils(bal)}`].join("\n");
   return /*#__PURE__*/React.createElement("main", {
     style: S.main
   }, /*#__PURE__*/React.createElement("div", {
@@ -39,7 +44,7 @@ function Report({
     style: S.inp,
     value: yr,
     onChange: e => setYr(+e.target.value)
-  }, [2024, 2025, 2026, 2027].map(y => /*#__PURE__*/React.createElement("option", {
+  }, yrs.map(y => /*#__PURE__*/React.createElement("option", {
     key: y,
     value: y
   }, y)))), /*#__PURE__*/React.createElement("div", {
@@ -64,15 +69,27 @@ function Report({
     }
   }, /*#__PURE__*/React.createElement("span", null, "סהכ"), /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6366f1",
-      fontSize: 17
+      color: "#0e7490",
+      fontSize: 17,
+      fontVariantNumeric: "tabular-nums"
     }
-  }, ils(total)))), ss.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, ils(total)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...S.repRow,
+      fontWeight: 700
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "יתרה נוכחית"), /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: bal > 0 ? "#b91c1c" : "#047857",
+      fontSize: 15,
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, ils(bal))), ss.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: S.acts
   }, /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnP,
-      background: "#25d366"
+      background: "#128c4b"
     },
     onClick: () => openWaDraft({
       phone: c === null || c === void 0 ? void 0 : c.phone,

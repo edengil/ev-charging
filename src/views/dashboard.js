@@ -38,7 +38,7 @@ function Dashboard({
     const first = ready[0];
     const cl = clients.find(c => c.id === first.clientId);
     const name = cl && cl.name || "לקוח";
-    appAlert(`יש טעינה שלא נסגרה ל־${name} — אפשר לאשר מהבאנר למעלה. לא חוסם טעינה חדשה.`, "info", 6500);
+    appAlert(`טעינה של ${name} ממתינה לאישור — לוחצים ״השלם טעינה״ בכרטיס למעלה. לא חוסם טעינה חדשה.`, "info", 6500);
   }, []);
   // רק חובות חיוביים — יתרות זכות לא מקזזות את סיכום החובות הפתוחים
   const totBal = stats.reduce((a, c) => a + (c.isSelf ? 0 : Math.max(0, c.balance)), 0);
@@ -54,6 +54,37 @@ function Dashboard({
   const paceDelta = (() => {
     if (profitPrevMTD === 0) return profitMTD === 0 ? null : 100;
     return Math.round((profitMTD - profitPrevMTD) / Math.abs(profitPrevMTD) * 100);
+  })();
+  // ── hero "החודש הזה": קוט״ש + הכנסות החודש, ו־4 שבועות אחרונים ──
+  const selfIdsHero = selfClientIds(clients);
+  const moSess = sessions.filter(s => {
+    const d = new Date(s.date);
+    return isNeighborSession(s, selfIdsHero) && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const moKwh = moSess.reduce((a, s) => a + (Number(s.kwhInflated) || 0), 0);
+  const moRev = moSess.reduce((a, s) => a + (Number(s.amountBilled) || 0), 0);
+  const weekKwh = [3, 2, 1, 0].map(w => {
+    const end = new Date(now);
+    end.setDate(now.getDate() - w * 7);
+    end.setHours(23, 59, 59, 999);
+    const start = new Date(end);
+    start.setDate(end.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+    return sessions.reduce((a, s) => {
+      if (!isNeighborSession(s, selfIdsHero)) return a;
+      const d = new Date(s.date);
+      return d >= start && d <= end ? a + (Number(s.kwhInflated) || 0) : a;
+    }, 0);
+  });
+  const maxWeekKwh = Math.max(1, ...weekKwh);
+  // ── insights strip ──
+  const debtCount = stats.filter(c => !c.isSelf && !c.hidden && hasDebt(c.balance)).length;
+  const uncatCount = (() => {
+    try {
+      return Number(localStorage.getItem("ev_uncat_count")) || 0;
+    } catch (e) {
+      return 0;
+    }
   })();
   const sorted = useMemo(() => {
     const arr = stats.filter(c => !c.hidden);
@@ -74,6 +105,21 @@ function Dashboard({
     sessions: sessions,
     openSess: openSess,
     onUpsertOpen: onUpsertOpen,
+    go: go
+  }), /*#__PURE__*/React.createElement(ActiveChargeCards, {
+    openCards: openCards,
+    clients: clients,
+    onComplete: onComplete,
+    onDelOpen: onDelOpen
+  }), /*#__PURE__*/React.createElement(MonthHero, {
+    moKwh: moKwh,
+    moRev: moRev,
+    weekKwh: weekKwh,
+    maxWeekKwh: maxWeekKwh
+  }), /*#__PURE__*/React.createElement(InsightsStrip, {
+    debtCount: debtCount,
+    uncatCount: uncatCount,
+    openCount: openCards.length,
     go: go
   }), /*#__PURE__*/React.createElement("div", {
     style: S.sumRow
@@ -150,125 +196,28 @@ function Dashboard({
     onClick: () => go("wevo-sync"),
     "data-testid": "nav-wevo-sync"
   }, "סנכרון Wevo"), /*#__PURE__*/React.createElement("button", {
-    style: S.quietBtn,
+    style: { ...S.quietBtn, position: "relative" },
     onClick: () => go("uncatalogued"),
     "data-testid": "nav-uncatalogued"
-  }, "טעינות לא מקוטלגות"), /*#__PURE__*/React.createElement(NotifyEnableButton, null)), openCards.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "טעינות לא מקוטלגות", uncatCount > 0 && /*#__PURE__*/React.createElement("span", {
     style: {
-      marginBottom: 16
+      position: "absolute",
+      top: -8,
+      insetInlineStart: -8,
+      minWidth: 22,
+      height: 22,
+      borderRadius: 999,
+      background: C.err,
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 800,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "0 6px",
+      boxShadow: C.shadowPop
     }
-  }, /*#__PURE__*/React.createElement("p", {
-    style: {
-      ...S.secTitle,
-      color: "#374151"
-    }
-  }, "טעינות פתוחות (", openCards.length, ")"), openCards.map(o => {
-    const cl = clients.find(c => c.id === o.clientId);
-    const est = estimateFromOpen(o, cl);
-    const showBill = cl && !isSelfClient(cl) && (o.liveBilled != null || est.calc.amountBilled > 0);
-    const stt = openChargeStatus(o, liveStation);
-    const liveNow = stt.kind === "live" || stt.kind === "slow";
-    const endOk = !liveNow && validChargeEndMs(o);
-    const liveKw = stt.kind === "live" || stt.kind === "slow" ? o.liveKw != null ? Number(o.liveKw) : null : null;
-    const statusLine = stt.text;
-    const tone = stt.kind === "unplugged" ? "done" : stt.kind === "cable" ? "cable" : "live";
-    return /*#__PURE__*/React.createElement("div", {
-      key: o.id,
-      style: {
-        ...S.row,
-        border: tone === "done" ? "2px solid #86efac" : tone === "cable" ? "2px solid #93c5fd" : "2px solid #fde68a",
-        background: tone === "done" ? "#f0fdf4" : tone === "cable" ? "#eff6ff" : "#fffbeb",
-        flexWrap: "wrap"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1,
-        minWidth: 140
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12,
-        fontWeight: 700,
-        color: tone === "done" ? "#166534" : tone === "cable" ? "#1d4ed8" : "#92400e"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        display: "inline-block",
-        marginLeft: 8,
-        marginBottom: 4,
-        background: tone === "done" ? "#dcfce7" : tone === "cable" ? "#dbeafe" : "#fef3c7",
-        color: tone === "done" ? "#166534" : tone === "cable" ? "#1d4ed8" : "#92400e",
-        borderRadius: 999,
-        padding: "3px 8px",
-        fontSize: 12,
-        fontWeight: 800
-      }
-    }, statusLine), /*#__PURE__*/React.createElement("span", {
-      style: { fontSize: 15 }
-    }, (cl === null || cl === void 0 ? void 0 : cl.name) || "בלי לקוח")), /*#__PURE__*/React.createElement("div", {
-      style: S.rDate
-    }, "התחיל (חיבור): ", fdate(o.startDate), " ", ftime(o.startDate), endOk ? ` → סיום טעינה: ${fdate(o.chargeEndedAt || o.endDate)} ${ftime(o.chargeEndedAt || o.endDate)}` : "", o.plugOutAt && endOk && o.plugOutAt !== (o.chargeEndedAt || o.endDate) ? ` · ניתוק: ${ftime(o.plugOutAt)}` : ""), isChargeTimelineRelevant({
-      isSelf: isSelfClient(cl),
-      ...timelineHintsFromOpenOrSession(o)
-    }) && /*#__PURE__*/React.createElement(ChargeTimelineBox, {
-      compact: true,
-      timeline: resolveChargeTimeline({}, {
-        plugInAt: o.plugInAt || o.startDate,
-        chargeStartedAt: o.chargeStartedAt,
-        chargeEndedAt: liveNow ? null : o.chargeEndedAt || o.endDate,
-        plugOutAt: liveNow ? null : o.plugOutAt,
-        chargingFullTime: liveNow ? null : o.chargingFullTime,
-        netDuration: o.netDuration
-      }),
-      billStartKey: o.billStartKey || "plugIn",
-      billEndKey: o.billEndKey || "chargeEnd"
-    }), (o.liveKwh != null || o.wevoTxnId || liveKw != null) && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: tone === "done" ? "#14532d" : tone === "cable" ? "#1e3a8a" : "#78350f",
-        marginTop: 6,
-        lineHeight: 1.5,
-        fontWeight: 700,
-        fontSize: 14
-      }
-    }, o.liveKwh != null && /*#__PURE__*/React.createElement("span", null, Number(o.liveKwh).toFixed(2), ' קוט"ש'), liveKw != null && /*#__PURE__*/React.createElement("span", null, " · ", liveKw.toFixed(1), " kW"), o.liveWevoCost != null && /*#__PURE__*/React.createElement("span", null, " · עלות ₪", Number(o.liveWevoCost).toFixed(2)), showBill && /*#__PURE__*/React.createElement("span", null, " · לחיוב ", ils(o.liveBilled != null ? o.liveBilled : est.calc.amountBilled), " (", o.liveRateLabel || est.calc.rateLabel, ")"), o.wevoTxnId && /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: "#a8a29e"
-      }
-    }, " · txn#", o.wevoTxnId))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        flexDirection: "column",
-        gap: 6,
-        alignItems: "flex-end"
-      }
-    }, /*#__PURE__*/React.createElement("button", {
-      onClick: () => onComplete(o.id, o.clientId),
-      style: {
-        background: tone === "done" ? "#059669" : tone === "cable" ? "#2563eb" : "#d97706",
-        color: "#fff",
-        border: "none",
-        borderRadius: 10,
-        padding: "10px 14px",
-        fontSize: 14,
-        fontWeight: 800,
-        cursor: "pointer"
-      },
-      "data-testid": `open-complete-${o.id}`
-    }, (tone === "done" || tone === "cable") && !(Number(o.liveKwh) > 0) ? "אין קוט״ש" : tone === "done" || tone === "cable" ? "✓ אשר ושמור" : "✓ השלם"), /*#__PURE__*/React.createElement("button", {
-      onClick: () => onDelOpen(o.id),
-      style: {
-        background: "none",
-        border: "none",
-        color: "#94a3b8",
-        fontSize: 12,
-        fontWeight: 600,
-        cursor: "pointer",
-        padding: "4px 2px"
-      },
-      "data-testid": `open-delete-${o.id}`
-    }, "מחק")));
-  })), /*#__PURE__*/React.createElement("div", {
+  }, uncatCount)), /*#__PURE__*/React.createElement(NotifyEnableButton, null)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -481,6 +430,28 @@ function ArchiveView({
       return ta - tb;
     });
   }, [stats]);
+  const uncatAssigned = useMemo(() => (archivedUncat || []).filter(e => e && e.assignedTo), [archivedUncat]);
+  const uncatPlain = useMemo(() => (archivedUncat || []).filter(e => e && !e.assignedTo), [archivedUncat]);
+  const uncatSectionStyle = {
+    background: "#f8fafc",
+    border: "1.5px solid #e2e8f0",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
+    marginTop: 4
+  };
+  const uncatTitleStyle = {
+    fontWeight: 800,
+    fontSize: 16,
+    color: "#334155",
+    marginBottom: 6
+  };
+  const uncatDescStyle = {
+    fontSize: 13,
+    color: "#64748b",
+    lineHeight: 1.45,
+    marginBottom: 10
+  };
   return /*#__PURE__*/React.createElement("main", {
     style: S.main
   }, /*#__PURE__*/React.createElement("div", {
@@ -560,30 +531,47 @@ function ArchiveView({
       flex: 1.2
     },
     "data-testid": `archive-restore-${c.id}`
-  }, "שחזר מהארכיון"))), archivedUncat && archivedUncat.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "שחזר מהארכיון"))), uncatAssigned.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: uncatSectionStyle
+  }, /*#__PURE__*/React.createElement("div", {
+    style: uncatTitleStyle
+  }, "טעינות משויכות"), /*#__PURE__*/React.createElement("div", {
+    style: uncatDescStyle
+  }, "טעינות Wevo ששויכו ללקוח — נשמרו גם בכרטיס הלקוח. רשומת מעקב בלבד."), uncatAssigned.map(e => /*#__PURE__*/React.createElement("div", {
+    key: e.key,
     style: {
-      background: "#f8fafc",
-      border: "1.5px solid #e2e8f0",
-      borderRadius: 12,
-      padding: 14,
-      marginBottom: 14,
-      marginTop: 4
+      ...S.cCard,
+      opacity: 0.95,
+      marginBottom: 8
     }
   }, /*#__PURE__*/React.createElement("div", {
+    style: S.cTop
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontWeight: 800,
-      fontSize: 16,
-      color: "#334155",
-      marginBottom: 6
+      flex: 1
     }
-  }, "🔌 טעינות מאורכבות (לא שויכו)"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.cName
+  }, e.plugInTime ? fdate(e.plugInTime) : "—"), /*#__PURE__*/React.createElement("div", {
+    style: S.cMeta
+  }, e.kwh != null ? Number(e.kwh).toFixed(2) + ' קוט"ש' : "", e.cost != null ? " · ₪" + Number(e.cost).toFixed(2) : "", e.transactionId ? " · txn#" + e.transactionId : "")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => go("client", e.assignedTo),
     style: {
+      ...S.btnS,
+      padding: "8px",
       fontSize: 13,
-      color: "#64748b",
-      lineHeight: 1.45,
-      marginBottom: 10
-    }
-  }, "טעינות שהועברו לארכיון מהרשימה הלא־מקוטלגת בלי שיוך ללקוח. לא נוצר חיוב. אפשר לשחזר בכל רגע."), archivedUncat.map(e => /*#__PURE__*/React.createElement("div", {
+      fontWeight: 700,
+      color: "#0e7490"
+    },
+    "data-testid": "archive-assigned-client-" + e.key
+  }, "שויכה ל־" + (e.assignedName || "לקוח")))))), uncatPlain.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: uncatSectionStyle
+  }, /*#__PURE__*/React.createElement("div", {
+    style: uncatTitleStyle
+  }, "🔌 טעינות מאורכבות (לא שויכו)"), /*#__PURE__*/React.createElement("div", {
+    style: uncatDescStyle
+  }, "טעינות שהועברו לארכיון מהרשימה הלא־מקוטלגת בלי שיוך ללקוח. לא נוצר חיוב. אפשר לשחזר בכל רגע."), uncatPlain.map(e => /*#__PURE__*/React.createElement("div", {
     key: e.key,
     style: {
       ...S.cCard,
@@ -669,6 +657,137 @@ function WevoMiniLog() {
       flexShrink: 0
     }
   }, ftime(new Date(row.at))))));
+}
+
+function fmtElapsed(ms) {
+  const m = Math.max(0, Math.floor(ms / 60000));
+  const h = Math.floor(m / 60);
+  return h > 0 ? `${h} שע׳ ${m % 60} דק׳` : `${m} דק׳`;
+}
+
+// ── כרטיסי טעינה פתוחה (hero) ──
+function ActiveChargeCards({ openCards, clients, onComplete, onDelOpen }) {
+  if (!openCards || !openCards.length) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 14 }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: { ...S.secTitle, color: "#374151" }
+  }, "טעינות פתוחות (", openCards.length, ")"), openCards.map(o => {
+    const cl = clients.find(c => c.id === o.clientId);
+    const startMs = new Date(o.startDate).getTime();
+    const elapsed = isNaN(startMs) ? "—" : fmtElapsed(Date.now() - startMs);
+    return /*#__PURE__*/React.createElement("div", {
+      key: o.id,
+      style: {
+        background: "#fff",
+        borderInlineStart: "4px solid #0ea5c6",
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 10,
+        boxShadow: C.shadowCard
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", gap: 8 }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "ev-live-dot",
+      style: { width: 10, height: 10, borderRadius: "50%", background: "#0ea5c6", display: "inline-block" }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 16, fontWeight: 800, color: C.ink }
+    }, (cl && cl.name) || "בלי לקוח"), /*#__PURE__*/React.createElement("div", {
+      style: { ...S.num, fontSize: 13, color: C.meta, marginRight: "auto", display: "flex", alignItems: "center", gap: 4 }
+    }, /*#__PURE__*/React.createElement(Icon, { n: "clock", s: 14 }), elapsed)), o.liveKwh != null && /*#__PURE__*/React.createElement("div", {
+      style: { ...S.num, fontSize: 13, color: C.body, marginTop: 6, fontWeight: 700 }
+    }, Number(o.liveKwh).toFixed(2), ' קוט"ש'), /*#__PURE__*/React.createElement("button", {
+      onClick: () => onComplete(o.id, o.clientId),
+      style: { ...S.btnP, marginTop: 10 },
+      "data-testid": `open-complete-${o.id}`
+    }, "השלם טעינה"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => onDelOpen(o.id),
+      style: {
+        background: "none", border: "none", color: "#94a3b8",
+        fontSize: 12, fontWeight: 600, cursor: "pointer",
+        padding: "8px 2px", marginTop: 2, minHeight: 44
+      },
+      "data-testid": `open-delete-${o.id}`
+    }, "מחק"));
+  }));
+}
+
+// ── hero "החודש הזה" ──
+function MonthHero({ moKwh, moRev, weekKwh, maxWeekKwh }) {
+  const labels = ["לפני 3", "לפני 2", "שבוע שעבר", "השבוע"];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#0e7490,#0ea5c6)",
+      borderRadius: 16,
+      padding: 18,
+      marginBottom: 14,
+      boxShadow: C.shadowPop,
+      color: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12, color: "rgba(255,255,255,.75)", fontWeight: 700, marginBottom: 8 }
+  }, "החודש הזה"), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 22, marginBottom: 14 }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: { ...S.num, fontSize: 22, fontWeight: 800 }
+  }, Number(moKwh).toFixed(1)), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12, color: "rgba(255,255,255,.75)" }
+  }, 'קוט"ש')), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: { ...S.num, fontSize: 22, fontWeight: 800 }
+  }, ils(moRev)), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12, color: "rgba(255,255,255,.75)" }
+  }, "הכנסות"))), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", alignItems: "flex-end", height: 56, gap: 6 }
+  }, weekKwh.map((w, i) => {
+    const h = Math.max(4, Math.round(w / maxWeekKwh * 40));
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end" }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: "70%",
+        margin: "0 auto",
+        height: h,
+        borderRadius: 6,
+        background: i === 3 ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.45)"
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11, color: "rgba(255,255,255,.7)", marginTop: 4 }
+    }, labels[i]));
+  })));
+}
+
+// ── שורת תובנות ──
+function InsightsStrip({ debtCount, uncatCount, openCount, go }) {
+  const chips = [];
+  if (debtCount > 0) chips.push({ icon: "alert", text: `${debtCount} לקוחות עם חוב`, onClick: () => go("debts") });
+  if (uncatCount > 0) chips.push({ icon: "alert", text: `${uncatCount} טעינות לא מקוטלגות`, onClick: () => go("uncatalogued") });
+  if (openCount > 0) chips.push({ icon: "clock", text: `${openCount} טעינות פתוחות`, onClick: null });
+  if (!chips.length) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", gap: 8, marginBottom: 14, overflowX: "auto", paddingBottom: 2 }
+  }, chips.map((ch, i) => /*#__PURE__*/React.createElement("button", {
+    key: i,
+    onClick: ch.onClick || undefined,
+    style: {
+      ...S.num,
+      background: C.primarySoft,
+      color: C.primaryInk,
+      border: "none",
+      borderRadius: 999,
+      padding: "8px 12px",
+      fontSize: 12,
+      fontWeight: 700,
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      whiteSpace: "nowrap",
+      cursor: ch.onClick ? "pointer" : "default",
+      fontFamily: "inherit",
+      minHeight: 44
+    }
+  }, /*#__PURE__*/React.createElement(Icon, { n: ch.icon, s: 15 }), ch.text)));
 }
 
 function SumCard({

@@ -1,14 +1,57 @@
 /**
- * src/60-styles.js — עיצוב (S).
+ * src/60-styles.js — עיצוב (S) + טוקני עיצוב (C).
  * חלק מחבילת הדפדפן של EV Charge Manager.
  * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
  * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
+ *
+ * עקרונות (שדרוג עיצוב 30.09.2026):
+ * - צבע ראשי אחד: ציאן (משפחת #0ea5c6) — זהה למותג/כותרת/תפריט.
+ * - ניגודיות WCAG AA (4.5:1) לטקסט: primaryStrong/warn/err כהים על לבן.
+ * - סקאלת טיפוגרפיה: 11/12/13/14/16/18/22. מטא מינימום 11px.
+ * - רדיוסים: 8 (קלט/צ׳יפ) / 12 (כרטיס) / 16 (טופס) / 22 (צף) / 999 (pill).
+ * - מטרות מגע מינימום 44px לכפתורים.
+ * - מספרים: fontVariantNumeric tabular-nums (S.num).
  */
+// ── Design tokens ──────────────────────────────────────────────────────────
+const C = {
+  primary: "#0ea5c6",       // ציאן — אקצנטים, ניווט פעיל, מילוי גדול
+  primaryStrong: "#0e7490", // ציאן כהה — כפתורים עם טקסט לבן (4.83:1), קישורים
+  primaryInk: "#164e63",    // טקסט על רקע בהיר
+  primarySoft: "#ecfeff",   // רקע בהיר
+  ink: "#0f172a",           // כותרות
+  body: "#334155",          // גוף
+  meta: "#64748b",          // טקסט משני (4.76:1 על לבן)
+  faint: "#94a3b8",         // דקורטיבי בלבד
+  line: "#e2e8f0",          // גבולות
+  bg: "#f4f8fb",            // רקע אפליקציה
+  card: "#ffffff",
+  ok: "#047857", okSoft: "#d1fae5", okInk: "#065f46",
+  warn: "#b45309", warnSoft: "#fef3c7", warnInk: "#92400e",
+  err: "#b91c1c", errSoft: "#fee2e2", errInk: "#991b1b",
+  wa: "#128c4b", waSoft: "#e8f7ee", waInk: "#0d6b38",
+  shadowCard: "0 1px 3px rgba(15,23,42,0.07)",
+  shadowPop: "0 8px 24px rgba(15,23,42,0.13)"
+};
+
+// CSS גלובלי זעיר: חיווי פוקוס למקלדת + אנימציית פעימה לנקודת "חי".
+// מוזרק בזמן ריצה כדי לשרוד את תהליך ה־inject.
+(function () {
+  if (typeof document === "undefined" || document.getElementById("ev-ds-css")) return;
+  const el = document.createElement("style");
+  el.id = "ev-ds-css";
+  el.textContent =
+    "button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{" +
+    "outline:2px solid #0ea5c6;outline-offset:2px;border-radius:8px}" +
+    "@keyframes evPulse{0%{transform:scale(1);opacity:1}50%{transform:scale(1.35);opacity:.55}100%{transform:scale(1);opacity:1}}" +
+    ".ev-live-dot{animation:evPulse 1.6s ease-in-out infinite}";
+  document.head.appendChild(el);
+})();
+
 // ── Styles ─────────────────────────────────────────────────────────────────
 const S = {
   app: {
     minHeight: "100vh",
-    background: "#f8faff",
+    background: C.bg,
     fontFamily: "'Heebo', sans-serif",
     direction: "rtl",
     maxWidth: 500,
@@ -32,21 +75,26 @@ const S = {
   hTitle: {
     fontSize: 18,
     fontWeight: 800,
-    color: "#0f172a"
+    color: C.ink
   },
   backBtn: {
     background: "none",
     border: "none",
-    color: "#0ea5c6",
+    color: C.primaryStrong,
     fontWeight: 700,
     fontSize: 14,
     cursor: "pointer",
-    padding: "4px 10px",
+    padding: "10px 14px",
+    minHeight: 44,
     borderRadius: 8,
     fontFamily: "inherit"
   },
   main: {
     padding: "16px 16px 48px"
+  },
+  // מספרים טבולריים — סכומים לא "רוקדים" כשהם מתעדכנים
+  num: {
+    fontVariantNumeric: "tabular-nums"
   },
   sumRow: {
     display: "flex",
@@ -56,25 +104,25 @@ const S = {
   },
   sumCard: {
     flex: 1,
-    background: "#fff",
-    borderRadius: 14,
+    background: C.card,
+    borderRadius: 12,
     padding: "12px 8px",
     display: "flex",
     alignItems: "center",
     gap: 7,
-    boxShadow: "0 1px 6px rgba(0,0,0,0.06)"
+    boxShadow: C.shadowCard
   },
   sumIcon: {
     fontSize: 18
   },
   sumVal: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 800,
     letterSpacing: -0.5
   },
   sumLbl: {
-    fontSize: 11,
-    color: "#64748b",
+    fontSize: 12,
+    color: C.meta,
     marginTop: 2
   },
   actRow: {
@@ -86,30 +134,51 @@ const S = {
   actBtn: {
     flex: 1,
     minWidth: 60,
+    minHeight: 44,
     border: "none",
-    borderRadius: 10,
+    borderRadius: 12,
     color: "#fff",
     fontWeight: 700,
-    fontSize: 13,
+    fontSize: 14,
     padding: "11px 4px",
     cursor: "pointer"
   },
   quietBtn: {
     flex: "1 1 108px",
-    background: "#fff",
+    minHeight: 44,
+    background: C.card,
     border: "1px solid #e2e8f0",
-    borderRadius: 10,
-    color: "#334155",
+    borderRadius: 12,
+    color: C.body,
     fontWeight: 600,
-    fontSize: 13,
+    fontSize: 14,
     padding: "10px 8px",
     cursor: "pointer",
     fontFamily: "inherit"
   },
+  // כפתור קטן לפעולות שורה (ערוך/ארכיון/מחק) — 44px גובה
+  btnXS(bg, color) {
+    return {
+      background: bg,
+      color: color,
+      border: "1px solid transparent",
+      borderRadius: 10,
+      fontWeight: 700,
+      fontSize: 13,
+      padding: "0 14px",
+      minHeight: 44,
+      cursor: "pointer",
+      fontFamily: "inherit",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6
+    };
+  },
   secTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 700,
-    color: "#374151",
+    color: C.body,
     marginBottom: 10
   },
   cGrid: {
@@ -118,10 +187,10 @@ const S = {
     gap: 10
   },
   cCard: {
-    background: "#fff",
-    borderRadius: 14,
+    background: C.card,
+    borderRadius: 12,
     padding: 14,
-    boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+    boxShadow: C.shadowCard,
     cursor: "pointer"
   },
   cTop: {
@@ -135,7 +204,7 @@ const S = {
       width: sz,
       height: sz,
       borderRadius: "50%",
-      background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+      background: "linear-gradient(135deg,#0ea5c6,#0e7490)",
       color: "#fff",
       display: "flex",
       alignItems: "center",
@@ -150,17 +219,17 @@ const S = {
     fontSize: 15
   },
   cMeta: {
-    fontSize: 11,
-    color: "#9ca3af"
+    fontSize: 12,
+    color: C.meta
   },
   balBadge(d) {
     return {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: 700,
       borderRadius: 8,
-      padding: "3px 8px",
-      background: d ? "#fef3c7" : "#d1fae5",
-      color: d ? "#b45309" : "#065f46"
+      padding: "4px 10px",
+      background: d ? C.warnSoft : C.okSoft,
+      color: d ? C.warnInk : C.okInk
     };
   },
   miniStats: {
@@ -174,14 +243,14 @@ const S = {
   },
   mLbl: {
     display: "block",
-    fontSize: 9,
-    color: "#9ca3af",
+    fontSize: 11,
+    color: C.meta,
     marginBottom: 1
   },
   mVal: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 700,
-    color: "#374151"
+    color: C.body
   },
   cHeader: {
     display: "flex",
@@ -196,7 +265,7 @@ const S = {
   },
   cPhone: {
     fontSize: 12,
-    color: "#9ca3af"
+    color: C.meta
   },
   tabs: {
     display: "flex",
@@ -208,56 +277,58 @@ const S = {
       flex: 1,
       background: "none",
       border: "none",
-      padding: "10px 0",
-      fontSize: 13,
-      color: a ? "#6366f1" : "#9ca3af",
+      padding: "12px 0",
+      minHeight: 44,
+      fontSize: 14,
+      color: a ? C.primaryStrong : C.meta,
       cursor: "pointer",
       fontWeight: a ? 700 : 500,
-      borderBottom: a ? "2px solid #6366f1" : "none",
-      marginBottom: a ? -2 : 0
+      borderBottom: a ? "2px solid #0ea5c6" : "none",
+      marginBottom: a ? -2 : 0,
+      fontFamily: "inherit"
     };
   },
   row: {
-    background: "#fff",
+    background: C.card,
     borderRadius: 12,
     padding: "14px 14px",
     marginBottom: 10,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+    boxShadow: C.shadowCard,
     position: "relative",
     overflow: "hidden"
   },
   rDate: {
     fontSize: 13,
     fontWeight: 600,
-    color: "#374151"
+    color: C.body
   },
   rMeta: {
-    fontSize: 11,
-    color: "#9ca3af"
+    fontSize: 12,
+    color: C.meta
   },
   rCost: {
-    fontSize: 10,
-    color: "#9ca3af",
+    fontSize: 11,
+    color: C.meta,
     marginTop: 2
   },
   rAmt: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 800
   },
   rPft: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 600,
-    color: "#10b981"
+    color: C.ok
   },
   rbadge(c) {
     return {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: 700,
-      padding: "2px 6px",
-      borderRadius: 6,
+      padding: "3px 8px",
+      borderRadius: 8,
       background: c + "22",
       color: c
     };
@@ -265,27 +336,27 @@ const S = {
   mBadge: {
     fontSize: 11,
     background: "#f3f4f6",
-    color: "#6b7280",
-    padding: "2px 7px",
-    borderRadius: 6,
+    color: "#475569",
+    padding: "3px 8px",
+    borderRadius: 8,
     marginTop: 3,
     display: "inline-block"
   },
   empty: {
     textAlign: "center",
-    color: "#64748b",
-    background: "#fff",
+    color: C.meta,
+    background: C.card,
     border: "1px solid #e2e8f0",
     borderRadius: 12,
-    padding: "22px 16px",
+    padding: "24px 16px",
     fontSize: 14,
-    lineHeight: 1.45
+    lineHeight: 1.5
   },
   form: {
-    background: "#fff",
+    background: C.card,
     borderRadius: 16,
     padding: 16,
-    boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
+    boxShadow: C.shadowCard,
     marginBottom: 16
   },
   fg: {
@@ -295,7 +366,7 @@ const S = {
     display: "block",
     fontSize: 12,
     fontWeight: 600,
-    color: "#374151",
+    color: C.body,
     marginBottom: 5
   },
   inp: {
@@ -303,11 +374,12 @@ const S = {
     boxSizing: "border-box",
     border: "1.5px solid #e5e7eb",
     borderRadius: 8,
-    padding: "9px 12px",
-    fontSize: 14,
+    padding: "10px 12px",
+    fontSize: 16,
     color: "#111827",
     background: "#fafafa",
-    outline: "none"
+    outline: "none",
+    fontFamily: "inherit"
   },
   rg: {
     display: "flex",
@@ -315,28 +387,28 @@ const S = {
     flexWrap: "wrap"
   },
   rlbl: {
-    fontSize: 13,
+    fontSize: 14,
     display: "flex",
     alignItems: "center",
     gap: 4,
     cursor: "pointer"
   },
   errMsg: {
-    color: "#ef4444",
+    color: C.err,
     fontSize: 12,
     marginTop: 6
   },
   prev: {
     background: "#f9fafb",
     border: "1.5px solid #e5e7eb",
-    borderRadius: 10,
+    borderRadius: 12,
     padding: "12px 14px",
     marginBottom: 14
   },
   prevTitle: {
     fontWeight: 700,
-    fontSize: 13,
-    color: "#374151",
+    fontSize: 14,
+    color: C.body,
     marginBottom: 8
   },
   pRow: {
@@ -352,25 +424,29 @@ const S = {
   },
   btnP: {
     flex: 1,
-    background: "#6366f1",
+    minHeight: 48,
+    background: C.primaryStrong,
     color: "#fff",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 12,
     padding: "13px",
     fontWeight: 700,
-    fontSize: 15,
-    cursor: "pointer"
+    fontSize: 16,
+    cursor: "pointer",
+    fontFamily: "inherit"
   },
   btnS: {
     flex: 1,
+    minHeight: 48,
     background: "#f3f4f6",
-    color: "#374151",
+    color: C.body,
     border: "none",
-    borderRadius: 10,
+    borderRadius: 12,
     padding: "13px",
     fontWeight: 600,
-    fontSize: 15,
-    cursor: "pointer"
+    fontSize: 16,
+    cursor: "pointer",
+    fontFamily: "inherit"
   },
   toast(t) {
     return {
@@ -381,30 +457,30 @@ const S = {
       color: "#fff",
       fontWeight: 700,
       fontSize: 14,
-      padding: "12px 24px",
-      borderRadius: 12,
-      background: t === "ok" ? "#10b981" : t === "info" ? "#f59e0b" : "#ef4444",
-      boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+      padding: "13px 22px",
+      borderRadius: 14,
+      background: t === "ok" ? C.ok : t === "info" ? C.warn : C.err,
+      boxShadow: "0 8px 28px rgba(15,23,42,0.28)",
       zIndex: 9999,
       whiteSpace: "normal",
       maxWidth: "92vw",
       textAlign: "center",
-      lineHeight: 1.35
+      lineHeight: 1.4
     };
   },
   rep: {
-    background: "#fff",
-    borderRadius: 14,
+    background: C.card,
+    borderRadius: 12,
     padding: 16,
-    boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+    boxShadow: C.shadowCard,
     marginBottom: 16
   },
   repH: {
     display: "flex",
     justifyContent: "space-between",
     fontWeight: 700,
-    fontSize: 13,
-    color: "#374151",
+    fontSize: 14,
+    color: C.body,
     borderBottom: "1px solid #e5e7eb",
     paddingBottom: 10,
     marginBottom: 10
@@ -420,16 +496,16 @@ const S = {
     display: "flex",
     alignItems: "center",
     gap: 8,
-    background: "#fef2f2",
+    background: C.errSoft,
     border: "1.5px solid #ef4444",
-    borderRadius: 10,
+    borderRadius: 12,
     padding: "8px 12px"
   },
   confirmOverlay: {
     position: "absolute",
     inset: 0,
-    background: "#fff",
-    borderRadius: 10,
+    background: C.card,
+    borderRadius: 12,
     display: "flex",
     alignItems: "center",
     gap: 8,
@@ -438,17 +514,16 @@ const S = {
     zIndex: 10
   },
   statBox: {
-    background: "#fff",
-    borderRadius: 14,
+    background: C.card,
+    borderRadius: 12,
     padding: 16,
-    boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+    boxShadow: C.shadowCard,
     marginBottom: 14
   },
   statTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 700,
-    color: "#374151",
+    color: C.body,
     marginBottom: 10
   }
 };
-

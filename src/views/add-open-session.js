@@ -12,7 +12,7 @@ function AddOpenSession({
   onCancel
 }) {
   var _ref2, _clients$2;
-  const [cid, setCid] = useState((_ref2 = defaultCid !== null && defaultCid !== void 0 ? defaultCid : (_clients$2 = clients[0]) === null || _clients$2 === void 0 ? void 0 : _clients$2.id) !== null && _ref2 !== void 0 ? _ref2 : "");
+  const [cid, setCid] = useState(defaultCid != null ? defaultCid : "");
   const [dt, setDt] = useState(toLocalDT(new Date()));
   const [notes, setNotes] = useState("");
   return /*#__PURE__*/React.createElement("main", {
@@ -36,7 +36,9 @@ function AddOpenSession({
     style: S.inp,
     value: cid,
     onChange: e => setCid(e.target.value)
-  }, clients.map(c => /*#__PURE__*/React.createElement("option", {
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "בחר לקוח\u2026"), clients.map(c => /*#__PURE__*/React.createElement("option", {
     key: c.id,
     value: c.id
   }, c.name)))), /*#__PURE__*/React.createElement(FG, {
@@ -58,8 +60,9 @@ function AddOpenSession({
   }, /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnP,
-      background: "#0ea5e9"
+      opacity: cid ? 1 : 0.5
     },
+    disabled: !cid,
     onClick: () => onSave({
       id: uid(),
       clientId: cid,
@@ -67,7 +70,7 @@ function AddOpenSession({
       notes
     }),
     "data-testid": "open-start"
-  }, "⏳ התחל טעינה"), /*#__PURE__*/React.createElement("button", {
+  }, cid ? "⏳ התחל טעינה" : "בחר לקוח להתחלה"), /*#__PURE__*/React.createElement("button", {
     style: S.btnS,
     onClick: onCancel
   }, "ביטול"))));

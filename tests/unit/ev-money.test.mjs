@@ -51,7 +51,10 @@ import {
   chargerReportsVehicle,
   dedupeSessionsByTxn,
   routeNotifyClick,
-  fictionalBilledDisplay
+  fictionalBilledDisplay,
+  findDuplicateSuspect,
+  findUncataloguedCharges,
+  assignedChargeArchiveEntry
 } from "../../lib/ev-money.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -784,5 +787,78 @@ describe("באג סגירה מוקדמת של טעינה פתוחה", () => {
     assert.equal(repaired.chargeEndedAt, null);
     assert.equal(repaired.endDate, null);
     assert.equal(repaired.readyToComplete, false);
+  });
+});
+
+describe("כלל היומיים בחשד כפילות + שיוך מול טעינה פתוחה", () => {
+  const tx = {
+    transactionId: "t1",
+    plugInTime: "2026-09-29T10:00:00",
+    chargingFullTime: "2026-09-29T12:00:00",
+    totalEnergyKwh: 20.5,
+    totalCost: 15.3
+  };
+  const sess = (date) => ({
+    id: "s-" + date,
+    clientId: "c1",
+    date,
+    kwhRaw: 20.5,
+    costToOwner: 15.3
+  });
+
+  it("אין חשד כפילות כשהתאריכים במרווח של מעל יומיים — גם עם קוט״ש וסכום זהים", () => {
+    assert.equal(findDuplicateSuspect([sess("2026-09-26T10:00:00")], "c1", tx), null);
+  });
+
+  it("יש חשד כפילות כשהתאריכים קרובים (יום אחד) עם קוט״ש זהה", () => {
+    const s = sess("2026-09-28T10:00:00");
+    assert.equal(findDuplicateSuspect([s], "c1", tx), s);
+  });
+
+  it("עסקה עם טעינה פתוחה תואמת (אותו txn) מוסתרת מהשיוך", () => {
+    const open = { id: "o1", wevoTxnId: "t1", liveKwh: 20.5, liveWevoCost: 15.3, readyToComplete: true };
+    assert.deepEqual(findUncataloguedCharges([tx], [], 0, [open]), []);
+  });
+
+  it("עסקה עם טעינה פתוחה תואמת (קוט״ש/סכום/זמן, בלי txn) מוסתרת מהשיוך", () => {
+    const open = {
+      id: "o2",
+      plugInAt: "2026-09-29T10:00:00",
+      chargeEndedAt: "2026-09-29T12:00:00",
+      liveKwh: 20.5,
+      liveWevoCost: 15.3,
+      readyToComplete: true
+    };
+    assert.deepEqual(findUncataloguedCharges([tx], [], 0, [open]), []);
+  });
+
+  it("עסקה חוזרת לרשימת השיוך אחרי שהפתוחה נמחקה (אין פתוחות)", () => {
+    assert.deepEqual(findUncataloguedCharges([tx], [], 0, []), [tx]);
+  });
+
+  it("טעינה פתוחה מתאריך רחוק לא מסתירה עסקה", () => {
+    const open = {
+      id: "o3",
+      plugInAt: "2026-09-20T10:00:00",
+      chargeEndedAt: "2026-09-20T12:00:00",
+      liveKwh: 20.5,
+      liveWevoCost: 15.3
+    };
+    assert.deepEqual(findUncataloguedCharges([tx], [], 0, [open]), [tx]);
+  });
+
+  it("רשומת ארכיון לטעינה משויכת — כוללת מזהה עסקה ושם לקוח", () => {
+    const e = assignedChargeArchiveEntry(
+      { transactionId: "t9", plugInTime: "2026-09-29T10:00:00", totalEnergyKwh: 20.5, totalCost: 15.3 },
+      "c1",
+      "עדן גיל"
+    );
+    assert.equal(e.transactionId, "t9");
+    assert.equal(e.assignedTo, "c1");
+    assert.equal(e.assignedName, "עדן גיל");
+    assert.equal(e.kwh, 20.5);
+    assert.equal(e.cost, 15.3);
+    assert.ok(String(e.key).startsWith("assigned:t9:"));
+    assert.ok(e.archivedAt);
   });
 });

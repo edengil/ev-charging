@@ -27,6 +27,7 @@ function ClientView({
   const [selYr, setSelYr] = useState(now.getFullYear());
   const [delS, setDelS] = useState(null);
   const [delC, setDelC] = useState(false);
+  const [delO, setDelO] = useState(null);
   const c = clients.find(x => x.id === cid);
   const st = stats.find(x => x.id === cid);
   if (!c || !st) return null;
@@ -384,19 +385,63 @@ function ClientView({
         cursor: "pointer"
       },
       "data-testid": `open-complete-${o.id}`
-    }, ended && !(Number(o.liveKwh) > 0) ? "אין קוט״ש" : ended ? "✓ אשר ושמור" : "✓ השלם"), /*#__PURE__*/React.createElement("button", {
-      onClick: () => onDelOpen(o.id),
+    }, ended && !(Number(o.liveKwh) > 0) ? "בדוק ואשר" : ended ? "✓ אשר ושמור" : "✓ השלם"), delO !== o.id ? /*#__PURE__*/React.createElement("button", {
+      onClick: () => setDelO(o.id),
       style: {
         background: "none",
-        border: "none",
-        color: "#94a3b8",
-        fontSize: 12,
-        fontWeight: 600,
+        border: "1px solid #e2e8f0",
+        borderRadius: 10,
+        color: "#64748b",
+        fontSize: 13,
+        fontWeight: 700,
         cursor: "pointer",
-        padding: "4px 2px"
+        minHeight: 44,
+        padding: "0 14px",
+        fontFamily: "inherit"
       },
       "data-testid": `open-delete-${o.id}`
-    }, "מחק")));
+    }, "מחק") : /*#__PURE__*/React.createElement("div", {
+      style: S.confirmOverlay,
+      "data-testid": `open-delete-confirm-${o.id}`
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: "#991b1b",
+        fontWeight: 700,
+        flex: 1
+      }
+    }, "למחוק טעינה פתוחה?"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        onDelOpen(o.id);
+        setDelO(null);
+      },
+      style: {
+        background: "#b91c1c",
+        color: "#fff",
+        border: "none",
+        borderRadius: 8,
+        fontWeight: 700,
+        fontSize: 13,
+        minHeight: 40,
+        padding: "0 14px",
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "מחק"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setDelO(null),
+      style: {
+        background: "#f3f4f6",
+        color: "#334155",
+        border: "none",
+        borderRadius: 8,
+        fontWeight: 600,
+        fontSize: 13,
+        minHeight: 40,
+        padding: "0 14px",
+        cursor: "pointer",
+        fontFamily: "inherit"
+      }
+    }, "ביטול"))));
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10
