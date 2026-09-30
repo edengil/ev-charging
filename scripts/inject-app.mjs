@@ -75,6 +75,11 @@ ${body}
     UNCATALOGUED_SINCE_MS: UNCATALOGUED_SINCE_MS,
     findUncataloguedCharges: findUncataloguedCharges,
     wevoTxToOpenSession: wevoTxToOpenSession,
+    findDuplicateSuspect: findDuplicateSuspect,
+    duplicateSuspectLabel: duplicateSuspectLabel,
+    duplicateAssignDecision: duplicateAssignDecision,
+    waChargeMessage: waChargeMessage,
+    waDebtPing: waDebtPing,
     fictionalBilledDisplay: fictionalBilledDisplay
   };
 })();
@@ -135,6 +140,11 @@ var wevoTxTimeMs = __EV_MONEY__.wevoTxTimeMs;
 var UNCATALOGUED_SINCE_MS = __EV_MONEY__.UNCATALOGUED_SINCE_MS;
 var findUncataloguedCharges = __EV_MONEY__.findUncataloguedCharges;
 var wevoTxToOpenSession = __EV_MONEY__.wevoTxToOpenSession;
+var findDuplicateSuspect = __EV_MONEY__.findDuplicateSuspect;
+var duplicateSuspectLabel = __EV_MONEY__.duplicateSuspectLabel;
+var duplicateAssignDecision = __EV_MONEY__.duplicateAssignDecision;
+var waChargeMessage = __EV_MONEY__.waChargeMessage;
+var waDebtPing = __EV_MONEY__.waDebtPing;
 var fictionalBilledDisplay = __EV_MONEY__.fictionalBilledDisplay;
 /* === end lib/ev-money === */
 `;

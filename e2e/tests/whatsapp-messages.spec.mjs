@@ -15,6 +15,7 @@ test.describe("whatsapp-messages", () => {
         debt: waChargeMessage(40, 120),
         credit: waChargeMessage(35, -80),
         self: waChargeMessage(20, 0, { isSelf: true }),
+        firstCharge: waChargeMessage(55, 55),
         link: waLink("0501234567", "היי מה קורה?\nיצא לך 42")
       };
     });
@@ -22,6 +23,8 @@ test.describe("whatsapp-messages", () => {
     expect(msgs.debt).toBe("היי מה קורה?\nיצא בטעינה 40\nאנחנו על 120");
     expect(msgs.credit).toBe("היי מה קורה?\nיצא לך 35\nיש לך אצלי 80");
     expect(msgs.self).toBe("היי מה קורה?\nיצא לך 20");
+    // טעינה ראשונה: היתרה כולה היא הטעינה — אין כפילות סכום
+    expect(msgs.firstCharge).toBe("היי מה קורה?\nיצא לך 55");
     expect(msgs.link).toContain("api.whatsapp.com/send");
     expect(msgs.link).toContain("phone=972501234567");
     expect(textFromWaUrl(msgs.link)).toContain("יצא לך 42");
@@ -68,14 +71,15 @@ test.describe("whatsapp-messages", () => {
     await page.getByTestId("wa-session-s-wa-1").click();
     await expect(page.getByTestId("wa-draft")).toBeVisible();
     const draft = await page.getByTestId("wa-draft-text").inputValue();
-    expect(draft).toContain("יצא בטעינה 55");
-    expect(draft).toContain("אנחנו על 55");
+    // טעינה ראשונה — אין חוב קודם: הסכום מופיע פעם אחת, בלי שורת "אנחנו על"
+    expect(draft).toContain("יצא לך 55");
+    expect(draft).not.toContain("אנחנו על");
     expect(opened).toBeNull();
 
     await page.getByTestId("wa-draft-open").click();
     await expect.poll(() => opened).toBeTruthy();
     const text = textFromWaUrl(opened);
-    expect(text).toContain("יצא בטעינה 55");
-    expect(text).toContain("אנחנו על 55");
+    expect(text).toContain("יצא לך 55");
+    expect(text).not.toContain("אנחנו על");
   });
 });

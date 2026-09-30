@@ -493,32 +493,7 @@ function applyKnownClientCars(clients) {
   };
 }
 
-/* clientBalance/hasDebt/hasCredit: lib/ev-money via inject */
-/** הודעת וואטסאפ אחרי טעינה — לפי חוב / יתרת זכות / מסולק */
-function waChargeMessage(amountBilled, balance, {
-  isSelf = false
-} = {}) {
-  const charge = Math.round(Number(amountBilled) || 0);
-  if (isSelf) {
-    return `היי מה קורה?\nיצא לך ${charge}`;
-  }
-  const bal = Number(balance) || 0;
-  if (hasDebt(bal)) {
-    return `היי מה קורה?\nיצא בטעינה ${charge}\nאנחנו על ${Math.round(bal)}`;
-  }
-  if (hasCredit(bal)) {
-    return `היי מה קורה?\nיצא לך ${charge}\nיש לך אצלי ${Math.round(Math.abs(bal))}`;
-  }
-  return `היי מה קורה?\nיצא לך ${charge}`;
-}
-
-/** תזכורת חוב בלי להיכנס לכרטיס — עם סכום הטעינה האחרונה אם יש */
-function waDebtPing(balance, lastAmount) {
-  const bal = Math.round(Number(balance) || 0);
-  const charge = Math.round(Number(lastAmount) || 0);
-  if (charge > 0) return waChargeMessage(charge, bal);
-  return `היי מה קורה?\nאנחנו על ${bal}`;
-}
+/* clientBalance/hasDebt/hasCredit/waChargeMessage/waDebtPing: lib/ev-money via inject */
 
 // לדיבוג/בדיקות E2E
 try {

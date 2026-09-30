@@ -20,6 +20,20 @@ function UncataloguedView({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [clientPick, setClientPick] = useState({});
+  const [dupWarn, setDupWarn] = useState({});
+  const [dupOk, setDupOk] = useState({});
+  const clearDup = tid => {
+    setDupWarn(prev => {
+      const n = { ...prev };
+      delete n[tid];
+      return n;
+    });
+    setDupOk(prev => {
+      const n = { ...prev };
+      delete n[tid];
+      return n;
+    });
+  };
   const load = async () => {
     setLoading(true);
     setError("");
@@ -126,6 +140,19 @@ function UncataloguedView({
     const pick = clientPick[tid] || "";
     const kwh = Number(tx.totalEnergyKwh);
     const cost = tx.totalCost != null ? Number(tx.totalCost) : null;
+    const warn = dupWarn[tid] || null;
+    const tryAssign = () => {
+      if (!onAssign || !pick) return;
+      const suspect = findDuplicateSuspect(sessions, pick, tx);
+      if (suspect && !dupOk[tid]) {
+        setDupWarn(prev => ({ ...prev,
+          [tid]: suspect
+        }));
+        return;
+      }
+      clearDup(tid);
+      onAssign(tx, pick);
+    };
     return /*#__PURE__*/React.createElement("div", {
       key: tid,
       style: {
@@ -167,9 +194,12 @@ function UncataloguedView({
         flex: 1
       },
       value: pick,
-      onChange: e => setClientPick(prev => ({ ...prev,
-        [tid]: e.target.value
-      })),
+      onChange: e => {
+        clearDup(tid);
+        setClientPick(prev => ({ ...prev,
+          [tid]: e.target.value
+        }));
+      },
       "data-testid": "uncatalogued-client-" + tid
     }, /*#__PURE__*/React.createElement("option", {
       value: ""
@@ -183,8 +213,53 @@ function UncataloguedView({
         opacity: pick ? 1 : 0.5
       },
       disabled: !pick,
-      onClick: () => onAssign && onAssign(tx, pick),
+      onClick: tryAssign,
       "data-testid": "uncatalogued-assign-" + tid
-    }, "שייך וחייב")));
+    }, "שייך וחייב")), warn && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#fffbeb",
+        border: "1.5px solid #fcd34d",
+        borderRadius: 10,
+        padding: "10px 12px",
+        marginTop: 8,
+        fontSize: 13,
+        color: "#92400e",
+        lineHeight: 1.5
+      },
+      "data-testid": "uncatalogued-dupwarn-" + tid
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        marginBottom: 8
+      }
+    }, "⚠️ נראה ככפילות של טעינה קיימת: ", duplicateSuspectLabel(warn)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      style: { ...S.btnP,
+        background: "#b45309",
+        whiteSpace: "nowrap"
+      },
+      onClick: () => {
+        setDupOk(prev => ({ ...prev,
+          [tid]: true
+        }));
+        setDupWarn(prev => {
+          const n = { ...prev };
+          delete n[tid];
+          return n;
+        });
+        if (onAssign) onAssign(tx, pick);
+      },
+      "data-testid": "uncatalogued-dupconfirm-" + tid
+    }, "שייך בכל זאת"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      style: S.btnS,
+      onClick: () => clearDup(tid),
+      "data-testid": "uncatalogued-dupcancel-" + tid
+    }, "בטל"))))
   })));
 }

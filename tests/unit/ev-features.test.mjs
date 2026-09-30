@@ -8,6 +8,11 @@ import {
   UNCATALOGUED_SINCE_MS,
   findUncataloguedCharges,
   wevoTxToOpenSession,
+  findDuplicateSuspect,
+  duplicateSuspectLabel,
+  duplicateAssignDecision,
+  waChargeMessage,
+  waDebtPing,
   BILLING_PREMIUM_START_H,
   BILLING_PREMIUM_END_H
 } from "../../lib/ev-money.mjs";
@@ -130,5 +135,106 @@ describe("חותמת זמן של עסקת Wevo", () => {
     assert.equal(wevoTxTimeMs({ chargingFullTime: plug }), plug);
     assert.equal(wevoTxTimeMs({}), 0);
     assert.equal(wevoTxTimeMs(null), 0);
+  });
+});
+
+describe("הגנה מפני כפילות בשיוך טעינה לא מקוטלגת", () => {
+  const tx = (over = {}) => ({
+    transactionId: "tx-1",
+    plugInTime: "2026-09-28T10:00",
+    totalEnergyKwh: 20,
+    totalCost: 50,
+    ...over
+  });
+  const sess = (over = {}) => ({
+    id: "s1",
+    clientId: "c1",
+    date: "2026-09-28T10:05",
+    kwhRaw: 20,
+    amountBilled: 50,
+    source: "manual",
+    ...over
+  });
+
+  it("(א) מזהה חשד כפילות לפי חפיפת זמן — גם אחרי עריכת ערכי הטעינה", () => {
+    // המשתמש ערך קוט"ש/סכום (20→22, 50→55): ההתאמה המלאה נשברה, אבל הזמן חופף
+    const s = findDuplicateSuspect([sess({ kwhRaw: 22, amountBilled: 55 })], "c1", tx());
+    assert.ok(s, "ציפינו לחשד כפילות");
+    assert.equal(s.id, "s1");
+  });
+
+  it("(א2) מזהה חשד לפי קוט\"ש דומה גם בלי חפיפת זמן", () => {
+    const s = findDuplicateSuspect(
+      [sess({ date: "2026-09-20T10:00", kwhRaw: 20.02, amountBilled: 99 })],
+      "c1",
+      tx()
+    );
+    assert.ok(s, "ציפינו לחשד כפילות לפי קוט\"ש דומה");
+  });
+
+  it("(א3) שורות מראה wevo-sync אינן חשודות", () => {
+    const s = findDuplicateSuspect([sess({ source: "wevo-sync" })], "c1", tx());
+    assert.equal(s, null);
+  });
+
+  it("(ב) אין אזהרה כשאין חפיפה ואין ערכים דומים", () => {
+    const s = findDuplicateSuspect(
+      [sess({ date: "2026-09-20T10:00", kwhRaw: 5, amountBilled: 12 })],
+      "c1",
+      tx()
+    );
+    assert.equal(s, null);
+  });
+
+  it("(ב2) טעינות של לקוח אחר לא נבדקות", () => {
+    const s = findDuplicateSuspect([sess()], "c2", tx());
+    assert.equal(s, null);
+  });
+
+  it("(ג) החיוב נוצר רק אחרי אישור מפורש", () => {
+    assert.equal(duplicateAssignDecision({ id: "s1" }, false), "warn");
+    assert.equal(duplicateAssignDecision({ id: "s1" }, true), "assign");
+    assert.equal(duplicateAssignDecision(null, false), "assign");
+    assert.equal(duplicateAssignDecision(null, true), "assign");
+  });
+
+  it("תווית החשד מכילה תאריך וקוט\"ש", () => {
+    const label = duplicateSuspectLabel(sess());
+    assert.ok(label.includes("28.09") || label.includes("28/09"), `התווית חסרת תאריך: ${label}`);
+    assert.ok(label.includes("20"), `התווית חסרת קוט"ש: ${label}`);
+  });
+});
+
+describe("הודעת וואטסאפ — בלי כפילות סכום ללקוח חדש", () => {
+  it("טעינה ראשונה (אין חוב קודם): הסכום מופיע פעם אחת בלבד", () => {
+    const msg = waChargeMessage(50, 50);
+    assert.equal(msg, "היי מה קורה?\nיצא לך 50");
+    assert.equal((msg.match(/50/g) || []).length, 1, `כפילות בהודעה: ${msg}`);
+  });
+
+  it("חוב קודם מעבר לטעינה: שתי שורות עם סכומים שונים", () => {
+    assert.equal(waChargeMessage(50, 80), "היי מה קורה?\nיצא בטעינה 50\nאנחנו על 80");
+  });
+
+  it("יתרת זכות: שורת זכות", () => {
+    assert.equal(waChargeMessage(50, -20), "היי מה קורה?\nיצא לך 50\nיש לך אצלי 20");
+  });
+
+  it("מסולק: שורה אחת", () => {
+    assert.equal(waChargeMessage(50, 0), "היי מה קורה?\nיצא לך 50");
+  });
+
+  it("לקוח עצמי: שורה אחת", () => {
+    assert.equal(waChargeMessage(50, 999, { isSelf: true }), "היי מה קורה?\nיצא לך 50");
+  });
+
+  it("waDebtPing עם טעינה אחרונה ששווה ליתרה — בלי כפילות", () => {
+    const msg = waDebtPing(50, 50);
+    assert.equal(msg, "היי מה קורה?\nיצא לך 50");
+    assert.equal((msg.match(/50/g) || []).length, 1, `כפילות בהודעה: ${msg}`);
+  });
+
+  it("waDebtPing בלי טעינה אחרונה — תזכורת חוב", () => {
+    assert.equal(waDebtPing(80, 0), "היי מה קורה?\nאנחנו על 80");
   });
 });

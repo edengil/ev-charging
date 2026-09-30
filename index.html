@@ -1294,6 +1294,79 @@ function wevoTxToOpenSession(tx, clientId) {
   };
 }
 
+/**
+ * חשד לכפילות בשיוך טעינה לא מקוטלגת: טעינה שמורה של אותו לקוח שחופפת
+ * בזמן (חלון 36 שעות) או עם קוט"ש/סכום דומים — למרות שההתאמה המלאה נכשלה
+ * (למשל אחרי עריכת ערכי הטעינה השמורה). שורות מראה wevo-sync אינן קיטלוג
+ * אמיתי ולכן לא נבדקות. מחזיר את הטעינה החשודה או null.
+ */
+function findDuplicateSuspect(sessions, clientId, tx) {
+  if (!tx || clientId == null || String(clientId) === "") return null;
+  const mine = (sessions || []).filter(s => s && String(s.clientId) === String(clientId) && s.source !== "wevo-sync");
+  if (!mine.length) return null;
+  const tk = chargeKwh(tx);
+  const tcRaw = tx.totalCost != null ? Number(tx.totalCost) : null;
+  const tc = tcRaw != null && Number.isFinite(tcRaw) ? tcRaw : null;
+  for (const s of mine) {
+    if (chargeTimesNear(s, tx)) return s;
+    const sk = chargeKwh(s);
+    if (sk != null && tk != null && sk > 0 && tk > 0 && Math.abs(sk - tk) <= 0.05) return s;
+    if (tc != null) {
+      const sc = chargeMoney(s);
+      if (sc != null && Math.abs(sc - tc) <= 0.05) return s;
+      const ab = s.amountBilled != null ? Number(s.amountBilled) : null;
+      if (ab != null && Number.isFinite(ab) && Math.abs(ab - tc) <= 0.05) return s;
+    }
+  }
+  return null;
+}
+
+/** תווית תצוגה לחשד כפילות: תאריך + קוט"ש של הטעינה הקיימת. */
+function duplicateSuspectLabel(s) {
+  const times = chargeTimes(s, ["date", "startDate", "plugInAt", "chargeEndedAt", "endDate"]);
+  const ms = times.length ? times[0] : 0;
+  let d = "—";
+  try {
+    if (ms) d = new Date(ms).toLocaleString("he-IL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  } catch {}
+  const kwh = chargeKwh(s);
+  return `${d}${kwh != null ? ` · ${kwh} קוט"ש` : ""}`;
+}
+
+/**
+ * החלטת שיוך מול חשד כפילות: עם חשד וללא אישור מפורש — "warn" (אין חיוב);
+ * אחרת — "assign".
+ */
+function duplicateAssignDecision(suspect, confirmed) {
+  return suspect && !confirmed ? "warn" : "assign";
+}
+
+/**
+ * הודעת וואטסאפ אחרי טעינה — לפי חוב / יתרת זכות / מסולק.
+ * כשהיתרה כולה היא הטעינה הנוכחית (אין חוב קודם — למשל טעינה ראשונה),
+ * לא חוזרים על הסכום פעמיים.
+ */
+function waChargeMessage(amountBilled, balance, { isSelf = false } = {}) {
+  const charge = Math.round(Number(amountBilled) || 0);
+  if (isSelf) return `היי מה קורה?\nיצא לך ${charge}`;
+  const bal = Number(balance) || 0;
+  if (hasDebt(bal) && Math.round(bal) !== charge) {
+    return `היי מה קורה?\nיצא בטעינה ${charge}\nאנחנו על ${Math.round(bal)}`;
+  }
+  if (hasCredit(bal)) {
+    return `היי מה קורה?\nיצא לך ${charge}\nיש לך אצלי ${Math.round(Math.abs(bal))}`;
+  }
+  return `היי מה קורה?\nיצא לך ${charge}`;
+}
+
+/** תזכורת חוב בלי להיכנס לכרטיס — עם סכום הטעינה האחרונה אם יש */
+function waDebtPing(balance, lastAmount) {
+  const bal = Math.round(Number(balance) || 0);
+  const charge = Math.round(Number(lastAmount) || 0);
+  if (charge > 0) return waChargeMessage(charge, bal);
+  return `היי מה קורה?\nאנחנו על ${bal}`;
+}
+
   return {
     METHODS: METHODS,
     PAYMENT_METHOD_OPTIONS: PAYMENT_METHOD_OPTIONS,
@@ -1355,6 +1428,11 @@ function wevoTxToOpenSession(tx, clientId) {
     UNCATALOGUED_SINCE_MS: UNCATALOGUED_SINCE_MS,
     findUncataloguedCharges: findUncataloguedCharges,
     wevoTxToOpenSession: wevoTxToOpenSession,
+    findDuplicateSuspect: findDuplicateSuspect,
+    duplicateSuspectLabel: duplicateSuspectLabel,
+    duplicateAssignDecision: duplicateAssignDecision,
+    waChargeMessage: waChargeMessage,
+    waDebtPing: waDebtPing,
     fictionalBilledDisplay: fictionalBilledDisplay
   };
 })();
@@ -1415,6 +1493,11 @@ var wevoTxTimeMs = __EV_MONEY__.wevoTxTimeMs;
 var UNCATALOGUED_SINCE_MS = __EV_MONEY__.UNCATALOGUED_SINCE_MS;
 var findUncataloguedCharges = __EV_MONEY__.findUncataloguedCharges;
 var wevoTxToOpenSession = __EV_MONEY__.wevoTxToOpenSession;
+var findDuplicateSuspect = __EV_MONEY__.findDuplicateSuspect;
+var duplicateSuspectLabel = __EV_MONEY__.duplicateSuspectLabel;
+var duplicateAssignDecision = __EV_MONEY__.duplicateAssignDecision;
+var waChargeMessage = __EV_MONEY__.waChargeMessage;
+var waDebtPing = __EV_MONEY__.waDebtPing;
 var fictionalBilledDisplay = __EV_MONEY__.fictionalBilledDisplay;
 /* === end lib/ev-money === */
 
@@ -3188,32 +3271,7 @@ function applyKnownClientCars(clients) {
   };
 }
 
-/* clientBalance/hasDebt/hasCredit: lib/ev-money via inject */
-/** הודעת וואטסאפ אחרי טעינה — לפי חוב / יתרת זכות / מסולק */
-function waChargeMessage(amountBilled, balance, {
-  isSelf = false
-} = {}) {
-  const charge = Math.round(Number(amountBilled) || 0);
-  if (isSelf) {
-    return `היי מה קורה?\nיצא לך ${charge}`;
-  }
-  const bal = Number(balance) || 0;
-  if (hasDebt(bal)) {
-    return `היי מה קורה?\nיצא בטעינה ${charge}\nאנחנו על ${Math.round(bal)}`;
-  }
-  if (hasCredit(bal)) {
-    return `היי מה קורה?\nיצא לך ${charge}\nיש לך אצלי ${Math.round(Math.abs(bal))}`;
-  }
-  return `היי מה קורה?\nיצא לך ${charge}`;
-}
-
-/** תזכורת חוב בלי להיכנס לכרטיס — עם סכום הטעינה האחרונה אם יש */
-function waDebtPing(balance, lastAmount) {
-  const bal = Math.round(Number(balance) || 0);
-  const charge = Math.round(Number(lastAmount) || 0);
-  if (charge > 0) return waChargeMessage(charge, bal);
-  return `היי מה קורה?\nאנחנו על ${bal}`;
-}
+/* clientBalance/hasDebt/hasCredit/waChargeMessage/waDebtPing: lib/ev-money via inject */
 
 // לדיבוג/בדיקות E2E
 try {
@@ -9127,6 +9185,20 @@ function UncataloguedView({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [clientPick, setClientPick] = useState({});
+  const [dupWarn, setDupWarn] = useState({});
+  const [dupOk, setDupOk] = useState({});
+  const clearDup = tid => {
+    setDupWarn(prev => {
+      const n = { ...prev };
+      delete n[tid];
+      return n;
+    });
+    setDupOk(prev => {
+      const n = { ...prev };
+      delete n[tid];
+      return n;
+    });
+  };
   const load = async () => {
     setLoading(true);
     setError("");
@@ -9233,6 +9305,19 @@ function UncataloguedView({
     const pick = clientPick[tid] || "";
     const kwh = Number(tx.totalEnergyKwh);
     const cost = tx.totalCost != null ? Number(tx.totalCost) : null;
+    const warn = dupWarn[tid] || null;
+    const tryAssign = () => {
+      if (!onAssign || !pick) return;
+      const suspect = findDuplicateSuspect(sessions, pick, tx);
+      if (suspect && !dupOk[tid]) {
+        setDupWarn(prev => ({ ...prev,
+          [tid]: suspect
+        }));
+        return;
+      }
+      clearDup(tid);
+      onAssign(tx, pick);
+    };
     return /*#__PURE__*/React.createElement("div", {
       key: tid,
       style: {
@@ -9274,9 +9359,12 @@ function UncataloguedView({
         flex: 1
       },
       value: pick,
-      onChange: e => setClientPick(prev => ({ ...prev,
-        [tid]: e.target.value
-      })),
+      onChange: e => {
+        clearDup(tid);
+        setClientPick(prev => ({ ...prev,
+          [tid]: e.target.value
+        }));
+      },
       "data-testid": "uncatalogued-client-" + tid
     }, /*#__PURE__*/React.createElement("option", {
       value: ""
@@ -9290,9 +9378,54 @@ function UncataloguedView({
         opacity: pick ? 1 : 0.5
       },
       disabled: !pick,
-      onClick: () => onAssign && onAssign(tx, pick),
+      onClick: tryAssign,
       "data-testid": "uncatalogued-assign-" + tid
-    }, "שייך וחייב")));
+    }, "שייך וחייב")), warn && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#fffbeb",
+        border: "1.5px solid #fcd34d",
+        borderRadius: 10,
+        padding: "10px 12px",
+        marginTop: 8,
+        fontSize: 13,
+        color: "#92400e",
+        lineHeight: 1.5
+      },
+      "data-testid": "uncatalogued-dupwarn-" + tid
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        marginBottom: 8
+      }
+    }, "⚠️ נראה ככפילות של טעינה קיימת: ", duplicateSuspectLabel(warn)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      style: { ...S.btnP,
+        background: "#b45309",
+        whiteSpace: "nowrap"
+      },
+      onClick: () => {
+        setDupOk(prev => ({ ...prev,
+          [tid]: true
+        }));
+        setDupWarn(prev => {
+          const n = { ...prev };
+          delete n[tid];
+          return n;
+        });
+        if (onAssign) onAssign(tx, pick);
+      },
+      "data-testid": "uncatalogued-dupconfirm-" + tid
+    }, "שייך בכל זאת"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      style: S.btnS,
+      onClick: () => clearDup(tid),
+      "data-testid": "uncatalogued-dupcancel-" + tid
+    }, "בטל"))))
   })));
 }
 
