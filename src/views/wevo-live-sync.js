@@ -45,6 +45,46 @@ function WevoOpenLiveSync({
     notifyPhone("הטעינה נגמרה", `${name}${kwhTxt}`, `ev-end-${existing.id}`);
   };
 
+  // ── תזכורת "סיים לטעון אבל לא ניתק" — כל 30 דקות עד ניתוק ──────────────
+  const IDLE_REM_KEY = "ev_idle_reminders";
+  const readIdleReminders = () => {
+    try { return JSON.parse(localStorage.getItem(IDLE_REM_KEY) || "{}"); } catch { return {}; }
+  };
+  const writeIdleReminder = (openId, ms) => {
+    try {
+      const m = readIdleReminders();
+      m[openId] = ms;
+      localStorage.setItem(IDLE_REM_KEY, JSON.stringify(m));
+    } catch {}
+  };
+  const checkIdleReminders = st => {
+    if (!st || isActuallyCharging(st)) return;
+    // רכב עדיין מחובר לעמדה?
+    if (!chargerReportsVehicle(st, sessionsRefLive.current)) return;
+    const nowMs = Date.now();
+    const seen = readIdleReminders();
+    let touched = false;
+    for (const o of openRef.current || []) {
+      if (!o || !o.id) continue;
+      const endMs = idleEndMs(o);
+      if (!endMs) continue;
+      if (o.plugOutAt) continue;
+      const r = shouldSendIdleReminder({ endMs, plugOutAt: o.plugOutAt, lastReminderMs: seen[o.id] || 0, nowMs });
+      if (!r.due) continue;
+      seen[o.id] = nowMs;
+      touched = true;
+      const cl = (clientsRef.current || []).find(c => c.id === o.clientId);
+      const name = cl && cl.name ? cl.name : "לקוח";
+      const msg = idleReminderText(name, r.idleMinutes);
+      pushWevoLog("idle", `${name}: ${msg}`, true);
+      appAlert("🔌 " + msg, "warn", 9000);
+      notifyPhone("הרכב עדיין מחובר לעמדה", msg, `ev-idle-${o.id}`);
+    }
+    if (touched) {
+      try { localStorage.setItem(IDLE_REM_KEY, JSON.stringify(seen)); } catch {}
+    }
+  };
+
   const buildPayload = (st, clientId, existing) => {
     const list = clientsRef.current || [];
     const plugIn = st && st.plugInTime ? toLocalDT(new Date(st.plugInTime)) : toLocalDT(new Date());
@@ -260,6 +300,8 @@ function WevoOpenLiveSync({
             } catch {}
           }
         }
+        checkIdleReminders(st);
+        void refreshOwnerCostsFromWevo();
         prevStateRef.current = st;
       } catch (e) {
         pushWevoLog("sync", e && e.message || "שגיאת סנכרון מצב", false);

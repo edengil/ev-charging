@@ -350,7 +350,7 @@ function ClientView({
       style: e.kind === "payment" ? S.pill(C.okSoft, C.okInk) : e.kind === "debt" ? S.pill(C.errSoft, C.errInk) : S.pill(C.primarySoft, C.primaryInk)
     }, e.title), /*#__PURE__*/React.createElement("span", {
       style: S.rDate
-    }, fdate(e.sortDate), " ", ftime(e.sortDate))), /*#__PURE__*/React.createElement("div", {
+    }, fdateDay(e.sortDate), " ", ftime(e.sortDate))), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         color: C.meta
@@ -430,7 +430,7 @@ function ClientView({
         ...S.rDate,
         marginTop: 4
       }
-    }, "חיבור: ", fdate(o.startDate), " ", ftime(o.startDate), !liveNow && (o.chargeEndedAt || o.endDate) ? ` → סיום: ${fdate(o.chargeEndedAt || o.endDate)} ${ftime(o.chargeEndedAt || o.endDate)}` : ""), isChargeTimelineRelevant({
+    }, "חיבור: ", fdateDay(o.startDate), " ", ftime(o.startDate), !liveNow && (o.chargeEndedAt || o.endDate) ? ` → סיום: ${fdate(o.chargeEndedAt || o.endDate)} ${ftime(o.chargeEndedAt || o.endDate)}` : ""), isChargeTimelineRelevant({
       isSelf: selfClient,
       ...timelineHintsFromOpenOrSession(o)
     }) && /*#__PURE__*/React.createElement(ChargeTimelineBox, {
@@ -557,7 +557,7 @@ function ClientView({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: S.rDate
-    }, fdate(s.date), " ", ftime(s.date), (s.chargeEndedAt || s.endDate) ? ` → ${fdate(s.chargeEndedAt || s.endDate) === fdate(s.date) ? ftime(s.chargeEndedAt || s.endDate) : fdate(s.chargeEndedAt || s.endDate) + " " + ftime(s.chargeEndedAt || s.endDate)}` : ""), (s.plugInAt || s.chargeStartedAt || s.chargeEndedAt || s.plugOutAt) && isChargeTimelineRelevant({
+    }, fdateDay(s.date), " ", ftime(s.date), (s.chargeEndedAt || s.endDate) ? ` → ${fdate(s.chargeEndedAt || s.endDate) === fdate(s.date) ? ftime(s.chargeEndedAt || s.endDate) : fdate(s.chargeEndedAt || s.endDate) + " " + ftime(s.chargeEndedAt || s.endDate)}` : ""), (s.plugInAt || s.chargeStartedAt || s.chargeEndedAt || s.plugOutAt) && isChargeTimelineRelevant({
       isSelf: selfRow,
       ...timelineHintsFromOpenOrSession({
         ...s,

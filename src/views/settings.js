@@ -5,6 +5,11 @@
  * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
  */
 // ── SettingsView: עדכון תעריפים ─────────────────────────────────────────────
+function tariffMh(min) {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
 function SettingsView({
   onSaved,
   onCancel
@@ -14,6 +19,34 @@ function SettingsView({
   const [rr, setRr] = useState(String(cfg.rateRegular));
   const [op, setOp] = useState(String(cfg.ownerPeak));
   const [oo, setOo] = useState(String(cfg.ownerOff));
+  // תעריף Wevo חי — לוח שעות ישירות מ־Wevo; עלות הבעלים מתעדכנת אוטומטית
+  const [live, setLive] = useState(null);
+  const [liveErr, setLiveErr] = useState("");
+  const [liveBusy, setLiveBusy] = useState(false);
+  const pullTariff = async (force) => {
+    setLiveBusy(true);
+    setLiveErr("");
+    try {
+      const r = await refreshOwnerCostsFromWevo(force);
+      if (r && r.ok && r.norm) {
+        setLive(r.norm);
+        const c = getConfig();
+        setOp(String(c.ownerPeak));
+        setOo(String(c.ownerOff));
+      } else if (r && r.error === "NO_CREDS") {
+        setLiveErr("התחבר תחילה בסנכרון Wevo כדי למשוך את התעריף");
+      } else if (r && r.error === "PARSE") {
+        setLiveErr("לא הצלחתי לקרוא את לוח התעריפים מ־Wevo — אפשר לנסות שוב");
+      } else if (r && r.error) {
+        setLiveErr(r.error);
+      }
+    } finally {
+      setLiveBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (getWevoCreds().email) void pullTariff(false);
+  }, []);
   const [inf, setInf] = useState(String(cfg.inflation != null ? cfg.inflation : 1.21));
   const valid = [rp, rr, op, oo, inf].every(v => v !== "" && !isNaN(parseFloat(v)) && parseFloat(v) > 0);
   return /*#__PURE__*/React.createElement("main", {
@@ -134,6 +167,69 @@ function SettingsView({
     value: oo,
     onChange: e => setOo(e.target.value)
   })), /*#__PURE__*/React.createElement("div", {
+    style: { ...S.statusCard("#1d4ed8"),
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+      marginBottom: live ? 8 : 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: "#1d4ed8"
+    }
+  }, "תעריף Wevo חי (לוח שעות)"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: { ...S.btnS,
+      opacity: liveBusy ? 0.6 : 1
+    },
+    onClick: () => void pullTariff(true),
+    disabled: liveBusy,
+    "data-testid": "settings-wevo-tariff-refresh"
+  }, liveBusy ? "מושך…" : "משוך ועדכן עכשיו")), live && live.ranges.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: "#1d4ed8",
+      lineHeight: 1.6
+    }
+  }, live.ranges.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700
+    }
+  }, `${tariffMh(r.startMin)}–${r.endMin != null ? tariffMh(r.endMin) : "…"}`), /*#__PURE__*/React.createElement("span", null, `₪${r.rate.toFixed(2)}/קוט״ש`)))), live && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      fontWeight: 700,
+      color: "#1d4ed8"
+    },
+    "data-testid": "settings-wevo-tariff-summary"
+  }, `עלות בעלים כעת: פיק ₪${Number(live.ownerPeak).toFixed(2)} · רגיל ₪${Number(live.ownerOff).toFixed(2)}`), liveErr && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#b91c1c",
+      marginTop: 4
+    }
+  }, liveErr), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11.5,
+      color: C.meta,
+      marginTop: live ? 4 : 0
+    }
+  }, "עלות הבעלים מתעדכנת אוטומטית מ־Wevo בכל סנכרון. תעריפי הגבייה מלקוחות נקבעים ידנית בלבד ולא מתעדכנים אוטומטית.")), /*#__PURE__*/React.createElement("div", {
     style: S.acts
   }, /*#__PURE__*/React.createElement("button", {
     style: {

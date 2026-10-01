@@ -745,6 +745,8 @@ function WevoLivePanel({
   const chargingNow = isActuallyCharging(st);
   const waitingAuth = isWaitingForAuthorize(st);
   const vehicleNow = chargerReportsVehicle(st, sessions);
+  // טעינות שסיימו אבל הרכב עדיין מחובר — באנר תזכורת
+  const idleOpens = vehicleNow ? (openSess || []).filter(o => o && o.id && idleEndMs(o) && !o.plugOutAt) : [];
   const savedEcho = !vehicleNow && (sessions || []).some(s => savedSessionMatchesCharge(s, {
     wevoTxnId: st.transactionId,
     transactionId: st.transactionId,
@@ -867,7 +869,51 @@ function WevoLivePanel({
       marginBottom: 8,
       lineHeight: 1.4
     }
-  }, hint), /*#__PURE__*/React.createElement("div", {
+  }, hint), idleOpens.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fff7ed",
+      border: "1.5px solid #fdba74",
+      borderRadius: 10,
+      padding: "10px 12px",
+      marginBottom: 8,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    },
+    "data-testid": "idle-banner"
+  }, idleOpens.map(o => {
+    const cl = (clients || []).find(c => c.id === o.clientId) || {};
+    const nm = cl.name || "לקוח";
+    const mins = Math.max(1, Math.round((Date.now() - idleEndMs(o)) / 60000));
+    return /*#__PURE__*/React.createElement("div", {
+      key: o.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#9a3412",
+        lineHeight: 1.4
+      }
+    }, "🔌 " + idleReminderText(nm, mins)), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => openWaDraft({
+        phone: cl.phone || "",
+        name: nm,
+        text: idleWaDraftText(nm, mins)
+      }),
+      style: { ...S.btnXS(C.waSoft, C.waInk),
+        whiteSpace: "nowrap"
+      },
+      title: "טיוטת וואטסאפ",
+      "data-testid": `idle-wa-${o.id}`
+    }, "שלח תזכורת בוואטסאפ"));
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       color: "#334155",

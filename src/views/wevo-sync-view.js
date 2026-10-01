@@ -66,6 +66,7 @@ function WevoSyncView({
       const result = mergeWevoTransactions(clients || [], sessions || [], data.transactions || [], openSess || []);
       setInfo(`נמשכו ${data.count} טעינות מ-Wevo`);
       onMerged(result);
+      void refreshOwnerCostsFromWevo(true);
     } catch (e) {
       const msg = e.message || String(e);
       if (/Failed to fetch|NetworkError|fetch/i.test(msg)) {

@@ -91,6 +91,47 @@ async function wevoApi(action, extra = {}) {
   return data;
 }
 
+let _ownerTariffBusy = false;
+let _ownerTariffLastMs = 0;
+/**
+ * מושך את לוח התעריפים מ־Wevo ומעדכן אוטומטית את עלויות הבעלים בלבד
+ * (פיק = התעריף הגבוה בלוח, רגילה = הנמוך).
+ * תעריפי הגבייה מלקוחות נשארים ידניים — לעולם לא נוגעים בהם כאן.
+ * מוגבל לפעם אחת ב־5 דקות, אלא אם force=true (כפתור ההגדרות).
+ * @returns {Promise<{ok:true, norm:object} | {ok:false, error:string} | null>}
+ */
+async function refreshOwnerCostsFromWevo(force = false) {
+  if (_ownerTariffBusy) return null;
+  const now = Date.now();
+  if (!force && now - _ownerTariffLastMs < 5 * 60 * 1000) return null;
+  _ownerTariffBusy = true;
+  try {
+    const data = await wevoApi("tariff");
+    const norm = normalizeWevoTariff(data);
+    _ownerTariffLastMs = Date.now();
+    if (!norm || !norm.ok) {
+      return { ok: false, error: "PARSE", norm };
+    }
+    const cfg = getConfig();
+    const peakChanged = Math.abs(Number(cfg.ownerPeak || 0) - norm.ownerPeak) > 0.001;
+    const offChanged = Math.abs(Number(cfg.ownerOff || 0) - norm.ownerOff) > 0.001;
+    if (peakChanged || offChanged) {
+      persistConfig({ ownerPeak: norm.ownerPeak, ownerOff: norm.ownerOff });
+      const msg = `תעריף Wevo עודכן אוטומטית: פיק ₪${norm.ownerPeak.toFixed(2)} · רגיל ₪${norm.ownerOff.toFixed(2)}`;
+      try {
+        pushWevoLog("tariff", msg, true);
+      } catch {}
+      appAlert(`⚡ ${msg}`, "ok", 5000);
+    }
+    return { ok: true, norm };
+  } catch (e) {
+    const msg = e && e.message === "NO_CREDS" ? "NO_CREDS" : (e && e.message) || "שגיאה במשיכת התעריף";
+    return { ok: false, error: msg };
+  } finally {
+    _ownerTariffBusy = false;
+  }
+}
+
 let _liveStationSnap = null;
 function rememberLiveStation(st) {
   _liveStationSnap = st && typeof st === "object" ? st : null;

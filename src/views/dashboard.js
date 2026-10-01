@@ -369,7 +369,7 @@ function Dashboard({
     style: S.mLbl
   }, "טעינה אחרונה"), /*#__PURE__*/React.createElement("span", {
     style: S.mVal
-  }, c.last ? fdate(c.last.date) : "—"))), !c.isSelf && /*#__PURE__*/React.createElement("button", {
+  }, c.last ? fdateDay(c.last.date) : "—"))), !c.isSelf && /*#__PURE__*/React.createElement("button", {
     type: "button",
     "data-testid": `client-preauth-${c.id}`,
     onClick: e => {
@@ -552,7 +552,7 @@ function ArchiveView({
     style: S.cName
   }, c.name), /*#__PURE__*/React.createElement("div", {
     style: S.cMeta
-  }, c.archived ? "הועבר ידנית לארכיון" : "לא פעיל (מעל חודש)", " · ", c.last ? `טעינה אחרונה ${fdate(c.last.date)}` : "בלי טעינות", formatClientCarLine(c) ? ` · ${formatClientCarLine(c)}` : "")), /*#__PURE__*/React.createElement("div", {
+  }, c.archived ? "הועבר ידנית לארכיון" : "לא פעיל (מעל חודש)", " · ", c.last ? `טעינה אחרונה ${fdateDay(c.last.date)}` : "בלי טעינות", formatClientCarLine(c) ? ` · ${formatClientCarLine(c)}` : "")), /*#__PURE__*/React.createElement("div", {
     style: balanceBadgeStyle(c.balance, false)
   }, formatBalanceText(c.balance))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -603,7 +603,7 @@ function ArchiveView({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: S.cName
-  }, e.plugInTime ? fdate(e.plugInTime) : "—"), /*#__PURE__*/React.createElement("div", {
+  }, e.plugInTime ? fdateDay(e.plugInTime) : "—"), /*#__PURE__*/React.createElement("div", {
     style: S.cMeta
   }, e.kwh != null ? Number(e.kwh).toFixed(2) + ' קוט״ש' : "", e.cost != null ? " · ₪" + Number(e.cost).toFixed(2) : "", e.transactionId ? " · txn#" + e.transactionId : "")), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -637,7 +637,7 @@ function ArchiveView({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: S.cName
-  }, e.plugInTime ? fdate(e.plugInTime) : "—"), /*#__PURE__*/React.createElement("div", {
+  }, e.plugInTime ? fdateDay(e.plugInTime) : "—"), /*#__PURE__*/React.createElement("div", {
     style: S.cMeta
   }, e.kwh != null ? Number(e.kwh).toFixed(2) + ' קוט״ש' : "", e.cost != null ? " · ₪" + Number(e.cost).toFixed(2) : "", e.transactionId ? " · txn#" + e.transactionId : ""))), /*#__PURE__*/React.createElement("div", {
     style: {

@@ -25,7 +25,7 @@ function Report({
   const minYr = Math.min(now.getFullYear(), ...sessions.map(s => new Date(s.date).getFullYear()).filter(y => !isNaN(y)));
   const yrs = [];
   for (let y = minYr; y <= now.getFullYear(); y++) yrs.push(y);
-  const reportText = () => [`דוח טעינות – ${c === null || c === void 0 ? void 0 : c.name}`, `חודש: ${MONTHS[mo]} ${yr}`, "─────────────────", ...ss.map(s => `${fdate(s.date)} ${ftime(s.date)} | ${s.kwhInflated} קוט"ש | ${ils(s.amountBilled)}`), "─────────────────", `סה"כ לתשלום: ${ils(total)}`, `יתרה נוכחית: ${ils(bal)}`].join("\n");
+  const reportText = () => [`דוח טעינות – ${c === null || c === void 0 ? void 0 : c.name}`, `חודש: ${MONTHS[mo]} ${yr}`, "─────────────────", ...ss.map(s => `${fdateDay(s.date)} ${ftime(s.date)} | ${s.kwhInflated} קוט"ש | ${ils(s.amountBilled)}`), "─────────────────", `סה"כ לתשלום: ${ils(total)}`, `יתרה נוכחית: ${ils(bal)}`].join("\n");
   return /*#__PURE__*/React.createElement("main", {
     style: S.main
   }, /*#__PURE__*/React.createElement("div", {
@@ -65,7 +65,7 @@ function Report({
   }), ss.map(s => /*#__PURE__*/React.createElement("div", {
     key: s.id,
     style: S.repRow
-  }, /*#__PURE__*/React.createElement("span", null, fdate(s.date), " ", ftime(s.date)), /*#__PURE__*/React.createElement("span", null, s.kwhInflated, " קוט״ש"), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", null, fdateDay(s.date), " ", ftime(s.date)), /*#__PURE__*/React.createElement("span", null, s.kwhInflated, " קוט״ש"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontWeight: 700
     }

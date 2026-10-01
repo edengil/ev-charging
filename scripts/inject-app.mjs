@@ -158,6 +158,48 @@ var fictionalBilledDisplay = __EV_MONEY__.fictionalBilledDisplay;
 `;
 }
 
+function bundleIdleLib() {
+  const raw = fs.readFileSync(path.join(root, "lib/ev-idle.mjs"), "utf8");
+  const body = raw
+    .replace(/^export\s+/gm, "")
+    .replace(/\nexport\s*\{[\s\S]*?\};?\s*$/m, "\n");
+  return `/* === lib/ev-idle (injected) === */
+var __EV_IDLE__ = (function () {
+${body}
+  return {
+    IDLE_REMINDER_INTERVAL_MS: IDLE_REMINDER_INTERVAL_MS,
+    idleEndMs: idleEndMs,
+    shouldSendIdleReminder: shouldSendIdleReminder,
+    idleReminderText: idleReminderText,
+    idleWaDraftText: idleWaDraftText
+  };
+})();
+var IDLE_REMINDER_INTERVAL_MS = __EV_IDLE__.IDLE_REMINDER_INTERVAL_MS;
+var idleEndMs = __EV_IDLE__.idleEndMs;
+var shouldSendIdleReminder = __EV_IDLE__.shouldSendIdleReminder;
+var idleReminderText = __EV_IDLE__.idleReminderText;
+var idleWaDraftText = __EV_IDLE__.idleWaDraftText;
+/* === end lib/ev-idle === */
+`;
+}
+
+function bundleTariffLib() {
+  const raw = fs.readFileSync(path.join(root, "lib/ev-tariff.mjs"), "utf8");
+  const body = raw
+    .replace(/^export\s+/gm, "")
+    .replace(/\nexport\s*\{[\s\S]*?\};?\s*$/m, "\n");
+  return `/* === lib/ev-tariff (injected) === */
+var __EV_TARIFF__ = (function () {
+${body}
+  return {
+    normalizeWevoTariff: normalizeWevoTariff
+  };
+})();
+var normalizeWevoTariff = __EV_TARIFF__.normalizeWevoTariff;
+/* === end lib/ev-tariff === */
+`;
+}
+
 /** Concatenate src/ modules in manifest order (single classic <script> bundle). */
 function bundleAppSources() {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "src/manifest.json"), "utf8"));
@@ -175,12 +217,24 @@ function bundleAppSources() {
 }
 
 const money = bundleMoneyLib();
+const idle = bundleIdleLib();
+const tariff = bundleTariffLib();
 const app = bundleAppSources();
-const src = money + "\n" + app;
+const src = money + "\n" + idle + "\n" + tariff + "\n" + app;
 
 const checkMoney = spawnSync(process.execPath, ["--check", path.join(root, "lib/ev-money.mjs")], { encoding: "utf8" });
 if (checkMoney.status !== 0) {
   console.error(checkMoney.stderr || checkMoney.stdout);
+  process.exit(1);
+}
+const checkIdle = spawnSync(process.execPath, ["--check", path.join(root, "lib/ev-idle.mjs")], { encoding: "utf8" });
+if (checkIdle.status !== 0) {
+  console.error(checkIdle.stderr || checkIdle.stdout);
+  process.exit(1);
+}
+const checkTariff = spawnSync(process.execPath, ["--check", path.join(root, "lib/ev-tariff.mjs")], { encoding: "utf8" });
+if (checkTariff.status !== 0) {
+  console.error(checkTariff.stderr || checkTariff.stdout);
   process.exit(1);
 }
 

@@ -16,6 +16,13 @@ const ftime = d => new Date(d).toLocaleTimeString("he-IL", {
   hour: "2-digit",
   minute: "2-digit"
 });
+const WEEKDAYS_HE = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+// תאריך + שם יום בעברית, מחושב מהתאריך בפועל (למשל "חמישי 01.10.26")
+const fdateDay = d => {
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return fdate(d);
+  return `${WEEKDAYS_HE[dt.getDay()]} ${fdate(dt)}`;
+};
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 const MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
 

@@ -74,6 +74,47 @@ export async function getTransactions(token) {
   return Array.isArray(data) ? data : [];
 }
 
+/**
+ * פרטי תעריף מהמטען הפרטי: לוח "תעריף משתנה" + פרטי עלות.
+ * מנסה עם chargerIdentifier+connector ואם נכשל (לא 401/403) — בלי פרמטרים.
+ * מחזיר { status, json } לכל נתיב, בלי לזרוק — הלקוח מנרמל בהגנה.
+ */
+async function fetchWevoTariffEndpoint(token, path, qs) {
+  const attempt = async suffix => {
+    try {
+      const res = await fetch(`${API_BASE}/rest${path}${suffix}`, { headers: authHeaders(token) });
+      const text = await res.text();
+      let parsed = null;
+      try {
+        parsed = JSON.parse(text || "null");
+      } catch {}
+      const out = { status: res.status, json: parsed };
+      if (parsed == null) out.raw = String(text || "").slice(0, 500);
+      return out;
+    } catch (e) {
+      return { status: 0, json: null, error: String((e && e.message) || e) };
+    }
+  };
+  let out = await attempt(qs);
+  if (out.status >= 400 && out.status !== 401 && out.status !== 403) {
+    const bare = await attempt("");
+    // אם הקריאה עם הפרמטרים החזירה 4xx — מעדיפים את התוצאה הטובה מבין השתיים
+    if (bare.status < out.status) out = bare;
+  }
+  return out;
+}
+
+export async function getChargerTariff(token, charger, connector) {
+  const qs = charger
+    ? `?chargerIdentifier=${encodeURIComponent(charger)}&connector=${encodeURIComponent(connector || 1)}`
+    : `?connector=${encodeURIComponent(connector || 1)}`;
+  const [rateDetails, variableRanges] = await Promise.all([
+    fetchWevoTariffEndpoint(token, "/charger/rate-details", qs),
+    fetchWevoTariffEndpoint(token, "/charger/variable-cost-ranges", qs)
+  ]);
+  return { rateDetails, variableRanges };
+}
+
 /** Open outbound WebSocket to Wevo with Authorization header (Workers). */
 async function openWevoSocket(token) {
   const resp = await fetch(`${API_BASE}/ws`, {
@@ -339,7 +380,7 @@ export async function handleWevoRequest(body) {
   const user = summarizeUser(userRaw);
   const charger = String(body.chargerIdentifier || user.chargerIdentifier || "");
   const connector = String(body.connector || user.connector || 1);
-  if (!charger && action !== "sync" && action !== "inspect") {
+  if (!charger && action !== "sync" && action !== "inspect" && action !== "tariff") {
     const err = new Error("לא נמצא מזהה מטען בחשבון");
     err.status = 400;
     throw err;
@@ -348,6 +389,11 @@ export async function handleWevoRequest(body) {
   if (action === "sync") {
     const list = await getTransactions(token);
     return { ok: true, action, user, count: list.length, transactions: list };
+  }
+
+  if (action === "tariff") {
+    const tariff = await getChargerTariff(token, charger, connector);
+    return { ok: true, action, user, tariff };
   }
 
   if (action === "inspect") {
@@ -365,6 +411,14 @@ export async function handleWevoRequest(body) {
       }
     }
     const ID_HINT = /id|tag|vin|rfid|car|user|token|vehicle|mac|auth|plate|license|driver|card|uid|serial|emaid|iso|ocpp/i;
+    let tariffRaw = null;
+    if (charger) {
+      try {
+        tariffRaw = await getChargerTariff(token, charger, connector);
+      } catch (e) {
+        tariffRaw = { error: (e && e.message) || String(e) };
+      }
+    }
     const keyInfo = new Map();
     const walk = (obj, prefix = "") => {
       if (obj == null || typeof obj !== "object") return;
@@ -389,6 +443,8 @@ export async function handleWevoRequest(body) {
     walk({ user: userRaw });
     walk({ transactions: (list || []).slice(0, 40) });
     walk({ state: rawState });
+    walk({ tariffRateDetails: tariffRaw && tariffRaw.rateDetails ? tariffRaw.rateDetails.json : null });
+    walk({ tariffVariableRanges: tariffRaw && tariffRaw.variableRanges ? tariffRaw.variableRanges.json : null });
     const fields = [...keyInfo.entries()]
       .map(([path, info]) => ({ path, ...info }))
       .sort((a, b) => a.path.localeCompare(b.path));
@@ -433,6 +489,8 @@ export async function handleWevoRequest(body) {
       sampleFinished: finished,
       sampleOngoing: ongoing,
       sampleState: rawState,
+      tariffRateDetails: tariffRaw && tariffRaw.rateDetails ? tariffRaw.rateDetails : null,
+      tariffVariableRanges: tariffRaw && tariffRaw.variableRanges ? tariffRaw.variableRanges : null,
       rfid: {
         nonNull: rfidStats.nonNull,
         uniqueCount: rfidUnique.length,
@@ -525,7 +583,7 @@ export async function handleWevoRequest(body) {
     };
   }
 
-  const err = new Error("action לא מוכר (sync|state|authorize|inspect)");
+  const err = new Error("action לא מוכר (sync|state|authorize|inspect|tariff)");
   err.status = 400;
   throw err;
 }
