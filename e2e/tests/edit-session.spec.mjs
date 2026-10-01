@@ -2,12 +2,19 @@ import { test, expect, openApp, CLIENT_A, CLIENT_SELF, DEFAULT_CONFIG } from "..
 
 test.describe("edit-session", () => {
   test("פתיחת עריכה לא מקפיצה חיוב ועלות", async ({ page }) => {
+    // תאריך יחסי (היום, לפני כמה שעות) — תאריך קבוע ישן מוצא מהחודש הנוכחי ומארכיון הפעילות
+    const fmtLocal = dt => {
+      const p = n => String(n).padStart(2, "0");
+      return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}T${p(dt.getHours())}:${p(dt.getMinutes())}:${p(dt.getSeconds())}`;
+    };
+    const start = fmtLocal(new Date(Date.now() - 3 * 60 * 60 * 1000));
+    const end = fmtLocal(new Date(Date.now() - 1 * 60 * 60 * 1000));
     const sessions = [
       {
         id: "s-edit-1",
         clientId: CLIENT_A.id,
-        date: "2026-09-01T10:00:00",
-        endDate: "2026-09-01T13:00:00",
+        date: start,
+        endDate: end,
         durMin: 180,
         kwhRaw: 20,
         kwhInflated: 24.2,
