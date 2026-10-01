@@ -123,34 +123,4 @@ test.describe("wevo-mock", () => {
     const mock = await readWevoMock(page);
     expect(mock.authorizeCalls.some(c => c.confirmPremium === true)).toBe(true);
   });
-
-  test("כפתור אישור מראש על כרטיס לקוח מחמש ומאשר חיבור", async ({ page }) => {
-    await resetWevoMock(page, "wait-auth");
-    await openApp(page, {
-      clients: [CLIENT_A, CLIENT_SELF],
-      extra: {
-        ev_wevo_creds: JSON.stringify(WEVO_CREDS)
-      }
-    });
-
-    await expect(page.getByTestId(`client-preauth-${CLIENT_A.id}`)).toBeVisible();
-    await page.getByTestId(`client-preauth-${CLIENT_A.id}`).click();
-    await expect(page.getByTestId(`client-preauth-${CLIENT_A.id}`)).toContainText(/ממתין לחיבור/);
-
-    const stored = await page.evaluate(() => localStorage.getItem("ev_wevo_preauth"));
-    expect(stored).toBeTruthy();
-    const parsed = JSON.parse(stored);
-    expect(parsed.clientId).toBe(CLIENT_A.id);
-    expect(parsed.mode).toBe("first-auth");
-
-    await expect
-      .poll(async () => {
-        const mock = await readWevoMock(page);
-        return mock.authorizeCalls?.length || 0;
-      }, { timeout: 25000 })
-      .toBeGreaterThan(0);
-
-    const mock = await readWevoMock(page);
-    expect(mock.lastAuthorize.confirmPremium).toBe(false);
-  });
 });

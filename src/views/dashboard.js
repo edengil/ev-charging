@@ -18,7 +18,6 @@ function Dashboard({
 }) {
   const [sortBy, setSortBy] = useState("debt");
   const [liveStation, setLiveStation] = useState(() => readLiveStation());
-  const [preAuthIntent, setPreAuthIntent] = useState(() => getWevoAuthIntent());
   useEffect(() => {
     const sync = () => setLiveStation(readLiveStation());
     window.addEventListener("ev-live-station", sync);
@@ -369,45 +368,7 @@ function Dashboard({
     style: S.mLbl
   }, "טעינה אחרונה"), /*#__PURE__*/React.createElement("span", {
     style: S.mVal
-  }, c.last ? fdateDay(c.last.date) : "—"))), !c.isSelf && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    "data-testid": `client-preauth-${c.id}`,
-    onClick: e => {
-      e.stopPropagation();
-      e.preventDefault();
-      const armed = preAuthIntent && preAuthIntent.clientId === c.id;
-      if (armed) {
-        clearWevoClientPreauth("בוטל מדשבורד");
-        setPreAuthIntent(null);
-      } else {
-        const next = armWevoClientPreauth(c.id);
-        setPreAuthIntent(next);
-      }
-    },
-    style: {
-      width: "100%",
-      marginTop: 8,
-      padding: "9px 10px",
-      borderRadius: 10,
-      border: "1.5px solid",
-      borderColor: preAuthIntent && preAuthIntent.clientId === c.id ? C.ok : "#bae6fd",
-      background: preAuthIntent && preAuthIntent.clientId === c.id ? C.okSoft : C.primarySoft,
-      color: preAuthIntent && preAuthIntent.clientId === c.id ? C.okInk : C.primaryInk,
-      fontWeight: 700,
-      fontSize: 12,
-      cursor: "pointer",
-      minHeight: 44,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 6,
-      fontFamily: "inherit"
-    }
-  }, preAuthIntent && preAuthIntent.clientId === c.id ? [/*#__PURE__*/React.createElement("span", {
-    key: "dot",
-    className: "ev-live-dot",
-    style: { width: 8, height: 8, borderRadius: "50%", background: C.ok, display: "inline-block" }
-  }), "ממתין לחיבור · בטל אישור מראש"] : [/*#__PURE__*/React.createElement(Icon, { key: "ic", n: "clock", s: 15 }), "אישור מראש · כשיתחבר"]))), archivedCount > 0 && /*#__PURE__*/React.createElement("button", {
+  }, c.last ? fdateDay(c.last.date) : "—"))))), archivedCount > 0 && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => go("archive"),
     style: {

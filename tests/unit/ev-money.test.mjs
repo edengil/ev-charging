@@ -713,8 +713,6 @@ describe("app-source drift guards", () => {
     const src = readAppBundle();
     assert.match(src, /wevo-preauth-arm/);
     assert.match(src, /wevo-preauth-premium-toggle/);
-    assert.match(src, /client-preauth-/);
-    assert.match(src, /armWevoClientPreauth/);
     assert.match(src, /sealConflictingWevoOpens/);
     assert.match(src, /findMatchingWevoOpen/);
     assert.match(src, /listConflictingWevoOpens/);

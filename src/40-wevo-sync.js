@@ -41,33 +41,6 @@ function setWevoAuthIntent(v) {
   } catch {}
 }
 
-/** חימוש אישור מראש מלקוח בדשבורד (מחוץ לפאנל Wevo). */
-function armWevoClientPreauth(clientId, opts = {}) {
-  if (!clientId) return null;
-  const next = normalizeWevoAuthIntent({
-    clientId,
-    mode: "first-auth",
-    armedAt: Date.now(),
-    queued: false,
-    lastAttemptAt: null,
-    lastError: null,
-    attempts: 0
-  });
-  setWevoAuthIntent(next);
-  if (!opts.silent) {
-    appAlert("אישור מראש פעיל — כשיתחבר רכב נאשר חיבור ונשייך ללקוח", "ok", 5200);
-  }
-  return next;
-}
-function clearWevoClientPreauth(reason) {
-  setWevoAuthIntent(null);
-  if (reason) {
-    try {
-      pushWevoLog("preauth", reason, true);
-    } catch {}
-  }
-}
-
 async function wevoApi(action, extra = {}) {
   const creds = getWevoCreds();
   if (!creds.email || !creds.password) {
