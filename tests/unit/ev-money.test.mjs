@@ -712,7 +712,7 @@ describe("app-source drift guards", () => {
   it("יש כפתורי אישור ייעודיים + אישור ראשון אוטומטי + כפתור לקוח", () => {
     const src = readAppBundle();
     assert.match(src, /wevo-preauth-arm/);
-    assert.match(src, /wevo-fullauth-arm/);
+    assert.match(src, /wevo-preauth-premium-toggle/);
     assert.match(src, /client-preauth-/);
     assert.match(src, /armWevoClientPreauth/);
     assert.match(src, /sealConflictingWevoOpens/);

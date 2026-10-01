@@ -26,6 +26,8 @@ function WevoLivePanel({
     const i = getWevoAuthIntent();
     return i && i.attempts || 0;
   });
+  // טוגל ״כולל תעריף יקר״ ליד כפתור האישור מראש — כבוי כברירת מחדל, פרימיום רק בהחלטה מפורשת
+  const [preAuthPremium, setPreAuthPremium] = useState(false);
   const openRef = useRef(openSess);
   openRef.current = openSess;
   const clientsRef = useRef(clients);
@@ -776,7 +778,6 @@ function WevoLivePanel({
     : selectedClient && selectedClient.name;
   // רק כשבאמת בטעינה — לא כשמחכים לאישור (Preparing)
   const alreadyAuthorized = chargingNow;
-  const approveNowPrimary = vehicleNow;
   const authBtnLabel = authBusy
     ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Spinner, {
       s: 15,
@@ -1074,7 +1075,7 @@ function WevoLivePanel({
       marginTop: 8,
       lineHeight: 1.4
     }
-  }, isOffPeakIntent ? "אישור מראש פעיל — ממשיך לנסות בלי תעריף יקר; הטעינה תתחיל כשהזול נכנס." : isFullIntent ? "מאשר עכשיו כולל תעריף יקר — ממשיך לנסות עד שהטעינה רצה." : isFirstAuthIntent ? "מאשר חיבור אוטומטית (אישור ראשון, בלי יקר). ליקר או המתנה לזול — הכפתורים למטה." : isSelfSelected ? "עדן — אשר טעינה רק כשיש רכב בעמדה." : cid && !isSelfSelected ? (vehicleNow ? "רכב בעמדה — אישור ראשון אוטומטי. ליקר או המתנה לזול — הכפתורים למטה." : "הלקוח נבחר. אישור ראשון יקרה רק כשיהיה רכב בעמדה.") : "בחר לקוח. רכב בעמדה יופיע למעלה לפני אישור.")), !isSelfSelected && cid && /*#__PURE__*/React.createElement("div", {
+  }, isOffPeakIntent ? "אישור מראש פעיל — ממשיך לנסות בלי תעריף יקר; הטעינה תתחיל כשהזול נכנס." : isFullIntent ? "מאשר עכשיו כולל תעריף יקר — ממשיך לנסות עד שהטעינה רצה." : isFirstAuthIntent ? "מאשר חיבור אוטומטית (אישור ראשון, בלי יקר). לאישור מראש (עם אופציה לתעריף יקר) — הכפתור למטה." : isSelfSelected ? "עדן — אשר טעינה רק כשיש רכב בעמדה." : cid && !isSelfSelected ? (vehicleNow ? "רכב בעמדה — אישור ראשון אוטומטי. לאישור מראש (עם אופציה לתעריף יקר) — הכפתור למטה." : "הלקוח נבחר. אישור ראשון יקרה רק כשיהיה רכב בעמדה.") : "בחר לקוח. רכב בעמדה יופיע למעלה לפני אישור.")), !isSelfSelected && cid && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -1123,29 +1124,40 @@ function WevoLivePanel({
       color: "#0369a1"
     },
     "data-testid": "wevo-firstauth-active"
-  }, "✓ מאשר חיבור אוטומטית · ", selectedClient && selectedClient.name, authAttemptsUi > 0 ? ` · ניסיון ${authAttemptsUi}` : ""), /*#__PURE__*/React.createElement("button", {
+  }, "✓ מאשר חיבור אוטומטית · ", selectedClient && selectedClient.name, authAttemptsUi > 0 ? ` · ניסיון ${authAttemptsUi}` : ""), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 7,
+      padding: "10px 12px",
+      background: preAuthPremium ? "#fff7ed" : "#f8fafc",
+      border: preAuthPremium ? "1.5px solid #fdba74" : "1.5px solid #e2e8f0",
+      borderRadius: 12,
+      fontWeight: 700,
+      fontSize: 13,
+      color: preAuthPremium ? "#c2410c" : "#475569",
+      cursor: "pointer",
+      flex: "1 1 180px",
+      userSelect: "none"
+    },
+    "data-testid": "wevo-preauth-premium-toggle"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: preAuthPremium,
+    onChange: e => setPreAuthPremium(e.target.checked),
+    style: { width: 17, height: 17, accentColor: "#ea580c" }
+  }), `כולל תעריף יקר (₪${Number((getConfig() || {}).ratePremium || 0).toFixed(2)}/קוט״ש)`), /*#__PURE__*/React.createElement("button", {
     type: "button",
     style: {
-      ...(approveNowPrimary ? S.quietBtn : S.btnP),
-      background: approveNowPrimary ? "#fff" : "#059669",
-      color: approveNowPrimary ? "#334155" : "#fff",
+      ...S.btnP,
+      background: preAuthPremium ? "#ea580c" : "#059669",
+      color: "#fff",
       padding: "11px 12px",
       flex: "1 1 180px"
     },
-    onClick: () => armAuthIntent("offpeak-preauth"),
+    onClick: () => armAuthIntent(preAuthPremium ? "full-now" : "offpeak-preauth"),
     "data-testid": "wevo-preauth-arm"
-  }, "אישור מראש · המתנה לזול"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: {
-      ...(approveNowPrimary ? S.btnP : S.quietBtn),
-      background: approveNowPrimary ? "#ea580c" : "#fff",
-      color: approveNowPrimary ? "#fff" : "#334155",
-      padding: "11px 12px",
-      flex: "1 1 180px"
-    },
-    onClick: () => armAuthIntent("full-now"),
-    "data-testid": "wevo-fullauth-arm"
-  }, "אשר עכשיו · כולל תעריף יקר"))),
+  }, preAuthPremium ? "אשר מראש · כולל יקר" : "אשר מראש"))),
 
   // עלות חיה
   showLiveMoney && /*#__PURE__*/React.createElement("div", {
@@ -1320,7 +1332,7 @@ function WevoLivePanel({
       textAlign: "center"
     },
     "data-testid": "wevo-auth-awaiting-click"
-  }, waitingAuth ? "ממתין ללחיצה על כפתור אישור למעלה" : "בחר אישור מראש או אשר עכשיו"), /*#__PURE__*/React.createElement("button", {
+  }, waitingAuth ? "ממתין ללחיצה על כפתור אישור למעלה" : "לחץ ׳אשר מראש׳ למעלה (עם אופציה לתעריף יקר)"), /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnP,
       background: "#f59e0b",

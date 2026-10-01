@@ -47,7 +47,9 @@ test.describe("wevo-mock", () => {
 
     await page.getByTestId("wevo-client-select").selectOption(CLIENT_A.id);
     await expect(page.getByTestId("wevo-preauth-arm")).toBeVisible();
-    await expect(page.getByTestId("wevo-fullauth-arm")).toBeVisible();
+    await expect(page.getByTestId("wevo-preauth-premium-toggle")).toBeVisible();
+    // טוגל הפרימיום כבוי כברירת מחדל
+    await expect(page.getByTestId("wevo-preauth-premium-toggle").locator("input")).not.toBeChecked();
 
     await expect
       .poll(async () => {
@@ -77,6 +79,8 @@ test.describe("wevo-mock", () => {
 
     await page.getByTestId("wevo-client-select").selectOption(CLIENT_A.id);
     await expect(page.getByTestId("wevo-preauth-arm")).toBeVisible();
+    // טוגל הפרימיום כבוי כברירת מחדל — פרימיום רק בהחלטה מפורשת
+    await expect(page.getByTestId("wevo-preauth-premium-toggle").locator("input")).not.toBeChecked();
     await page.getByTestId("wevo-preauth-arm").click();
     await expect(page.getByTestId("wevo-preauth-active")).toBeVisible();
     await expect(page.getByTestId("wevo-preauth-active")).toContainText(/אישור מראש פעיל/);
@@ -93,7 +97,7 @@ test.describe("wevo-mock", () => {
     await expect(page.getByTestId("wevo-preauth-active")).toBeVisible();
   });
 
-  test("אשר עכשיו כולל יקר שולח confirmPremium=true", async ({ page }) => {
+  test("אשר מראש עם טוגל פרימיום שולח confirmPremium=true", async ({ page }) => {
     await resetWevoMock(page, "wait-auth");
     await openApp(page, {
       clients: [CLIENT_A, CLIENT_SELF],
@@ -103,8 +107,10 @@ test.describe("wevo-mock", () => {
     });
 
     await page.getByTestId("wevo-client-select").selectOption(CLIENT_A.id);
-    await expect(page.getByTestId("wevo-fullauth-arm")).toBeVisible();
-    await page.getByTestId("wevo-fullauth-arm").click();
+    // מדליקים את אופציית הפרימיום ואז לוחצים אשר מראש
+    await page.getByTestId("wevo-preauth-premium-toggle").locator("input").check();
+    await expect(page.getByTestId("wevo-preauth-arm")).toContainText(/כולל יקר/);
+    await page.getByTestId("wevo-preauth-arm").click();
     await expect(page.getByTestId("wevo-fullauth-active")).toBeVisible();
 
     await expect
