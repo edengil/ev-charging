@@ -1370,11 +1370,12 @@ function wevoTxToOpenSession(tx, clientId) {
 }
 
 /**
- * חשד לכפילות בשיוך טעינה לא מקוטלגת: טעינה שמורה של אותו לקוח שחופפת
- * בזמן (חלון 36 שעות) או עם קוט"ש/סכום דומים — למרות שההתאמה המלאה נכשלה
- * (למשל אחרי עריכת ערכי הטעינה השמורה). שורות מראה wevo-sync אינן קיטלוג
- * אמיתי ולכן לא נבדקות. כלל היומיים: אם התאריכים במרווח של מעל יומיים —
- * אין חשד כפילות כלל. מחזיר את הטעינה החשודה או null.
+ * חשד לכפילות בשיוך טעינה לא מקוטלגת: טעינה שמורה של אותו לקוח בתוך חלון
+ * היומיים, עם סימן דמיון ממשי — חפיפת זמן הדוקה (עד שעה), קוט״ש קרוב או
+ * סכום קרוב. קרבת זמן רחבה לבדה אינה כפילות: מי שמטעין מדי יום יראה כמעט
+ * תמיד טעינה ישנה במרחק של עד 36 שעות, גם עם קוט״ש שונה לגמרי (73.09 מול
+ * 29.00) — זו בדיוק ההתראה השגויה שראינו. שורות מראה wevo-sync אינן קיטלוג
+ * אמיתי ולכן לא נבדקות. מחזיר את הטעינה החשודה או null.
  */
 function findDuplicateSuspect(sessions, clientId, tx) {
   if (!tx || clientId == null || String(clientId) === "") return null;
@@ -1385,14 +1386,20 @@ function findDuplicateSuspect(sessions, clientId, tx) {
   const tc = tcRaw != null && Number.isFinite(tcRaw) ? tcRaw : null;
   for (const s of mine) {
     if (!chargeTimesNearWindow(s, tx, DUP_SUSPECT_WINDOW_MS)) continue;
-    if (chargeTimesNear(s, tx)) return s;
+    // חפיפת זמן הדוקה (עד שעה) כשלעצמה מספיקה — אותה טעינה פיזית גם אם הערכים נערכו.
+    // קרבת זמן רחבה יותר אינה כפילות: נדרש גם קוט״ש קרוב או סכום קרוב.
+    if (chargeTimesNearWindow(s, tx, 60 * 60 * 1000)) return s;
     const sk = chargeKwh(s);
-    if (sk != null && tk != null && sk > 0 && tk > 0 && Math.abs(sk - tk) <= 0.05) return s;
+    if (sk != null && tk != null && sk > 0 && tk > 0) {
+      const kTol = Math.max(0.5, tk * 0.05);
+      if (Math.abs(sk - tk) <= kTol) return s;
+    }
     if (tc != null) {
+      const cTol = Math.max(0.5, tc * 0.05);
       const sc = chargeMoney(s);
-      if (sc != null && Math.abs(sc - tc) <= 0.05) return s;
+      if (sc != null && Math.abs(sc - tc) <= cTol) return s;
       const ab = s.amountBilled != null ? Number(s.amountBilled) : null;
-      if (ab != null && Number.isFinite(ab) && Math.abs(ab - tc) <= 0.05) return s;
+      if (ab != null && Number.isFinite(ab) && Math.abs(ab - tc) <= cTol) return s;
     }
   }
   return null;
@@ -1788,8 +1795,11 @@ function collectScalarRates(payload) {
 
 /**
  * מנרמל את תשובת פעולת "tariff" של השרת (או payload בודד) למבנה אחיד:
- * { ok, source, ranges: [{startMin, endMin, rate}], ownerPeak, ownerOff }
+ * { ok, source, ranges: [{startMin, endMin, rate}], ownerPeak, ownerOff,
+ *   ownerPeakStartMin, ownerPeakEndMin }
  * ownerPeak = התעריף הגבוה בלוח; ownerOff = הנמוך.
+ * חלון הפיק = איחוד הטווחים שבהם התעריף הוא הגבוה ביותר (בדקות מיום;
+ * endMin יכול לעבור 1440 כשהחלון חוצה חצות). null כשאין לוח שעות.
  * כשאין מספיק נתונים — ok:false ואין דריסה של כלום בצד הלקוח.
  */
 function normalizeWevoTariff(body) {
@@ -1839,12 +1849,23 @@ function normalizeWevoTariff(body) {
     })
     .sort((a, b) => a.startMin - b.startMin);
 
+  const peakRate = Math.max(...distinct);
+  const peakRanges = cleanRanges.filter(r => Math.abs(r.rate - peakRate) < 0.005);
+  let ownerPeakStartMin = null;
+  let ownerPeakEndMin = null;
+  if (peakRanges.length) {
+    ownerPeakStartMin = Math.min(...peakRanges.map(r => r.startMin));
+    ownerPeakEndMin = Math.max(...peakRanges.map(r => r.endMin));
+  }
+
   return {
     ok: true,
     source,
     ranges: cleanRanges,
-    ownerPeak: Math.max(...distinct),
-    ownerOff: Math.min(...distinct)
+    ownerPeak: peakRate,
+    ownerOff: Math.min(...distinct),
+    ownerPeakStartMin,
+    ownerPeakEndMin
   };
 }
 
@@ -2034,9 +2055,12 @@ const DEFAULT_CONFIG = {
   rateRegular: 1.47,
   // גבייה שאר הזמן
   ownerPeak: 2.08,
-  // עלות בעלים 17:00–23:00
+  // עלות בעלים בשעות הפיק (החלון עצמו נמשך מ־Wevo, שדה ownerPeak*Min למטה)
   ownerOff: 0.87,
   // עלות בעלים שאר הזמן + שישי/שבת
+  ownerPeakStartMin: 17 * 60,
+  // חלון פיק ברירת מחדל 17:00–23:00 — מתעדכן אוטומטית מלוח Wevo בכל סנכרון
+  ownerPeakEndMin: 23 * 60,
   inflation: 1.21 // ניפוח קוט״ש לגבייה (1.21 = +21%)
 };
 const PREM_S = 16,
@@ -2068,6 +2092,34 @@ async function loadConfigFromStorage() {
       _configListeners.forEach(fn => fn(_configCache));
     }
   } catch {}
+}
+/**
+ * חלון הפיק של עלות הבעלים (דקות מיום) — Wevo היא הקובעת: החלון נשמר
+ * מהלוח החי בכל סנכרון, וברירת המחדל 17:00–23:00 משמשת רק עד המשיכה הראשונה.
+ * endMin יכול לעבור 1440 כשהחלון חוצה חצות.
+ */
+function ownerPeakWindow(cfg = getConfig()) {
+  const s = Number(cfg && cfg.ownerPeakStartMin);
+  const e = Number(cfg && cfg.ownerPeakEndMin);
+  if (Number.isFinite(s) && Number.isFinite(e) && s >= 0 && s < 1440 && e > s && e <= 2880) {
+    return { startMin: s, endMin: e };
+  }
+  return { startMin: OWNER_PS * 60, endMin: OWNER_PE * 60 };
+}
+
+/** דקות החפיפה בין [start, end] לבין חלון הפיק היומי (עובד גם מעבר לחצות). */
+function peakOverlapMinutes(start, end, startMin, endMin) {
+  if (!(end > start)) return 0;
+  let total = 0;
+  const days = Math.min(8, Math.ceil((end - start) / 86400000) + 1);
+  for (let i = 0; i < days; i++) {
+    const mid = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const ps = mid.getTime() + startMin * 60000;
+    const pe = mid.getTime() + endMin * 60000;
+    const o = Math.min(end.getTime(), pe) - Math.max(start.getTime(), ps);
+    if (o > 0) total += o / 60000;
+  }
+  return total;
 }
 function calcSession(kwhRaw, startDt, endDt = null, forceReg = false, forcePrem = false, customRate = null) {
   const cfg = getConfig();
@@ -2115,24 +2167,16 @@ function calcSession(kwhRaw, startDt, endDt = null, forceReg = false, forcePrem 
   }
   const amountBilled = Math.ceil(kwhInflated * rate);
 
-  // Owner cost: Friday/Saturday flat, else weighted with midnight crossing
+  // Owner cost: Friday/Saturday flat, else weighted by the Wevo peak window
   const day = start.getDay();
   const isWeekend = day === 5 || day === 6;
-  const sh2 = start.getHours() + start.getMinutes() / 60;
-  const eh2 = end.getHours() + end.getMinutes() / 60;
   const totalOwnerMin = Math.max((end - start) / 60000, 1);
   let ownerRate;
   if (isWeekend) {
     ownerRate = cfg.ownerOff;
   } else {
-    let peakOwnerMin = 0;
-    if (sh2 < eh2) {
-      peakOwnerMin = Math.max(0, Math.min(eh2, OWNER_PE) - Math.max(sh2, OWNER_PS)) * 60;
-    } else {
-      const b = Math.max(0, OWNER_PE - Math.max(sh2, OWNER_PS)) * 60;
-      const a = Math.max(0, Math.min(eh2, OWNER_PE) - OWNER_PS) * 60;
-      peakOwnerMin = b + a;
-    }
+    const w = ownerPeakWindow(cfg);
+    const peakOwnerMin = peakOverlapMinutes(start, end, w.startMin, w.endMin);
     const peakRatio = Math.min(1, peakOwnerMin / totalOwnerMin);
     ownerRate = cfg.ownerPeak * peakRatio + cfg.ownerOff * (1 - peakRatio);
   }
@@ -2153,12 +2197,14 @@ function calcSession(kwhRaw, startDt, endDt = null, forceReg = false, forcePrem 
   };
 }
 
-/** שעות יקרות Wevo (עלות בעלים) — ימי חול 17:00–23:00 */
+/** שעות יקרות Wevo (עלות בעלים) — החלון מלוח Wevo החי, ימי חול בלבד */
 function isOwnerPeakNow(d = new Date()) {
   const day = d.getDay();
   if (day === 5 || day === 6) return false;
-  const h = d.getHours() + d.getMinutes() / 60;
-  return h >= OWNER_PS && h < OWNER_PE;
+  const m = d.getHours() * 60 + d.getMinutes();
+  const w = ownerPeakWindow();
+  if (m >= w.startMin && m < Math.min(w.endMin, 1440)) return true;
+  return w.endMin > 1440 && m < w.endMin - 1440;
 }
 
 /** שעות פרימיום לגבייה מלקוחות — 16:00–23:00 */
@@ -3292,6 +3338,11 @@ async function wevoApi(action, extra = {}) {
 
 let _ownerTariffBusy = false;
 let _ownerTariffLastMs = 0;
+/** דקות־מיום → "HH:MM" (סוף חוצה חצות מוצג כשעת היעד למחרת). */
+function mhMin(min) {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
 /**
  * מושך את לוח התעריפים מ־Wevo ומעדכן אוטומטית את עלויות הבעלים בלבד
  * (פיק = התעריף הגבוה בלוח, רגילה = הנמוך).
@@ -3314,9 +3365,23 @@ async function refreshOwnerCostsFromWevo(force = false) {
     const cfg = getConfig();
     const peakChanged = Math.abs(Number(cfg.ownerPeak || 0) - norm.ownerPeak) > 0.001;
     const offChanged = Math.abs(Number(cfg.ownerOff || 0) - norm.ownerOff) > 0.001;
-    if (peakChanged || offChanged) {
-      persistConfig({ ownerPeak: norm.ownerPeak, ownerOff: norm.ownerOff });
-      const msg = `תעריף Wevo עודכן אוטומטית: פיק ₪${norm.ownerPeak.toFixed(2)} · רגיל ₪${norm.ownerOff.toFixed(2)}`;
+    // חלון הפיק גם הוא של Wevo — נשמר כשהלוח מחזיר טווחים תקינים
+    const winOk =
+      norm.ownerPeakStartMin != null && norm.ownerPeakEndMin != null &&
+      norm.ownerPeakEndMin > norm.ownerPeakStartMin && norm.ownerPeakEndMin <= 2880;
+    const winChanged =
+      winOk &&
+      (Number(cfg.ownerPeakStartMin) !== norm.ownerPeakStartMin ||
+        Number(cfg.ownerPeakEndMin) !== norm.ownerPeakEndMin);
+    if (peakChanged || offChanged || winChanged) {
+      const patch = { ownerPeak: norm.ownerPeak, ownerOff: norm.ownerOff };
+      if (winOk) {
+        patch.ownerPeakStartMin = norm.ownerPeakStartMin;
+        patch.ownerPeakEndMin = norm.ownerPeakEndMin;
+      }
+      persistConfig(patch);
+      const winTxt = winOk ? ` · פיק ${mhMin(norm.ownerPeakStartMin)}–${mhMin(norm.ownerPeakEndMin)}` : "";
+      const msg = `תעריף Wevo עודכן אוטומטית: פיק ₪${norm.ownerPeak.toFixed(2)} · רגיל ₪${norm.ownerOff.toFixed(2)}${winTxt}`;
       try {
         pushWevoLog("tariff", msg, true);
       } catch {}
@@ -9558,24 +9623,16 @@ const DAY_HE = ["יום א'", "יום ב'", "יום ג'", "יום ד'", "יום 
 const MONTH_SHORT = ["ינו'", "פבר'", "מרץ", "אפר'", "מאי", "יונ'", "יול'", "אוג'", "ספט'", "אוק'", "נוב'", "דצמ'"];
 
 function ownerPremRatio(s) {
-  // Wevo "פרימיום" = חלק האנרגיה בשיא בעלים 17:00–23:00 (לא בסופ״ש)
+  // Wevo "פרימיום" = חלק האנרגיה בחלון הפיק החי של Wevo (לא בסופ״ש)
   const start = new Date(s.date);
   if (isNaN(start)) return 0;
   const durMin = Number(s.durMin) > 0 ? Number(s.durMin) : 60;
   const end = new Date(start.getTime() + durMin * 60000);
   const day = start.getDay();
   if (day === 5 || day === 6) return 0;
-  const sh = start.getHours() + start.getMinutes() / 60;
-  const eh = end.getHours() + end.getMinutes() / 60;
+  const w = ownerPeakWindow();
   const totalOwnerMin = Math.max((end - start) / 60000, 1);
-  let peakOwnerMin = 0;
-  if (sh < eh) {
-    peakOwnerMin = Math.max(0, Math.min(eh, OWNER_PE) - Math.max(sh, OWNER_PS)) * 60;
-  } else {
-    const b = Math.max(0, OWNER_PE - Math.max(sh, OWNER_PS)) * 60;
-    const a = Math.max(0, Math.min(eh, OWNER_PE) - OWNER_PS) * 60;
-    peakOwnerMin = b + a;
-  }
+  const peakOwnerMin = peakOverlapMinutes(start, end, w.startMin, w.endMin);
   return Math.max(0, Math.min(1, peakOwnerMin / totalOwnerMin));
 }
 
@@ -11149,7 +11206,7 @@ function SettingsView({
       color: C.warnInk
     }
   }, "עלות בעלים (מה שאתה משלם)")), /*#__PURE__*/React.createElement(FG, {
-    lbl: "עלות פיק (17:00–23:00, ימי חול) ₪/קוט״ש"
+    lbl: `עלות פיק (${tariffMh(cfg.ownerPeakStartMin != null ? cfg.ownerPeakStartMin : 17 * 60)}–${tariffMh(cfg.ownerPeakEndMin != null ? cfg.ownerPeakEndMin : 23 * 60)}, ימי חול) ₪/קוט״ש`
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
     type: "number",

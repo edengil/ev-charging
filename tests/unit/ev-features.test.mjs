@@ -219,6 +219,38 @@ describe("הגנה מפני כפילות בשיוך טעינה לא מקוטלג
     assert.equal(s, null);
   });
 
+  it("(ב3) טעינה ישנה גדולה בהרבה אינה כפילות רק בגלל קרבת זמן (באג צילום המסך)", () => {
+    // באפליקציה: יתומה של 29.00 קוט״ש מ־28.09 14:05 סומנה ככפילות של 73.09 מ־26.09 20:00
+    const big = {
+      id: "s-big",
+      clientId: "c1",
+      date: "2026-09-26T20:00",
+      endDate: "2026-09-27T06:30",
+      kwhRaw: 73.09,
+      costToOwner: 62.9,
+      amountBilled: 118,
+      source: "manual"
+    };
+    const orphan = {
+      transactionId: "tx-9",
+      plugInTime: "2026-09-28T14:05",
+      plugOutTime: "2026-09-28T18:05",
+      totalEnergyKwh: 29.0,
+      totalCost: 25.17
+    };
+    assert.equal(findDuplicateSuspect([big], "c1", orphan), null);
+  });
+
+  it("(ב4) קוט״ש זהה וסכום זהה במרחק יום עדיין חשוד ככפילות", () => {
+    const s = findDuplicateSuspect(
+      [sess({ date: "2026-09-27T09:00", endDate: "2026-09-27T13:00" })],
+      "c1",
+      tx()
+    );
+    assert.ok(s, "ציפינו לחשד כפילות");
+    assert.equal(s.id, "s1");
+  });
+
   it("(ג) החיוב נוצר רק אחרי אישור מפורש", () => {
     assert.equal(duplicateAssignDecision({ id: "s1" }, false), "warn");
     assert.equal(duplicateAssignDecision({ id: "s1" }, true), "assign");

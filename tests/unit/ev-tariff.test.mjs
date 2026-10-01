@@ -21,6 +21,39 @@ describe("נרמול תעריף Wevo — המרת זמנים", () => {
   });
 });
 
+describe("נרמול תעריף Wevo — חלון הפיק", () => {
+  it("חלון הפיק נגזר מהלוח: 17:00–22:00 בדקות", () => {
+    const body = {
+      tariff: {
+        rateDetails: { status: 200, json: null },
+        variableRanges: {
+          status: 200,
+          json: [
+            { startTime: 0, endTime: 61200, rate: 0.8 },
+            { startTime: 61200, endTime: 79200, rate: 0.86 },
+            { startTime: 79200, endTime: 86400, rate: 0.8 }
+          ]
+        }
+      }
+    };
+    const r = normalizeWevoTariff(body);
+    assert.equal(r.ownerPeakStartMin, 17 * 60);
+    assert.equal(r.ownerPeakEndMin, 22 * 60);
+  });
+
+  it("בלי לוח שעות (סקלרים בלבד) חלון הפיק הוא null", () => {
+    const r = normalizeWevoTariff({
+      tariff: {
+        rateDetails: { status: 200, json: { premiumRate: 0.86, standardRate: 0.8 } },
+        variableRanges: { status: 500, json: null }
+      }
+    });
+    assert.equal(r.ok, true);
+    assert.equal(r.ownerPeakStartMin, null);
+    assert.equal(r.ownerPeakEndMin, null);
+  });
+});
+
 describe("נרמול תעריף Wevo — טווחים", () => {
   it("טווחי שניות־מיום (צורת variable-cost-ranges)", () => {
     const body = {

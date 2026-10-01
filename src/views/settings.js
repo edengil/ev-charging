@@ -149,7 +149,7 @@ function SettingsView({
       color: C.warnInk
     }
   }, "עלות בעלים (מה שאתה משלם)")), /*#__PURE__*/React.createElement(FG, {
-    lbl: "עלות פיק (17:00–23:00, ימי חול) ₪/קוט״ש"
+    lbl: `עלות פיק (${tariffMh(cfg.ownerPeakStartMin != null ? cfg.ownerPeakStartMin : 17 * 60)}–${tariffMh(cfg.ownerPeakEndMin != null ? cfg.ownerPeakEndMin : 23 * 60)}, ימי חול) ₪/קוט״ש`
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
     type: "number",

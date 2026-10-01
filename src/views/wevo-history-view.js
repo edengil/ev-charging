@@ -21,24 +21,16 @@ const DAY_HE = ["יום א'", "יום ב'", "יום ג'", "יום ד'", "יום 
 const MONTH_SHORT = ["ינו'", "פבר'", "מרץ", "אפר'", "מאי", "יונ'", "יול'", "אוג'", "ספט'", "אוק'", "נוב'", "דצמ'"];
 
 function ownerPremRatio(s) {
-  // Wevo "פרימיום" = חלק האנרגיה בשיא בעלים 17:00–23:00 (לא בסופ״ש)
+  // Wevo "פרימיום" = חלק האנרגיה בחלון הפיק החי של Wevo (לא בסופ״ש)
   const start = new Date(s.date);
   if (isNaN(start)) return 0;
   const durMin = Number(s.durMin) > 0 ? Number(s.durMin) : 60;
   const end = new Date(start.getTime() + durMin * 60000);
   const day = start.getDay();
   if (day === 5 || day === 6) return 0;
-  const sh = start.getHours() + start.getMinutes() / 60;
-  const eh = end.getHours() + end.getMinutes() / 60;
+  const w = ownerPeakWindow();
   const totalOwnerMin = Math.max((end - start) / 60000, 1);
-  let peakOwnerMin = 0;
-  if (sh < eh) {
-    peakOwnerMin = Math.max(0, Math.min(eh, OWNER_PE) - Math.max(sh, OWNER_PS)) * 60;
-  } else {
-    const b = Math.max(0, OWNER_PE - Math.max(sh, OWNER_PS)) * 60;
-    const a = Math.max(0, Math.min(eh, OWNER_PE) - OWNER_PS) * 60;
-    peakOwnerMin = b + a;
-  }
+  const peakOwnerMin = peakOverlapMinutes(start, end, w.startMin, w.endMin);
   return Math.max(0, Math.min(1, peakOwnerMin / totalOwnerMin));
 }
 

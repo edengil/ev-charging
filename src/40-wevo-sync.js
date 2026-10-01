@@ -93,6 +93,11 @@ async function wevoApi(action, extra = {}) {
 
 let _ownerTariffBusy = false;
 let _ownerTariffLastMs = 0;
+/** דקות־מיום → "HH:MM" (סוף חוצה חצות מוצג כשעת היעד למחרת). */
+function mhMin(min) {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
 /**
  * מושך את לוח התעריפים מ־Wevo ומעדכן אוטומטית את עלויות הבעלים בלבד
  * (פיק = התעריף הגבוה בלוח, רגילה = הנמוך).
@@ -115,9 +120,23 @@ async function refreshOwnerCostsFromWevo(force = false) {
     const cfg = getConfig();
     const peakChanged = Math.abs(Number(cfg.ownerPeak || 0) - norm.ownerPeak) > 0.001;
     const offChanged = Math.abs(Number(cfg.ownerOff || 0) - norm.ownerOff) > 0.001;
-    if (peakChanged || offChanged) {
-      persistConfig({ ownerPeak: norm.ownerPeak, ownerOff: norm.ownerOff });
-      const msg = `תעריף Wevo עודכן אוטומטית: פיק ₪${norm.ownerPeak.toFixed(2)} · רגיל ₪${norm.ownerOff.toFixed(2)}`;
+    // חלון הפיק גם הוא של Wevo — נשמר כשהלוח מחזיר טווחים תקינים
+    const winOk =
+      norm.ownerPeakStartMin != null && norm.ownerPeakEndMin != null &&
+      norm.ownerPeakEndMin > norm.ownerPeakStartMin && norm.ownerPeakEndMin <= 2880;
+    const winChanged =
+      winOk &&
+      (Number(cfg.ownerPeakStartMin) !== norm.ownerPeakStartMin ||
+        Number(cfg.ownerPeakEndMin) !== norm.ownerPeakEndMin);
+    if (peakChanged || offChanged || winChanged) {
+      const patch = { ownerPeak: norm.ownerPeak, ownerOff: norm.ownerOff };
+      if (winOk) {
+        patch.ownerPeakStartMin = norm.ownerPeakStartMin;
+        patch.ownerPeakEndMin = norm.ownerPeakEndMin;
+      }
+      persistConfig(patch);
+      const winTxt = winOk ? ` · פיק ${mhMin(norm.ownerPeakStartMin)}–${mhMin(norm.ownerPeakEndMin)}` : "";
+      const msg = `תעריף Wevo עודכן אוטומטית: פיק ₪${norm.ownerPeak.toFixed(2)} · רגיל ₪${norm.ownerOff.toFixed(2)}${winTxt}`;
       try {
         pushWevoLog("tariff", msg, true);
       } catch {}
