@@ -66,6 +66,8 @@ function WevoOpenLiveSync({
     let touched = false;
     for (const o of openRef.current || []) {
       if (!o || !o.id) continue;
+      // התזכורת רק לטעינה של החיבור הנוכחי — לא לטעינה ישנה אחרי ניתוק וחיבור מחדש
+      if (!idleOpenMatchesStation(o, st)) continue;
       const endMs = idleEndMs(o);
       if (!endMs) continue;
       if (o.plugOutAt) continue;
@@ -193,10 +195,12 @@ function WevoOpenLiveSync({
           const sealedIds = sealConflictingWevoOpens(opens, st, onUpsertOpen, clientsRef.current, alertedReadyRef.current, prev);
           if (sealedIds && sealedIds.length) {
             const sealed = new Set(sealedIds);
+            const sealPlugOutAt = st && st.plugInTime ? toLocalDT(st.plugInTime) : toLocalDT(new Date());
             openRef.current = (openRef.current || []).map(o => sealed.has(o.id) ? {
               ...o,
               readyToComplete: true,
-              wevoEnded: true
+              wevoEnded: true,
+              plugOutAt: o.plugOutAt || sealPlugOutAt
             } : o);
           }
         }

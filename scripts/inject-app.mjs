@@ -168,17 +168,21 @@ var __EV_IDLE__ = (function () {
 ${body}
   return {
     IDLE_REMINDER_INTERVAL_MS: IDLE_REMINDER_INTERVAL_MS,
+    IDLE_REPLUG_GAP_MS: IDLE_REPLUG_GAP_MS,
     idleEndMs: idleEndMs,
     shouldSendIdleReminder: shouldSendIdleReminder,
     idleReminderText: idleReminderText,
-    idleWaDraftText: idleWaDraftText
+    idleWaDraftText: idleWaDraftText,
+    idleOpenMatchesStation: idleOpenMatchesStation
   };
 })();
 var IDLE_REMINDER_INTERVAL_MS = __EV_IDLE__.IDLE_REMINDER_INTERVAL_MS;
+var IDLE_REPLUG_GAP_MS = __EV_IDLE__.IDLE_REPLUG_GAP_MS;
 var idleEndMs = __EV_IDLE__.idleEndMs;
 var shouldSendIdleReminder = __EV_IDLE__.shouldSendIdleReminder;
 var idleReminderText = __EV_IDLE__.idleReminderText;
 var idleWaDraftText = __EV_IDLE__.idleWaDraftText;
+var idleOpenMatchesStation = __EV_IDLE__.idleOpenMatchesStation;
 /* === end lib/ev-idle === */
 `;
 }

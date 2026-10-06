@@ -203,10 +203,12 @@ function WevoLivePanel({
         const sealedIds = sealConflictingWevoOpens(openRef.current, st, onUpsertOpen, clientsRef.current, alertedReadyRef.current, prev);
         if (sealedIds && sealedIds.length) {
           const sealed = new Set(sealedIds);
+          const sealPlugOutAt = st && st.plugInTime ? toLocalDT(st.plugInTime) : toLocalDT(new Date());
           openRef.current = (openRef.current || []).map(o => sealed.has(o.id) ? {
             ...o,
             readyToComplete: true,
-            wevoEnded: true
+            wevoEnded: true,
+            plugOutAt: o.plugOutAt || sealPlugOutAt
           } : o);
         }
       }
@@ -747,8 +749,8 @@ function WevoLivePanel({
   const chargingNow = isActuallyCharging(st);
   const waitingAuth = isWaitingForAuthorize(st);
   const vehicleNow = chargerReportsVehicle(st, sessions);
-  // טעינות שסיימו אבל הרכב עדיין מחובר — באנר תזכורת
-  const idleOpens = vehicleNow ? (openSess || []).filter(o => o && o.id && idleEndMs(o) && !o.plugOutAt) : [];
+  // טעינות שסיימו אבל הרכב עדיין מחובר — באנר תזכורת (רק לחיבור הנוכחי, לא לטעינה ישנה)
+  const idleOpens = vehicleNow ? (openSess || []).filter(o => o && o.id && idleEndMs(o) && !o.plugOutAt && idleOpenMatchesStation(o, st)) : [];
   const savedEcho = !vehicleNow && (sessions || []).some(s => savedSessionMatchesCharge(s, {
     wevoTxnId: st.transactionId,
     transactionId: st.transactionId,

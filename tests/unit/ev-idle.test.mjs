@@ -5,7 +5,8 @@ import {
   idleEndMs,
   shouldSendIdleReminder,
   idleReminderText,
-  idleWaDraftText
+  idleWaDraftText,
+  idleOpenMatchesStation
 } from "../../lib/ev-idle.mjs";
 
 const MIN = 60 * 1000;
@@ -69,5 +70,33 @@ describe("תזכורת idle — טקסטים", () => {
 describe("קבוע קצב", () => {
   it("30 דקות במילישניות", () => {
     assert.equal(IDLE_REMINDER_INTERVAL_MS, 1800000);
+  });
+});
+
+describe("התאמת open לחיבור הנוכחי — מניעת תזכורת שגויה אחרי ניתוק וחיבור מחדש", () => {
+  const now = Date.now();
+  const iso = ms => new Date(ms).toISOString();
+  it("אותו txn — מתאים", () => {
+    assert.equal(idleOpenMatchesStation({ wevoTxnId: "123" }, { transactionId: 123, plugInTime: iso(now) }), true);
+  });
+  it("txn שונה — לא מתאים (התזכורת לא תישלח על הטעינה הישנה)", () => {
+    assert.equal(idleOpenMatchesStation({ wevoTxnId: "111" }, { transactionId: 222, plugInTime: iso(now) }), false);
+  });
+  it("חיבור חדש בהפרש גדול בלי txn — לא מתאים", () => {
+    const open = { plugInAt: iso(now - 15 * 60 * MIN) };
+    const st = { plugInTime: iso(now) };
+    assert.equal(idleOpenMatchesStation(open, st), false);
+  });
+  it("אותו חיבור בלי txn — מתאים", () => {
+    const open = { plugInAt: iso(now - 5 * MIN) };
+    const st = { plugInTime: iso(now - 4 * MIN) };
+    assert.equal(idleOpenMatchesStation(open, st), true);
+  });
+  it("אין מידע — לא חוסם (התנהגות קודמת)", () => {
+    assert.equal(idleOpenMatchesStation({ id: "a" }, {}), true);
+  });
+  it("null — לא מתאים", () => {
+    assert.equal(idleOpenMatchesStation(null, {}), false);
+    assert.equal(idleOpenMatchesStation({ id: "a" }, null), false);
   });
 });

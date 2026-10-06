@@ -123,4 +123,48 @@ test.describe("wevo-mock", () => {
     const mock = await readWevoMock(page);
     expect(mock.authorizeCalls.some(c => c.confirmPremium === true)).toBe(true);
   });
+
+  test("חיבור מחדש אחרי ניתוק — הטעינה הישנה נאטמת עם plugOutAt ולא מקבלת תזכורת idle", async ({ page }) => {
+    // סצנריו הבאג: טעינה מאתמול בלילה שהסתיימה, הניתוק בבוקר פוספס (אין plugOutAt),
+    // ועכשיו חיבור חדש עם txn אחר. בלי התיקון — תזכורת "עדיין מחובר" שגויה על הישנה.
+    const pad = n => String(n).padStart(2, "0");
+    const localDT = ms => {
+      const d = new Date(ms);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    const now = Date.now();
+    const oldOpen = {
+      id: "o-e2e-old",
+      clientId: CLIENT_SELF.id,
+      startDate: localDT(now - 18 * 3600 * 1000),
+      plugInAt: localDT(now - 18 * 3600 * 1000),
+      chargeEndedAt: localDT(now - 15 * 3600 * 1000),
+      chargingFullTime: now - 15 * 3600 * 1000,
+      endDate: localDT(now - 15 * 3600 * 1000),
+      wevoTxnId: "111",
+      notes: "txn#111 | Wevo live",
+      source: "wevo-live",
+      liveKwh: 29
+    };
+    await resetWevoMock(page, "wait-auth");
+    await openApp(page, {
+      clients: [CLIENT_A, CLIENT_SELF],
+      open: [oldOpen],
+      extra: {
+        ev_wevo_creds: JSON.stringify(WEVO_CREDS)
+      }
+    });
+
+    // החיבור החדש (txn 999001) מאטם את הישנה — חייב להיסגר עם plugOutAt,
+    // ואז התזכורת "הרכב עדיין מחובר לעמדה" לא יכולה להישלח עליה
+    let sealed = null;
+    await expect
+      .poll(async () => {
+        const opens = JSON.parse(await page.evaluate(() => localStorage.getItem("ev_open") || "[]"));
+        sealed = opens.find(o => o.id === "o-e2e-old");
+        return sealed && sealed.plugOutAt ? sealed.plugOutAt : null;
+      }, { timeout: 25000 })
+      .toBeTruthy();
+    expect(sealed.readyToComplete).toBe(true);
+  });
 });

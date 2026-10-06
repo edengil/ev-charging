@@ -267,12 +267,17 @@ function sealConflictingWevoOpens(opens, liveState, onUpsertOpen, clients, alert
   }
   for (const old of conflicts) {
     const endedAt = old.chargeEndedAt || old.endDate || toLocalDT(new Date());
+    // חיבור חדש = הרכב הישן בטוח כבר לא מחובר — מסמנים ניתוק כדי לא לשלוח
+    // תזכורת "עדיין מחובר" שגויה על הטעינה הישנה (באג: ניתוק בבוקר + חיבור מחדש)
+    const plugOutAt = old.plugOutAt ||
+      (liveState && liveState.plugInTime ? toLocalDT(liveState.plugInTime) : toLocalDT(new Date()));
     onUpsertOpen({
       ...old,
       readyToComplete: true,
       wevoEnded: true,
       endDate: old.endDate || endedAt,
-      chargeEndedAt: old.chargeEndedAt || endedAt
+      chargeEndedAt: old.chargeEndedAt || endedAt,
+      plugOutAt
     }, {
       silent: true
     });

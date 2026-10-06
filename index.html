@@ -1628,23 +1628,54 @@ function idleReminderText(name, idleMinutes) {
   return `הרכב של ${name} סיים לטעון לפני ${idleMinutes} דקות ועדיין מחובר לעמדה`;
 }
 
+/**
+ * האם ה-open הזה הוא הטעינה של החיבור הנוכחי בעמדה?
+ * מונע תזכורת "עדיין מחובר" שגויה על טעינה ישנה אחרי ניתוק וחיבור מחדש:
+ * החיבור החדש מדווח "יש רכב", וה-open הישן (בלי plugOutAt כי פספסנו את הניתוק)
+ * היה מקבל תזכורת על זמן סיום של אתמול בלילה.
+ * @returns {boolean}
+ */
+const IDLE_REPLUG_GAP_MS = 30 * 60 * 1000;
+
+function _idleMs(v) {
+  if (v == null || v === "") return null;
+  const ms = new Date(v).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+function idleOpenMatchesStation(open, st) {
+  if (!open || !st) return false;
+  const liveTxn = st.transactionId != null && String(st.transactionId) !== "" ? String(st.transactionId) : null;
+  const openTxn = open.wevoTxnId != null && String(open.wevoTxnId) !== "" ? String(open.wevoTxnId) : null;
+  if (liveTxn || openTxn) return !!liveTxn && !!openTxn && liveTxn === openTxn;
+  // בלי txn — משווים זמני חיבור: חיבור חדש בהפרש גדול מזמן החיבור של ה-open = לא אותה טעינה
+  const livePlug = _idleMs(st.plugInTime);
+  const openPlug = _idleMs(open.plugInAt || open.startDate);
+  if (livePlug && openPlug) return livePlug - openPlug <= IDLE_REPLUG_GAP_MS;
+  return true; // אין מספיק מידע — לא חוסמים (שומר על ההתנהגות הקודמת)
+}
+
 function idleWaDraftText(name, idleMinutes) {
   return `היי ${name}, הרכב סיים לטעון לפני כ-${idleMinutes} דקות ועדיין מחובר לעמדה. תוכל בבקשה לנתק כדי לפנות אותה? תודה!`;
 }
 
   return {
     IDLE_REMINDER_INTERVAL_MS: IDLE_REMINDER_INTERVAL_MS,
+    IDLE_REPLUG_GAP_MS: IDLE_REPLUG_GAP_MS,
     idleEndMs: idleEndMs,
     shouldSendIdleReminder: shouldSendIdleReminder,
     idleReminderText: idleReminderText,
-    idleWaDraftText: idleWaDraftText
+    idleWaDraftText: idleWaDraftText,
+    idleOpenMatchesStation: idleOpenMatchesStation
   };
 })();
 var IDLE_REMINDER_INTERVAL_MS = __EV_IDLE__.IDLE_REMINDER_INTERVAL_MS;
+var IDLE_REPLUG_GAP_MS = __EV_IDLE__.IDLE_REPLUG_GAP_MS;
 var idleEndMs = __EV_IDLE__.idleEndMs;
 var shouldSendIdleReminder = __EV_IDLE__.shouldSendIdleReminder;
 var idleReminderText = __EV_IDLE__.idleReminderText;
 var idleWaDraftText = __EV_IDLE__.idleWaDraftText;
+var idleOpenMatchesStation = __EV_IDLE__.idleOpenMatchesStation;
 /* === end lib/ev-idle === */
 
 /* === lib/ev-tariff (injected) === */
@@ -3285,33 +3316,6 @@ function setWevoAuthIntent(v) {
   } catch {}
 }
 
-/** חימוש אישור מראש מלקוח בדשבורד (מחוץ לפאנל Wevo). */
-function armWevoClientPreauth(clientId, opts = {}) {
-  if (!clientId) return null;
-  const next = normalizeWevoAuthIntent({
-    clientId,
-    mode: "first-auth",
-    armedAt: Date.now(),
-    queued: false,
-    lastAttemptAt: null,
-    lastError: null,
-    attempts: 0
-  });
-  setWevoAuthIntent(next);
-  if (!opts.silent) {
-    appAlert("אישור מראש פעיל — כשיתחבר רכב נאשר חיבור ונשייך ללקוח", "ok", 5200);
-  }
-  return next;
-}
-function clearWevoClientPreauth(reason) {
-  setWevoAuthIntent(null);
-  if (reason) {
-    try {
-      pushWevoLog("preauth", reason, true);
-    } catch {}
-  }
-}
-
 async function wevoApi(action, extra = {}) {
   const creds = getWevoCreds();
   if (!creds.email || !creds.password) {
@@ -3538,12 +3542,17 @@ function sealConflictingWevoOpens(opens, liveState, onUpsertOpen, clients, alert
   }
   for (const old of conflicts) {
     const endedAt = old.chargeEndedAt || old.endDate || toLocalDT(new Date());
+    // חיבור חדש = הרכב הישן בטוח כבר לא מחובר — מסמנים ניתוק כדי לא לשלוח
+    // תזכורת "עדיין מחובר" שגויה על הטעינה הישנה (באג: ניתוק בבוקר + חיבור מחדש)
+    const plugOutAt = old.plugOutAt ||
+      (liveState && liveState.plugInTime ? toLocalDT(liveState.plugInTime) : toLocalDT(new Date()));
     onUpsertOpen({
       ...old,
       readyToComplete: true,
       wevoEnded: true,
       endDate: old.endDate || endedAt,
-      chargeEndedAt: old.chargeEndedAt || endedAt
+      chargeEndedAt: old.chargeEndedAt || endedAt,
+      plugOutAt
     }, {
       silent: true
     });
@@ -6448,7 +6457,6 @@ function Dashboard({
 }) {
   const [sortBy, setSortBy] = useState("debt");
   const [liveStation, setLiveStation] = useState(() => readLiveStation());
-  const [preAuthIntent, setPreAuthIntent] = useState(() => getWevoAuthIntent());
   useEffect(() => {
     const sync = () => setLiveStation(readLiveStation());
     window.addEventListener("ev-live-station", sync);
@@ -6799,45 +6807,7 @@ function Dashboard({
     style: S.mLbl
   }, "טעינה אחרונה"), /*#__PURE__*/React.createElement("span", {
     style: S.mVal
-  }, c.last ? fdateDay(c.last.date) : "—"))), !c.isSelf && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    "data-testid": `client-preauth-${c.id}`,
-    onClick: e => {
-      e.stopPropagation();
-      e.preventDefault();
-      const armed = preAuthIntent && preAuthIntent.clientId === c.id;
-      if (armed) {
-        clearWevoClientPreauth("בוטל מדשבורד");
-        setPreAuthIntent(null);
-      } else {
-        const next = armWevoClientPreauth(c.id);
-        setPreAuthIntent(next);
-      }
-    },
-    style: {
-      width: "100%",
-      marginTop: 8,
-      padding: "9px 10px",
-      borderRadius: 10,
-      border: "1.5px solid",
-      borderColor: preAuthIntent && preAuthIntent.clientId === c.id ? C.ok : "#bae6fd",
-      background: preAuthIntent && preAuthIntent.clientId === c.id ? C.okSoft : C.primarySoft,
-      color: preAuthIntent && preAuthIntent.clientId === c.id ? C.okInk : C.primaryInk,
-      fontWeight: 700,
-      fontSize: 12,
-      cursor: "pointer",
-      minHeight: 44,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 6,
-      fontFamily: "inherit"
-    }
-  }, preAuthIntent && preAuthIntent.clientId === c.id ? [/*#__PURE__*/React.createElement("span", {
-    key: "dot",
-    className: "ev-live-dot",
-    style: { width: 8, height: 8, borderRadius: "50%", background: C.ok, display: "inline-block" }
-  }), "ממתין לחיבור · בטל אישור מראש"] : [/*#__PURE__*/React.createElement(Icon, { key: "ic", n: "clock", s: 15 }), "אישור מראש · כשיתחבר"]))), archivedCount > 0 && /*#__PURE__*/React.createElement("button", {
+  }, c.last ? fdateDay(c.last.date) : "—"))))), archivedCount > 0 && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => go("archive"),
     style: {
@@ -7690,6 +7660,8 @@ function WevoOpenLiveSync({
     let touched = false;
     for (const o of openRef.current || []) {
       if (!o || !o.id) continue;
+      // התזכורת רק לטעינה של החיבור הנוכחי — לא לטעינה ישנה אחרי ניתוק וחיבור מחדש
+      if (!idleOpenMatchesStation(o, st)) continue;
       const endMs = idleEndMs(o);
       if (!endMs) continue;
       if (o.plugOutAt) continue;
@@ -7817,10 +7789,12 @@ function WevoOpenLiveSync({
           const sealedIds = sealConflictingWevoOpens(opens, st, onUpsertOpen, clientsRef.current, alertedReadyRef.current, prev);
           if (sealedIds && sealedIds.length) {
             const sealed = new Set(sealedIds);
+            const sealPlugOutAt = st && st.plugInTime ? toLocalDT(st.plugInTime) : toLocalDT(new Date());
             openRef.current = (openRef.current || []).map(o => sealed.has(o.id) ? {
               ...o,
               readyToComplete: true,
-              wevoEnded: true
+              wevoEnded: true,
+              plugOutAt: o.plugOutAt || sealPlugOutAt
             } : o);
           }
         }
@@ -8148,10 +8122,12 @@ function WevoLivePanel({
         const sealedIds = sealConflictingWevoOpens(openRef.current, st, onUpsertOpen, clientsRef.current, alertedReadyRef.current, prev);
         if (sealedIds && sealedIds.length) {
           const sealed = new Set(sealedIds);
+          const sealPlugOutAt = st && st.plugInTime ? toLocalDT(st.plugInTime) : toLocalDT(new Date());
           openRef.current = (openRef.current || []).map(o => sealed.has(o.id) ? {
             ...o,
             readyToComplete: true,
-            wevoEnded: true
+            wevoEnded: true,
+            plugOutAt: o.plugOutAt || sealPlugOutAt
           } : o);
         }
       }
@@ -8692,8 +8668,8 @@ function WevoLivePanel({
   const chargingNow = isActuallyCharging(st);
   const waitingAuth = isWaitingForAuthorize(st);
   const vehicleNow = chargerReportsVehicle(st, sessions);
-  // טעינות שסיימו אבל הרכב עדיין מחובר — באנר תזכורת
-  const idleOpens = vehicleNow ? (openSess || []).filter(o => o && o.id && idleEndMs(o) && !o.plugOutAt) : [];
+  // טעינות שסיימו אבל הרכב עדיין מחובר — באנר תזכורת (רק לחיבור הנוכחי, לא לטעינה ישנה)
+  const idleOpens = vehicleNow ? (openSess || []).filter(o => o && o.id && idleEndMs(o) && !o.plugOutAt && idleOpenMatchesStation(o, st)) : [];
   const savedEcho = !vehicleNow && (sessions || []).some(s => savedSessionMatchesCharge(s, {
     wevoTxnId: st.transactionId,
     transactionId: st.transactionId,
