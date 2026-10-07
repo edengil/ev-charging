@@ -44,6 +44,9 @@ ${body}
     isWevoAuthIntentMode: isWevoAuthIntentMode,
     normalizeWevoAuthIntent: normalizeWevoAuthIntent,
     authRetryDelayMs: authRetryDelayMs,
+    AUTH_MAX_ATTEMPTS: AUTH_MAX_ATTEMPTS,
+    isScheduleBlocked: isScheduleBlocked,
+    offPeakWindowLabel: offPeakWindowLabel,
     wevoOpenTxnId: wevoOpenTxnId,
     isActiveWevoOpen: isActiveWevoOpen,
     findMatchingWevoOpen: findMatchingWevoOpen,
@@ -113,6 +116,9 @@ var isOffPeakPreauthQueuedOk = __EV_MONEY__.isOffPeakPreauthQueuedOk;
 var isWevoAuthIntentMode = __EV_MONEY__.isWevoAuthIntentMode;
 var normalizeWevoAuthIntent = __EV_MONEY__.normalizeWevoAuthIntent;
 var authRetryDelayMs = __EV_MONEY__.authRetryDelayMs;
+var AUTH_MAX_ATTEMPTS = __EV_MONEY__.AUTH_MAX_ATTEMPTS;
+var isScheduleBlocked = __EV_MONEY__.isScheduleBlocked;
+var offPeakWindowLabel = __EV_MONEY__.offPeakWindowLabel;
 var wevoOpenTxnId = __EV_MONEY__.wevoOpenTxnId;
 var isActiveWevoOpen = __EV_MONEY__.isActiveWevoOpen;
 var findMatchingWevoOpen = __EV_MONEY__.findMatchingWevoOpen;

@@ -716,6 +716,37 @@ function authRetryDelayMs(attempt) {
   return 30000;
 }
 
+/** מספר ניסיונות מקסימלי לאישור אוטומטי — אחריו עוצרים עם הודעת כשל מפורשת. */
+const AUTH_MAX_ATTEMPTS = 20;
+
+/**
+ * האם המטען חסום ע"י תזמון Wevo (delayCharge מחוץ לחלון הזול)?
+ * במצב כזה פקודת authorize לא מתחילה טעינה — צריך עקיפת פרימיום.
+ */
+function isScheduleBlocked(st, nowMs) {
+  if (!st || !st.delayCharge) return false;
+  if (st.inWindow === true) return false;
+  if (st.inWindow === false) return true;
+  // אין inWindow — מחשבים מחלון ה-off-peak (שניות מחצות, עשוי לחצות חצות)
+  const s = st.offPeakStartTime != null ? Number(st.offPeakStartTime) : null;
+  const e = st.offPeakEndTime != null ? Number(st.offPeakEndTime) : null;
+  if (s == null || e == null || Number.isNaN(s) || Number.isNaN(e)) return false;
+  const d = new Date(nowMs || Date.now());
+  const secNow = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+  const inWin = s <= e ? secNow >= s && secNow < e : secNow >= s || secNow < e;
+  return !inWin;
+}
+
+/** תווית שעת התחלת החלון הזול, או null */
+function offPeakWindowLabel(st) {
+  if (!st || st.offPeakStartTime == null) return null;
+  const s = Number(st.offPeakStartTime);
+  if (Number.isNaN(s)) return null;
+  const hh = String(Math.floor(s / 3600) % 24).padStart(2, "0");
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 /**
  * אחרי אישור בודד בשיא — מצב ממתין/השהיה הוא הצלחה (תור לזול), לא כישלון.
  */
@@ -1480,6 +1511,9 @@ function waDebtPing(balance, lastAmount) {
     isWevoAuthIntentMode: isWevoAuthIntentMode,
     normalizeWevoAuthIntent: normalizeWevoAuthIntent,
     authRetryDelayMs: authRetryDelayMs,
+    AUTH_MAX_ATTEMPTS: AUTH_MAX_ATTEMPTS,
+    isScheduleBlocked: isScheduleBlocked,
+    offPeakWindowLabel: offPeakWindowLabel,
     wevoOpenTxnId: wevoOpenTxnId,
     isActiveWevoOpen: isActiveWevoOpen,
     findMatchingWevoOpen: findMatchingWevoOpen,
@@ -1549,6 +1583,9 @@ var isOffPeakPreauthQueuedOk = __EV_MONEY__.isOffPeakPreauthQueuedOk;
 var isWevoAuthIntentMode = __EV_MONEY__.isWevoAuthIntentMode;
 var normalizeWevoAuthIntent = __EV_MONEY__.normalizeWevoAuthIntent;
 var authRetryDelayMs = __EV_MONEY__.authRetryDelayMs;
+var AUTH_MAX_ATTEMPTS = __EV_MONEY__.AUTH_MAX_ATTEMPTS;
+var isScheduleBlocked = __EV_MONEY__.isScheduleBlocked;
+var offPeakWindowLabel = __EV_MONEY__.offPeakWindowLabel;
 var wevoOpenTxnId = __EV_MONEY__.wevoOpenTxnId;
 var isActiveWevoOpen = __EV_MONEY__.isActiveWevoOpen;
 var findMatchingWevoOpen = __EV_MONEY__.findMatchingWevoOpen;
@@ -7970,6 +8007,8 @@ function WevoLivePanel({
   const alertedReadyRef = useRef(new Set());
   const lastPhaseRef = useRef("");
   const lastFailAlertAtRef = useRef(0);
+  const forceAttemptRef = useRef(false);
+  const selfIntentEventRef = useRef(false);
   const wakeLockRef = useRef(null);
 
   const linkedOpen = openForLiveStation(openSess, state, sessions);
@@ -7984,7 +8023,13 @@ function WevoLivePanel({
 
   const persistIntent = (next) => {
     const norm = normalizeWevoAuthIntent(next);
-    setWevoAuthIntent(norm);
+    // setWevoAuthIntent משגר אירוע סנכרון — מדכאים את האקו העצמי כדי שהפאנל לא יבעט בעצמו
+    selfIntentEventRef.current = true;
+    try {
+      setWevoAuthIntent(norm);
+    } finally {
+      selfIntentEventRef.current = false;
+    }
     setAuthIntentUi(norm);
     authIntentRef.current = norm;
     if (norm) {
@@ -8292,8 +8337,11 @@ function WevoLivePanel({
     const noPremium = !authorizeShouldConfirmPremium(mode);
     const confirmPremium = !noPremium;
     try {
+      // boost: ניסיון עקיפת תזמון — מקביל ל"התחל טעינת פרימיום כעת" באפליקציית Wevo.
+      // אם Wevo מתעלמת מהשדה, אין שינוי בהתנהגות.
       const data = await wevoApi("authorize", {
-        confirmPremium
+        confirmPremium,
+        boost: confirmPremium
       });
       const st = data.state || null;
       if (st) setState(st);
@@ -8444,6 +8492,14 @@ function WevoLivePanel({
       const intent = authIntentRef.current;
       if (!intent || !isWevoAuthIntentMode(intent.mode)) return;
 
+      // פרימיום הופעל באפליקציית Wevo (עקיפת תזמון ידנית) — האישור האוטומטי מיותר
+      if (st && st.isBoost && chargerReportsVehicle(st, sessions)) {
+        clearAuthIntent("פרימיום הופעל ב-Wevo");
+        pushWevoLog("preauth", "זוהה פרימיום ב-Wevo — ניסיונות אוטומטיים הופסקו", true);
+        appAlert("זוהה חיוב פרימיום ב-Wevo — מפסיק ניסיונות, עוקב אחרי הטעינה", "ok", 5000);
+        return;
+      }
+
       if (!st || !isWaitingForAuthorize(st)) {
         if (st && isActuallyCharging(st)) clearAuthIntent("טעינה התחילה");
         schedule(authRetryDelayMs(Math.max(1, autoAttemptsRef.current || 1)));
@@ -8456,6 +8512,16 @@ function WevoLivePanel({
         schedule(12000);
         return;
       }
+
+      // המטען בתזמון Wevo מחוץ לחלון הזול — authorize לא יתחיל טעינה.
+      // לא מנסים עיוורת כל 4 שניות; מחכים להחלטת המשתמש (באנר) או לחלון.
+      // ניסיון ידני ("נסה עקיפה") כן מבצע ניסיון אחד עם דגל boost.
+      if (intent.mode === "full-now" && isScheduleBlocked(st) && !forceAttemptRef.current) {
+        setErr("");
+        schedule(15000);
+        return;
+      }
+      forceAttemptRef.current = false;
 
       autoAttemptsRef.current += 1;
       const attempt = autoAttemptsRef.current;
@@ -8487,6 +8553,17 @@ function WevoLivePanel({
       }
       if (!ok) {
         const now = Date.now();
+        if (attempt >= AUTH_MAX_ATTEMPTS) {
+          const blocked = isScheduleBlocked(stateRef.current);
+          const winLabel = offPeakWindowLabel(stateRef.current);
+          clearAuthIntent("אישור אוטומטי הופסק אחרי ניסיונות רבים");
+          setErr(blocked
+            ? `המטען בתזמון Wevo ולא מגיב לאישור${winLabel ? ` — יתחיל ב־${winLabel}` : ""}. להפעלה מיידית: פרימיום באפליקציית Wevo`
+            : "האישור ב-Wevo נכשל שוב ושוב — בדוק את אפליקציית Wevo");
+          pushWevoLog("preauth", `אישור אוטומטי הופסק אחרי ${attempt} ניסיונות`, false);
+          appAlert("האישור האוטומטי הופסק — ראה הודעה בפאנל", "warn", 6000);
+          return;
+        }
         if (attempt >= 5 && now - lastFailAlertAtRef.current > 60000) {
           lastFailAlertAtRef.current = now;
           appAlert("עדיין מנסה לאשר ב-Wevo — לא ויתרתי", "info", 4500);
@@ -8498,6 +8575,7 @@ function WevoLivePanel({
 
     tryAuthKickRef.current = () => {
       autoAttemptsRef.current = Math.max(0, autoAttemptsRef.current - 1);
+      forceAttemptRef.current = true;
       schedule(120);
     };
 
@@ -8585,6 +8663,7 @@ function WevoLivePanel({
   // סנכרון כוונה מחוץ לפאנל (כפתור בדשבורד)
   useEffect(() => {
     const onIntent = ev => {
+      if (selfIntentEventRef.current) return; // אקו של persistIntent עצמי — לא בועטים
       const next = ev && ev.detail !== undefined ? normalizeWevoAuthIntent(ev.detail) : getWevoAuthIntent();
       setAuthIntentUi(next);
       authIntentRef.current = next;
@@ -8668,6 +8747,9 @@ function WevoLivePanel({
   const chargingNow = isActuallyCharging(st);
   const waitingAuth = isWaitingForAuthorize(st);
   const vehicleNow = chargerReportsVehicle(st, sessions);
+  // מטען חסום ע"י תזמון Wevo מחוץ לחלון הזול — authorize לא יתחיל טעינה
+  const scheduleBlocked = isScheduleBlocked(st);
+  const scheduleBlockedFullIntent = !!(isFullIntent && scheduleBlocked && !st.isBoost);
   // טעינות שסיימו אבל הרכב עדיין מחובר — באנר תזכורת (רק לחיבור הנוכחי, לא לטעינה ישנה)
   const idleOpens = vehicleNow ? (openSess || []).filter(o => o && o.id && idleEndMs(o) && !o.plugOutAt && idleOpenMatchesStation(o, st)) : [];
   const savedEcho = !vehicleNow && (sessions || []).some(s => savedSessionMatchesCharge(s, {
@@ -8996,7 +9078,32 @@ function WevoLivePanel({
       marginTop: 8,
       lineHeight: 1.4
     }
-  }, isOffPeakIntent ? "אישור מראש פעיל — ממשיך לנסות בלי תעריף יקר; הטעינה תתחיל כשהזול נכנס." : isFullIntent ? "מאשר עכשיו כולל תעריף יקר — ממשיך לנסות עד שהטעינה רצה." : isFirstAuthIntent ? "מאשר חיבור אוטומטית (אישור ראשון, בלי יקר). לאישור מראש (עם אופציה לתעריף יקר) — הכפתור למטה." : isSelfSelected ? "עדן — אשר טעינה רק כשיש רכב בעמדה." : cid && !isSelfSelected ? (vehicleNow ? "רכב בעמדה — אישור ראשון אוטומטי. לאישור מראש (עם אופציה לתעריף יקר) — הכפתור למטה." : "הלקוח נבחר. אישור ראשון יקרה רק כשיהיה רכב בעמדה.") : "בחר לקוח. רכב בעמדה יופיע למעלה לפני אישור.")), !isSelfSelected && cid && /*#__PURE__*/React.createElement("div", {
+  }, isOffPeakIntent ? "אישור מראש פעיל — ממשיך לנסות בלי תעריף יקר; הטעינה תתחיל כשהזול נכנס." : isFullIntent ? "מאשר עכשיו כולל תעריף יקר — ממשיך לנסות עד שהטעינה רצה." : isFirstAuthIntent ? "מאשר חיבור אוטומטית (אישור ראשון, בלי יקר). לאישור מראש (עם אופציה לתעריף יקר) — הכפתור למטה." : isSelfSelected ? "עדן — אשר טעינה רק כשיש רכב בעמדה." : cid && !isSelfSelected ? (vehicleNow ? "רכב בעמדה — אישור ראשון אוטומטי. לאישור מראש (עם אופציה לתעריף יקר) — הכפתור למטה." : "הלקוח נבחר. אישור ראשון יקרה רק כשיהיה רכב בעמדה.") : "בחר לקוח. רכב בעמדה יופיע למעלה לפני אישור.")),
+  scheduleBlockedFullIntent && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#fffbeb",
+      border: "1.5px solid #f59e0b",
+      borderRadius: 12,
+      padding: "10px 12px",
+      marginBottom: 10,
+      fontSize: 13,
+      color: "#92400e",
+      lineHeight: 1.6
+    },
+    "data-testid": "wevo-schedule-blocked"
+  }, "⏸ המטען בתזמון Wevo — הטעינה תתחיל ב־", offPeakWindowLabel(st) || "חלון הזול", ". פקודת האישור לא עוקפת תזמון, לכן הניסיונות האוטומטיים מושהים. ", /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...S.btnS,
+      padding: "6px 10px",
+      marginInlineStart: 6
+    },
+    onClick: () => {
+      if (tryAuthKickRef.current) tryAuthKickRef.current();
+    },
+    "data-testid": "wevo-boost-try"
+  }, "נסה עקיפת פרימיום"), " — או הפעל “התחל טעינת פרימיום כעת” באפליקציית Wevo."),
+  !isSelfSelected && cid && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,

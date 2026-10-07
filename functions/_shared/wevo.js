@@ -172,13 +172,15 @@ export function wsCommand(token, payload, { matchCharger, timeoutMs = 10000 } = 
   });
 }
 
-export function wsAuthorizePremium(token, charger, connector, { rounds = 3, gapMs = 1800, timeoutMs = 28000 } = {}) {
+export function wsAuthorizePremium(token, charger, connector, { rounds = 3, gapMs = 1800, timeoutMs = 28000, boost = false } = {}) {
   return new Promise(async (resolve, reject) => {
     let settled = false;
     let lastMsg = null;
     let lastState = null;
     let ws;
-    const payload = { command: "authorize", chargerIdentifier: charger, connector };
+    // boost: ניסיון עקיפת תזמון מטען — מקביל ל"התחל טעינת פרימיום כעת" באפליקציית Wevo.
+    // שדה לא מוכר מתעלם ע"י Wevo, כך שאין סיכון בהוספה.
+    const payload = { command: "authorize", chargerIdentifier: charger, connector, ...(boost ? { boost: true } : {}) };
     const done = (fn, val) => {
       if (settled) return;
       settled = true;
@@ -519,6 +521,7 @@ export async function handleWevoRequest(body) {
 
   if (action === "authorize") {
     const confirmPremium = body.confirmPremium !== false;
+    const boost = body.boost === true;
     const readState = async () => {
       const [rawState, list] = await Promise.all([
         wsCommand(token, { command: "getState", chargerIdentifier: charger, connector }, { matchCharger: charger }),
@@ -533,7 +536,8 @@ export async function handleWevoRequest(body) {
       result = await wsAuthorizePremium(token, charger, connector, {
         rounds: 3,
         gapMs: 1400,
-        timeoutMs: 12000
+        timeoutMs: 12000,
+        boost
       });
     } else {
       result = await wsCommand(
@@ -564,7 +568,8 @@ export async function handleWevoRequest(body) {
           result = await wsAuthorizePremium(token, charger, connector, {
             rounds: 2,
             gapMs: 1200,
-            timeoutMs: 8000
+            timeoutMs: 8000,
+            boost
           });
           state = await readState();
         } catch {}
@@ -579,6 +584,7 @@ export async function handleWevoRequest(body) {
       authorize: result,
       state,
       premiumConfirmed: confirmPremium,
+      boostRequested: boost,
       waitingAuthorize: !!(state && state.waitingAuthorize)
     };
   }

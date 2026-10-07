@@ -1,4 +1,8 @@
 /**
+ * ⚠️ DEPRECATED — לא בשימוש בפרודקשן.
+ * הפרוקסי החי הוא functions/_shared/wevo.js (Cloudflare Pages Functions).
+ * הקובץ הזה נשמר למקרה של פריסת Netlify בלבד — לא לעדכן כאן לוגיקה.
+ *
  * Netlify Function — Wevo bridge
  * Body:
  *   { email, password, action: "sync" | "state" | "authorize",

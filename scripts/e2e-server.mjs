@@ -34,7 +34,7 @@ let cloudStore = {
   updatedAt: null
 };
 
-/** wevo mock: charging | wait-auth */
+/** wevo mock: charging | wait-auth | scheduled */
 let wevoMock = {
   scenario: "charging",
   lastAuthorize: null,
@@ -125,15 +125,33 @@ function mockWevoWaitAuthState() {
     totalEnergyKwh: 0,
     totalCost: 0,
     electricityCost: 0,
+    delayCharge: false,
+    inWindow: true,
+    offPeakStartTime: null,
+    offPeakEndTime: null,
+    ongoing: null
+  };
+}
+
+/** מטען מתוזמן מחוץ לחלון הזול — authorize לא יתחיל טעינה */
+function mockWevoScheduledState() {
+  return {
+    ...mockWevoWaitAuthState(),
+    state: "Preparing",
     delayCharge: true,
     inWindow: false,
-    ongoing: null
+    offPeakStartTime: 79200,
+    offPeakEndTime: 0
   };
 }
 
 function mockWevoState() {
   const state =
-    wevoMock.scenario === "wait-auth" ? mockWevoWaitAuthState() : mockWevoChargingState();
+    wevoMock.scenario === "wait-auth"
+      ? mockWevoWaitAuthState()
+      : wevoMock.scenario === "scheduled"
+        ? mockWevoScheduledState()
+        : mockWevoChargingState();
   return {
     ok: true,
     state,
@@ -149,18 +167,35 @@ function handleMockWevo(body) {
     const call = {
       confirmPremium,
       rawConfirmPremium: body.confirmPremium,
+      boost: body.boost === true,
       at: Date.now()
     };
     wevoMock.lastAuthorize = call;
     wevoMock.authorizeCalls.push(call);
     if (!confirmPremium) {
-      // אישור מראש לזול — נשארים בממתין / תור, בלי מעבר לטעינה בשיא
-      wevoMock.scenario = "wait-auth";
+      // אישור מראש לזול — נשארים בממתין / תור, בלי מעבר לטעינה בשיא.
+      // בתרחיש scheduled נשארים מתוזמנים (לא חוזרים ל-wait-auth רגיל).
+      if (wevoMock.scenario !== "scheduled") {
+        wevoMock.scenario = "wait-auth";
+      }
       const state = mockWevoWaitAuthState();
       return {
         ok: true,
         authorized: true,
         premiumConfirmed: false,
+        waitingAuthorize: true,
+        state
+      };
+    }
+    if (wevoMock.scenario === "scheduled") {
+      // תזמון חוסם — גם אישור עם פרימיום לא מתחיל טעינה (משקף את הבאג האמיתי).
+      // מחזירים מצב מתוזמן כדי שהפאנל יראה באנר וישתהה.
+      const state = mockWevoScheduledState();
+      return {
+        ok: true,
+        authorized: true,
+        premiumConfirmed: true,
+        boostRequested: body.boost === true,
         waitingAuthorize: true,
         state
       };
@@ -290,7 +325,7 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/__e2e/wevo-mock") {
     if (req.method === "POST") {
       const body = await readBody(req);
-      if (body.scenario === "charging" || body.scenario === "wait-auth") {
+      if (body.scenario === "charging" || body.scenario === "wait-auth" || body.scenario === "scheduled") {
         wevoMock.scenario = body.scenario;
       }
       if (body.resetAuthorize) {

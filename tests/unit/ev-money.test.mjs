@@ -29,6 +29,9 @@ import {
   isWevoAuthIntentMode,
   normalizeWevoAuthIntent,
   authRetryDelayMs,
+  AUTH_MAX_ATTEMPTS,
+  isScheduleBlocked,
+  offPeakWindowLabel,
   findMatchingWevoOpen,
   listConflictingWevoOpens,
   wevoOpenTxnId,
@@ -354,6 +357,61 @@ describe("Wevo אישור מראש לזול", () => {
     assert.equal(authRetryDelayMs(11), 15000);
     assert.equal(authRetryDelayMs(31), 30000);
     assert.equal(authRetryDelayMs(100), 30000);
+  });
+
+  it("AUTH_MAX_ATTEMPTS הוא מספר סביר (עוצר לולאה אינסופית)", () => {
+    assert.ok(Number.isInteger(AUTH_MAX_ATTEMPTS));
+    assert.ok(AUTH_MAX_ATTEMPTS >= 10 && AUTH_MAX_ATTEMPTS <= 50);
+  });
+
+  it("isScheduleBlocked: delayCharge מחוץ לחלון (inWindow=false) → חסום", () => {
+    assert.equal(
+      isScheduleBlocked({ delayCharge: true, inWindow: false, state: "Preparing" }),
+      true
+    );
+  });
+
+  it("isScheduleBlocked: delayCharge בתוך חלון (inWindow=true) → לא חסום", () => {
+    assert.equal(
+      isScheduleBlocked({ delayCharge: true, inWindow: true, state: "Preparing" }),
+      false
+    );
+  });
+
+  it("isScheduleBlocked: בלי delayCharge → לא חסום", () => {
+    assert.equal(isScheduleBlocked({ delayCharge: false, inWindow: false }), false);
+    assert.equal(isScheduleBlocked({ inWindow: false }), false);
+    assert.equal(isScheduleBlocked(null), false);
+  });
+
+  it("isScheduleBlocked: בלי inWindow — מחשב מחלון off-peak (כולל חציית חצות)", () => {
+    // חלון 22:00–00:00; השעה 19:30 → מחוץ לחלון → חסום
+    const evening = new Date(2026, 9, 7, 19, 30, 0).getTime();
+    assert.equal(
+      isScheduleBlocked({ delayCharge: true, offPeakStartTime: 79200, offPeakEndTime: 0 }, evening),
+      true
+    );
+    // השעה 23:15 → בתוך החלון → לא חסום
+    const night = new Date(2026, 9, 7, 23, 15, 0).getTime();
+    assert.equal(
+      isScheduleBlocked({ delayCharge: true, offPeakStartTime: 79200, offPeakEndTime: 0 }, night),
+      false
+    );
+    // חלון רגיל 23:00–06:00; 02:00 → בתוך החלון
+    const wee = new Date(2026, 9, 8, 2, 0, 0).getTime();
+    assert.equal(
+      isScheduleBlocked({ delayCharge: true, offPeakStartTime: 82800, offPeakEndTime: 21600 }, wee),
+      false
+    );
+    // בלי נתוני חלון → לא חסום (לא מנחשים)
+    assert.equal(isScheduleBlocked({ delayCharge: true }, evening), false);
+  });
+
+  it("offPeakWindowLabel: מחזיר HH:MM או null", () => {
+    assert.equal(offPeakWindowLabel({ offPeakStartTime: 79200 }), "22:00");
+    assert.equal(offPeakWindowLabel({ offPeakStartTime: 82800 }), "23:00");
+    assert.equal(offPeakWindowLabel({}), null);
+    assert.equal(offPeakWindowLabel(null), null);
   });
 
   it("בתור לזול — waitingAuthorize/delayCharge בשיא נחשב הצלחה", () => {
