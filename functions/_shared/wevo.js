@@ -172,11 +172,19 @@ export function wsCommand(token, payload, { matchCharger, timeoutMs = 10000 } = 
   });
 }
 
-export function wsAuthorizePremium(token, charger, connector, { rounds = 3, gapMs = 1800, timeoutMs = 28000, boost = false } = {}) {
+/**
+ * אישור דו־שלבי כמו באפליקציית Wevo:
+ * שלב 1 — "אישור טעינה" (לחיצה ראשונה).
+ * שלב 2 — "אישור טעינת פרימיום" (לחיצה שנייה) — Wevo מציגה את האופציה הזו רק
+ * אחרי שהראשונה עובדה, ורק בשעות הפרימיום. לכן לא יורים את כל הלחיצות ברצף —
+ * מחכים בין השלבים ובודקים מצב. אותו WS נשאר פתוח בין השלבים.
+ */
+export function wsAuthorizePremium(token, charger, connector, { gapMs = 4000, timeoutMs = 22000, boost = false } = {}) {
   return new Promise(async (resolve, reject) => {
     let settled = false;
     let lastMsg = null;
     let lastState = null;
+    let charged = false;
     let ws;
     // boost: ניסיון עקיפת תזמון מטען — מקביל ל"התחל טעינת פרימיום כעת" באפליקציית Wevo.
     // שדה לא מוכר מתעלם ע"י Wevo, כך שאין סיכון בהוספה.
@@ -190,7 +198,7 @@ export function wsAuthorizePremium(token, charger, connector, { rounds = 3, gapM
       } catch {}
       fn(val);
     };
-    const timer = setTimeout(() => done(resolve, { lastMsg, lastState, timedOut: true }), timeoutMs);
+    const timer = setTimeout(() => done(resolve, { lastMsg, lastState, timedOut: true, charged }), timeoutMs);
     const sendAuthorize = () => {
       try {
         ws && ws.send(JSON.stringify(payload));
@@ -204,6 +212,10 @@ export function wsAuthorizePremium(token, charger, connector, { rounds = 3, gapM
           );
       } catch {}
     };
+    const isChargingState = data => {
+      const st = String((data && (data.state || data.rawStatus)) || "");
+      return st === "Charging" || st === "SuspendedEV" || st === "SuspendedEVSE";
+    };
     try {
       ws = await openWevoSocket(token);
       ws.addEventListener("message", event => {
@@ -216,18 +228,25 @@ export function wsAuthorizePremium(token, charger, connector, { rounds = 3, gapM
         if (data.chargerIdentifier && String(data.chargerIdentifier) !== String(charger)) return;
         lastMsg = data;
         if (data.state || data.rawStatus || data.transactionData) lastState = data;
-        const st = String(data.state || data.rawStatus || "");
-        if (st === "Charging" || st === "SuspendedEV" || st === "SuspendedEVSE") {
+        if (isChargingState(data)) {
+          charged = true;
           done(resolve, { lastMsg, lastState, charged: true });
         }
       });
       ws.addEventListener("error", () => done(reject, new Error("WebSocket error")));
+      // שלב 1: "אישור טעינה"
       sendAuthorize();
-      for (let i = 1; i < rounds; i++) {
-        setTimeout(sendAuthorize, gapMs * i);
-      }
-      setTimeout(sendGetState, gapMs * rounds + 400);
-      setTimeout(sendGetState, gapMs * rounds + 2000);
+      setTimeout(sendGetState, 2500);
+      // שלב 2: "אישור פרימיום" — רק אם עדיין לא נטען (נותנים ל-Wevo זמן לעבד את הראשון)
+      setTimeout(() => {
+        if (!charged && !isChargingState(lastState)) sendAuthorize();
+      }, gapMs);
+      setTimeout(sendGetState, gapMs + 2500);
+      // שלב 3 (גיבוי): לחיצה נוספת אם עדיין ממתין
+      setTimeout(() => {
+        if (!charged && !isChargingState(lastState)) sendAuthorize();
+      }, gapMs * 2);
+      setTimeout(sendGetState, gapMs * 2 + 2500);
     } catch (e) {
       done(reject, e);
     }
@@ -534,9 +553,8 @@ export async function handleWevoRequest(body) {
     let result;
     if (confirmPremium) {
       result = await wsAuthorizePremium(token, charger, connector, {
-        rounds: 3,
-        gapMs: 1400,
-        timeoutMs: 12000,
+        gapMs: 4000,
+        timeoutMs: 22000,
         boost
       });
     } else {
@@ -566,9 +584,8 @@ export async function handleWevoRequest(body) {
       if (confirmPremium) {
         try {
           result = await wsAuthorizePremium(token, charger, connector, {
-            rounds: 2,
-            gapMs: 1200,
-            timeoutMs: 8000,
+            gapMs: 3500,
+            timeoutMs: 16000,
             boost
           });
           state = await readState();
