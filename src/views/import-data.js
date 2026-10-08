@@ -333,6 +333,7 @@ function ImportData({
     }
   }, "בחר קובץ JSON", /*#__PURE__*/React.createElement("input", {
     type: "file",
+    "data-testid": "restore-file",
     accept: ".json,application/json,text/plain",
     style: { display: "none" },
     onChange: e => {
@@ -370,6 +371,7 @@ function ImportData({
     n: "check",
     s: 14
   }), "נטענו " + (json.length / 1024).toFixed(0) + "KB — לחץ \"ייבא נתונים\" לאישור"), /*#__PURE__*/React.createElement("textarea", {
+    "data-testid": "restore-textarea",
     style: {
       ...S.inp,
       height: 120,
@@ -387,6 +389,7 @@ function ImportData({
   }), err && /*#__PURE__*/React.createElement("div", {
     style: S.errMsg
   }, err), /*#__PURE__*/React.createElement("button", {
+    "data-testid": "restore-import",
     style: {
       ...S.btnP,
       padding: "11px",
