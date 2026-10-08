@@ -642,7 +642,8 @@ function CompleteSession({
     inputMode: "decimal",
     placeholder: "מחיר לקוט\"ש",
     value: customRate,
-    onChange: e => setCustomRate(e.target.value)
+    onChange: e => setCustomRate(e.target.value),
+    "data-testid": "complete-custom-rate"
   })), /*#__PURE__*/React.createElement(FG, {
     lbl: "תוספת / הנחה (₪) — אופציונלי"
   }, /*#__PURE__*/React.createElement("input", {
@@ -651,7 +652,8 @@ function CompleteSession({
     step: "1",
     placeholder: "10 תוספת או -5 הנחה",
     value: adjust,
-    onChange: e => setAdjust(e.target.value)
+    onChange: e => setAdjust(e.target.value),
+    "data-testid": "complete-adjust"
   }))), prev && /*#__PURE__*/React.createElement("div", {
     style: S.prev
   }, /*#__PURE__*/React.createElement("div", {

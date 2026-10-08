@@ -322,7 +322,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 </script>
 <script>
 /* === app version (injected) === */
-window.__APP_VERSION__ = {"commit":"60cef09","builtAt":"2026-10-08T05:21:46.304Z"};
+window.__APP_VERSION__ = {"commit":"160432a","builtAt":"2026-10-08T05:33:49.710Z"};
 /* === lib/ev-money (injected) === */
 var __EV_MONEY__ = (function () {
 /**
@@ -10195,6 +10195,7 @@ function WevoHistoryView({
   const ratesSub = isBilling ? "תעריפים שנגבים מהלקוחות:" : "תעריפים ל-24 השעות הקרובות:";
 
   return h("div", {
+    "data-testid": "wevo-bill-view",
     style: {
       background: WEVO.bg,
       minHeight: "100vh",
@@ -13565,7 +13566,8 @@ function CompleteSession({
     inputMode: "decimal",
     placeholder: "מחיר לקוט\"ש",
     value: customRate,
-    onChange: e => setCustomRate(e.target.value)
+    onChange: e => setCustomRate(e.target.value),
+    "data-testid": "complete-custom-rate"
   })), /*#__PURE__*/React.createElement(FG, {
     lbl: "תוספת / הנחה (₪) — אופציונלי"
   }, /*#__PURE__*/React.createElement("input", {
@@ -13574,7 +13576,8 @@ function CompleteSession({
     step: "1",
     placeholder: "10 תוספת או -5 הנחה",
     value: adjust,
-    onChange: e => setAdjust(e.target.value)
+    onChange: e => setAdjust(e.target.value),
+    "data-testid": "complete-adjust"
   }))), prev && /*#__PURE__*/React.createElement("div", {
     style: S.prev
   }, /*#__PURE__*/React.createElement("div", {

@@ -496,6 +496,7 @@ function WevoHistoryView({
   const ratesSub = isBilling ? "תעריפים שנגבים מהלקוחות:" : "תעריפים ל-24 השעות הקרובות:";
 
   return h("div", {
+    "data-testid": "wevo-bill-view",
     style: {
       background: WEVO.bg,
       minHeight: "100vh",
