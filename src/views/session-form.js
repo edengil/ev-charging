@@ -64,16 +64,11 @@ function SessionFormFields({
     onChange: e => setKwh(e.target.value),
     "data-testid": "session-kwh"
   })), isSelf ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#ecfeff",
-      border: "1.5px solid #a5f3fc",
-      borderRadius: 10,
-      padding: "10px 12px",
-      marginBottom: 14,
-      fontSize: 13,
-      color: "#0e7490"
-    }
-  }, "💳 עצמי — רק עלות בפועל באשראי, בלי ניפוח / תוספות") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FG, {
+    style: S.statusCard(C.primary)
+  }, /*#__PURE__*/React.createElement(Icon, { n: "card", s: 20, style: { color: C.primaryStrong, flexShrink: 0 } }),
+  /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, color: C.body, lineHeight: 1.55 }
+  }, "עצמי — רק עלות בפועל באשראי, בלי ניפוח / תוספות")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FG, {
     lbl: "תעריף"
   }, /*#__PURE__*/React.createElement("div", {
     style: S.rg

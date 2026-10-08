@@ -580,8 +580,8 @@ function ArchiveView({
   }, "שויכה ל־" + (e.assignedName || "לקוח")))))), uncatPlain.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: uncatSectionStyle
   }, /*#__PURE__*/React.createElement("div", {
-    style: uncatTitleStyle
-  }, "🔌 טעינות שהועברו לארכיון (לא שויכו)"), /*#__PURE__*/React.createElement("div", {
+    style: { ...uncatTitleStyle, display: "flex", alignItems: "center", gap: 7 }
+  }, /*#__PURE__*/React.createElement(Icon, { n: "plug", s: 17, style: { color: C.primaryStrong, flexShrink: 0 } }), "טעינות שהועברו לארכיון (לא שויכו)"), /*#__PURE__*/React.createElement("div", {
     style: uncatDescStyle
   }, "טעינות שהועברו לארכיון מהרשימה הלא־מקוטלגת בלי שיוך ללקוח. לא נוצר חיוב. אפשר לשחזר בכל רגע."), uncatPlain.map(e => /*#__PURE__*/React.createElement("div", {
     key: e.key,

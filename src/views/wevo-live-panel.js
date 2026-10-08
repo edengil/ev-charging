@@ -1289,25 +1289,26 @@ function WevoLivePanel({
     }
   }, "₪", est.wevoCost.toFixed(2))), !est.isSelf && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#eef2ff",
+      background: C.primarySoft,
       borderRadius: 10,
       padding: "8px 10px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      color: "#6366f1",
+      color: C.primaryStrong,
       marginBottom: 2
     }
   }, "לחיוב לקוח"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 800,
-      fontSize: 16,
-      color: "#4338ca"
+      fontSize: 18,
+      color: C.primaryStrong,
+      fontVariantNumeric: "tabular-nums"
     }
   }, ils(est.calc.amountBilled)), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
-      color: "#64748b",
+      color: C.meta,
       marginTop: 2
     }
   }, est.calc.kwhInflated, ' קוט״ש מנופח · ₪', est.calc.rate, " · ", est.calc.rateLabel)), /*#__PURE__*/React.createElement("div", {

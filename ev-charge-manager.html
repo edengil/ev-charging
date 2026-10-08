@@ -322,7 +322,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 </script>
 <script>
 /* === app version (injected) === */
-window.__APP_VERSION__ = {"commit":"f375f2f","builtAt":"2026-10-08T05:50:08.145Z"};
+window.__APP_VERSION__ = {"commit":"6307240","builtAt":"2026-10-08T05:56:35.064Z"};
 /* === lib/ev-money (injected) === */
 var __EV_MONEY__ = (function () {
 /**
@@ -7079,8 +7079,8 @@ function ArchiveView({
   }, "שויכה ל־" + (e.assignedName || "לקוח")))))), uncatPlain.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: uncatSectionStyle
   }, /*#__PURE__*/React.createElement("div", {
-    style: uncatTitleStyle
-  }, "🔌 טעינות שהועברו לארכיון (לא שויכו)"), /*#__PURE__*/React.createElement("div", {
+    style: { ...uncatTitleStyle, display: "flex", alignItems: "center", gap: 7 }
+  }, /*#__PURE__*/React.createElement(Icon, { n: "plug", s: 17, style: { color: C.primaryStrong, flexShrink: 0 } }), "טעינות שהועברו לארכיון (לא שויכו)"), /*#__PURE__*/React.createElement("div", {
     style: uncatDescStyle
   }, "טעינות שהועברו לארכיון מהרשימה הלא־מקוטלגת בלי שיוך ללקוח. לא נוצר חיוב. אפשר לשחזר בכל רגע."), uncatPlain.map(e => /*#__PURE__*/React.createElement("div", {
     key: e.key,
@@ -9268,25 +9268,26 @@ function WevoLivePanel({
     }
   }, "₪", est.wevoCost.toFixed(2))), !est.isSelf && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
-      background: "#eef2ff",
+      background: C.primarySoft,
       borderRadius: 10,
       padding: "8px 10px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      color: "#6366f1",
+      color: C.primaryStrong,
       marginBottom: 2
     }
   }, "לחיוב לקוח"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 800,
-      fontSize: 16,
-      color: "#4338ca"
+      fontSize: 18,
+      color: C.primaryStrong,
+      fontVariantNumeric: "tabular-nums"
     }
   }, ils(est.calc.amountBilled)), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
-      color: "#64748b",
+      color: C.meta,
       marginTop: 2
     }
   }, est.calc.kwhInflated, ' קוט״ש מנופח · ₪', est.calc.rate, " · ", est.calc.rateLabel)), /*#__PURE__*/React.createElement("div", {
@@ -11529,12 +11530,8 @@ function ClientView({
     style: S.main
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      background: `linear-gradient(180deg,${C.card} 0%,${C.primarySoft} 100%)`,
-      border: `1px solid ${C.line}`,
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 16,
-      boxShadow: C.shadowCard
+      ...S.hero,
+      padding: 16
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -11555,28 +11552,30 @@ function ClientView({
   }, /*#__PURE__*/React.createElement("h2", {
     style: {
       ...S.cNameLg,
-      fontSize: 22
+      fontSize: 22,
+      color: "#fff"
     }
   }, c.name), /*#__PURE__*/React.createElement("div", {
-    style: S.cPhone
+    style: { ...S.cPhone, color: "rgba(255,255,255,.85)" }
   }, c.phone || "אין טלפון"), formatClientCarLine(c) && /*#__PURE__*/React.createElement("div", {
     style: {
       ...S.cPhone,
       marginTop: 2,
-      color: C.meta,
+      color: "rgba(255,255,255,.85)",
       fontWeight: 600
     }
   }, formatClientCarLine(c))), /*#__PURE__*/React.createElement("span", {
     style: {
       ...S.pill(balPill.bg, balPill.ink),
-      fontSize: 13,
-      padding: "8px 14px",
-      flexShrink: 0
+      fontSize: 14,
+      padding: "8px 16px",
+      flexShrink: 0,
+      boxShadow: "0 1px 4px rgba(0,0,0,.18)"
     }
   }, balPill.text)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      borderTop: `1px solid ${C.line}`,
+      borderTop: "1px solid rgba(255,255,255,.28)",
       paddingTop: 10,
       marginBottom: 12
     }
@@ -11592,12 +11591,12 @@ function ClientView({
         ...S.num,
         fontSize: 15,
         fontWeight: 800,
-        color: C.ink
+        color: "#fff"
       }
     }, kv[1]), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
-        color: C.meta,
+        color: "rgba(255,255,255,.78)",
         marginTop: 1
       }
     }, kv[0]));
@@ -11918,7 +11917,10 @@ function ClientView({
         cursor: "pointer"
       },
       "data-testid": `open-complete-${o.id}`
-    }, ended && !(Number(o.liveKwh) > 0) ? "בדוק ואשר" : ended ? "✓ אשר ושמור" : "✓ השלם"), delO !== o.id ? /*#__PURE__*/React.createElement("button", {
+    }, ended && !(Number(o.liveKwh) > 0) ? "בדוק ואשר" : /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement(Icon, { n: "check", s: 15, style: { verticalAlign: "-2px", marginInlineEnd: 4 } }),
+      ended ? "אשר ושמור" : "השלם"
+    )), delO !== o.id ? /*#__PURE__*/React.createElement("button", {
       onClick: () => setDelO(o.id),
       style: {
         ...S.btnXS(C.card, C.meta),
@@ -12260,16 +12262,11 @@ function SessionFormFields({
     onChange: e => setKwh(e.target.value),
     "data-testid": "session-kwh"
   })), isSelf ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#ecfeff",
-      border: "1.5px solid #a5f3fc",
-      borderRadius: 10,
-      padding: "10px 12px",
-      marginBottom: 14,
-      fontSize: 13,
-      color: "#0e7490"
-    }
-  }, "💳 עצמי — רק עלות בפועל באשראי, בלי ניפוח / תוספות") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FG, {
+    style: S.statusCard(C.primary)
+  }, /*#__PURE__*/React.createElement(Icon, { n: "card", s: 20, style: { color: C.primaryStrong, flexShrink: 0 } }),
+  /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, color: C.body, lineHeight: 1.55 }
+  }, "עצמי — רק עלות בפועל באשראי, בלי ניפוח / תוספות")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(FG, {
     lbl: "תעריף"
   }, /*#__PURE__*/React.createElement("div", {
     style: S.rg

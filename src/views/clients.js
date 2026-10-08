@@ -76,12 +76,8 @@ function ClientView({
     style: S.main
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      background: `linear-gradient(180deg,${C.card} 0%,${C.primarySoft} 100%)`,
-      border: `1px solid ${C.line}`,
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 16,
-      boxShadow: C.shadowCard
+      ...S.hero,
+      padding: 16
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -102,28 +98,30 @@ function ClientView({
   }, /*#__PURE__*/React.createElement("h2", {
     style: {
       ...S.cNameLg,
-      fontSize: 22
+      fontSize: 22,
+      color: "#fff"
     }
   }, c.name), /*#__PURE__*/React.createElement("div", {
-    style: S.cPhone
+    style: { ...S.cPhone, color: "rgba(255,255,255,.85)" }
   }, c.phone || "אין טלפון"), formatClientCarLine(c) && /*#__PURE__*/React.createElement("div", {
     style: {
       ...S.cPhone,
       marginTop: 2,
-      color: C.meta,
+      color: "rgba(255,255,255,.85)",
       fontWeight: 600
     }
   }, formatClientCarLine(c))), /*#__PURE__*/React.createElement("span", {
     style: {
       ...S.pill(balPill.bg, balPill.ink),
-      fontSize: 13,
-      padding: "8px 14px",
-      flexShrink: 0
+      fontSize: 14,
+      padding: "8px 16px",
+      flexShrink: 0,
+      boxShadow: "0 1px 4px rgba(0,0,0,.18)"
     }
   }, balPill.text)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      borderTop: `1px solid ${C.line}`,
+      borderTop: "1px solid rgba(255,255,255,.28)",
       paddingTop: 10,
       marginBottom: 12
     }
@@ -139,12 +137,12 @@ function ClientView({
         ...S.num,
         fontSize: 15,
         fontWeight: 800,
-        color: C.ink
+        color: "#fff"
       }
     }, kv[1]), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
-        color: C.meta,
+        color: "rgba(255,255,255,.78)",
         marginTop: 1
       }
     }, kv[0]));
@@ -465,7 +463,10 @@ function ClientView({
         cursor: "pointer"
       },
       "data-testid": `open-complete-${o.id}`
-    }, ended && !(Number(o.liveKwh) > 0) ? "בדוק ואשר" : ended ? "✓ אשר ושמור" : "✓ השלם"), delO !== o.id ? /*#__PURE__*/React.createElement("button", {
+    }, ended && !(Number(o.liveKwh) > 0) ? "בדוק ואשר" : /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement(Icon, { n: "check", s: 15, style: { verticalAlign: "-2px", marginInlineEnd: 4 } }),
+      ended ? "אשר ושמור" : "השלם"
+    )), delO !== o.id ? /*#__PURE__*/React.createElement("button", {
       onClick: () => setDelO(o.id),
       style: {
         ...S.btnXS(C.card, C.meta),
