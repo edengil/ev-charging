@@ -20,4 +20,12 @@ test.describe("settings", () => {
     await page.getByTestId("settings-wevo-tariff-refresh").click();
     await expect(page.getByText(/התחבר תחילה בסנכרון Wevo/)).toBeVisible();
   });
+
+  test("שורת גרסת אפליקציה מוצגת בהגדרות", async ({ page }) => {
+    await openApp(page);
+    await page.getByTestId("bottomnav-settings").click();
+    const v = page.getByTestId("settings-app-version");
+    await expect(v).toBeVisible();
+    await expect(v).toContainText(/גרסת אפליקציה [0-9a-f]{7}/);
+  });
 });

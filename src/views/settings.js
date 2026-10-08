@@ -10,6 +10,19 @@ function tariffMh(min) {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
+// שורת גרסה קטנה בתחתית מסך ההגדרות — מזהה מה פרוס בפועל באתר החי.
+function appVersionLabel() {
+  try {
+    const v = window.__APP_VERSION__;
+    if (v && v.commit && v.commit !== "unknown") {
+      const d = v.builtAt ? new Date(v.builtAt) : null;
+      const ds = d && !isNaN(d.getTime()) ? d.toLocaleDateString("he-IL") : "";
+      return `גרסת אפליקציה ${v.commit}${ds ? " · " + ds : ""}`;
+    }
+  } catch {}
+  return "";
+}
+
 function SettingsView({
   onSaved,
   onCancel
@@ -251,6 +264,14 @@ function SettingsView({
   }, "שמור תעריפים"), /*#__PURE__*/React.createElement("button", {
     style: S.btnS,
     onClick: onCancel
-  }, "ביטול"))));
+  }, "ביטול")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.meta,
+      marginTop: 10,
+      textAlign: "center"
+    },
+    "data-testid": "settings-app-version"
+  }, appVersionLabel())));
 }
 

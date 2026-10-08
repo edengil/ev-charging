@@ -230,7 +230,18 @@ const money = bundleMoneyLib();
 const idle = bundleIdleLib();
 const tariff = bundleTariffLib();
 const app = bundleAppSources();
-const src = money + "\n" + idle + "\n" + tariff + "\n" + app;
+
+// חתימת גרסה: קומיט + תאריך בנייה — מוצג במסך ההגדרות כדי לדעת מה פרוס בפועל.
+function appVersionBanner() {
+  let commit = "unknown";
+  try {
+    const r = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" });
+    if (r.status === 0 && r.stdout) commit = r.stdout.trim();
+  } catch {}
+  const builtAt = new Date().toISOString();
+  return `/* === app version (injected) === */\nwindow.__APP_VERSION__ = ${JSON.stringify({ commit, builtAt })};\n`;
+}
+const src = appVersionBanner() + money + "\n" + idle + "\n" + tariff + "\n" + app;
 
 const checkMoney = spawnSync(process.execPath, ["--check", path.join(root, "lib/ev-money.mjs")], { encoding: "utf8" });
 if (checkMoney.status !== 0) {
