@@ -145,13 +145,30 @@ function mockWevoScheduledState() {
   };
 }
 
+/** טעינה הסתיימה אבל הכבל עדיין מחובר — הרכב מדווח כנוכח, לא נטען */
+function mockWevoConnectedDoneState() {
+  return {
+    ...mockWevoChargingState(),
+    state: "Occupied",
+    charging: false,
+    waitingAuthorize: false,
+    rateKw: 0,
+    delayCharge: false,
+    inWindow: true,
+    chargingFullTime: new Date().toISOString(),
+    ongoing: null
+  };
+}
+
 function mockWevoState() {
   const state =
     wevoMock.scenario === "wait-auth"
       ? mockWevoWaitAuthState()
       : wevoMock.scenario === "scheduled"
         ? mockWevoScheduledState()
-        : mockWevoChargingState();
+        : wevoMock.scenario === "connected-done"
+          ? mockWevoConnectedDoneState()
+          : mockWevoChargingState();
   return {
     ok: true,
     state,
@@ -325,7 +342,7 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/__e2e/wevo-mock") {
     if (req.method === "POST") {
       const body = await readBody(req);
-      if (body.scenario === "charging" || body.scenario === "wait-auth" || body.scenario === "scheduled") {
+      if (body.scenario === "charging" || body.scenario === "wait-auth" || body.scenario === "scheduled" || body.scenario === "connected-done") {
         wevoMock.scenario = body.scenario;
       }
       if (body.resetAuthorize) {

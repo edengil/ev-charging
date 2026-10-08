@@ -212,4 +212,31 @@ test.describe("wevo-mock", () => {
       .toBeTruthy();
     expect(sealed.readyToComplete).toBe(true);
   });
+
+  test("סיום טעינה כשהכבל עדיין מחובר — מסומן כמוכן לאישור עם התראה", async ({ page }) => {
+    await resetWevoMock(page, "charging");
+    await openApp(page, {
+      clients: [CLIENT_A, CLIENT_SELF],
+      extra: {
+        ev_wevo_creds: JSON.stringify(WEVO_CREDS)
+      }
+    });
+    await expect(page.getByTestId("wevo-panel")).toBeVisible();
+    await page.getByTestId("wevo-client-select").selectOption(CLIENT_A.id);
+    await expect(page.getByTestId("wevo-panel-state")).toContainText(/טעינה|Charging|מטעין/i, {
+      timeout: 15000
+    });
+    // הטעינה מסתיימת אבל הכבל נשאר מחובר
+    await page.request.post("/__e2e/wevo-mock", { data: { scenario: "connected-done" } });
+    // הטעינה הפתוחה חייבת להיסגר כ"מוכנה לאישור" גם בלי ניתוק כבל
+    let done = null;
+    await expect
+      .poll(async () => {
+        const opens = JSON.parse(await page.evaluate(() => localStorage.getItem("ev_open") || "[]"));
+        done = opens.find(o => o.clientId === CLIENT_A.id);
+        return done && done.readyToComplete === true;
+      }, { timeout: 30000 })
+      .toBe(true);
+    expect(done.wevoEnded).toBe(true);
+  });
 });

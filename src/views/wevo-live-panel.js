@@ -235,6 +235,8 @@ function WevoLivePanel({
         } else if (phase === "charging" && (lastPhaseRef.current === "wait-auth" || lastPhaseRef.current === "connected")) {
           pushWevoLog("charge", "טעינה התחילה", true);
           appAlert("הטעינה התחילה", "ok", 4000);
+        } else if (phase === "connected" && lastPhaseRef.current === "charging") {
+          pushWevoLog("charge-end", "טעינה הסתיימה — כבל עדיין מחובר", true);
         }
         lastPhaseRef.current = phase;
       }
@@ -290,10 +292,16 @@ function WevoLivePanel({
           });
         }
       }
-      // ניתוק / סיום טעינה — ממלאים סיום+קוט״ש מ-Wevo וממתינים לאישור
+      // ניתוק / סיום טעינה — ממלאים סיום+קוט״ש מ-Wevo וממתינים לאישור.
+      // כולל מצב שהטעינה הסתיימה אבל הכבל עדיין מחובר (לא רק ניתוק פיזי) —
+      // אחרת הטעינה נשארת "פתוחה" לנצח ואין התראה ואין אפשרות לחייב.
+      // הערה: wasCharging (ולא wasActive) למקרה המחובר — כדי לא לסמן כ"הסתיים"
+      // רכב שרק חובר וממתין לאישור (Occupied נחשב wait-auth).
       const wasActive = prev && (isActuallyCharging(prev) || isWaitingForAuthorize(prev));
+      const wasChargingNow = prev && isActuallyCharging(prev);
       const nowIdle = st && !isActuallyCharging(st) && !isWaitingForAuthorize(st) && !chargerReportsVehicle(st, sessions);
-      if (wasActive && nowIdle) {
+      const nowConnectedDone = wasChargingNow && st && !isActuallyCharging(st) && chargerReportsVehicle(st, sessions) && String(st.state || "") !== "Finishing";
+      if ((wasActive && nowIdle) || nowConnectedDone) {
         const txn = prev.transactionId || st && st.transactionId;
         const existing = findActiveWevoOpen(openRef.current, txn || prev);
         if (existing && existing.clientId && !existing.readyToComplete) {
