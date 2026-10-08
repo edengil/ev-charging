@@ -238,5 +238,9 @@ test.describe("wevo-mock", () => {
       }, { timeout: 30000 })
       .toBe(true);
     expect(done.wevoEnded).toBe(true);
+    // באנר "מוכן לחיוב" בולט בראש המסך הראשי — בלי להיכנס לכרטיס לקוח
+    await expect(page.getByTestId("ready-complete-banner")).toBeVisible();
+    await expect(page.getByTestId("ready-complete-banner")).toContainText(CLIENT_A.name);
+    await expect(page.getByTestId(`ready-complete-${done.id}`)).toBeVisible();
   });
 });

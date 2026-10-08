@@ -107,6 +107,7 @@ function Dashboard({
   // מוסתרת מהרשימה רק כשהפאנל החי באמת מציג רכב — אחרת הטעינה נעלמת משני המקומות
   const liveOpen = chargerReportsVehicle(liveStation, sessions) ? findChargeStillOnStation(openSess, liveStation, sessions) : null;
   const openCards = dropOpensAlreadySaved(openSess, sessions).filter(o => !liveOpen || o.id !== liveOpen.id);
+  const readyCards = (openSess || []).filter(o => o.readyToComplete && !sessions.some(s => s.id === o.id));
   return /*#__PURE__*/React.createElement("main", {
     style: S.main
   }, /*#__PURE__*/React.createElement(WevoLivePanel, {
@@ -115,6 +116,10 @@ function Dashboard({
     openSess: openSess,
     onUpsertOpen: onUpsertOpen,
     go: go
+  }), /*#__PURE__*/React.createElement(ReadyToCompleteBanner, {
+    readyCards: readyCards,
+    clients: clients,
+    onComplete: onComplete
   }), /*#__PURE__*/React.createElement(ActiveChargeCards, {
     openCards: openCards,
     clients: clients,
@@ -687,6 +692,69 @@ function fmtElapsed(ms) {
 }
 
 // ── כרטיסי טעינה פתוחה (hero) ──
+// ── באנר "מוכן לחיוב" בראש הדשבורד ─────────────────────────────────────────
+// טעינה שהסתיימה (readyToComplete) מקבלת קריאה לפעולה בולטת — בלי להיכנס
+// לכרטיס הלקוח. לחיצה אחת פותחת את אשף ההשלמה ישירות.
+function ReadyToCompleteBanner({ readyCards, clients, onComplete }) {
+  if (!readyCards || !readyCards.length) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
+      border: "2px solid #10b981",
+      borderRadius: 14,
+      padding: "12px 14px",
+      marginBottom: 12
+    },
+    "data-testid": "ready-complete-banner"
+  }, readyCards.map(o => {
+    const cl = clients.find(c => c.id === o.clientId);
+    const kwh = o.liveKwh != null && Number(o.liveKwh) > 0 ? Number(o.liveKwh).toFixed(1) : null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: o.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "6px 0"
+      }
+    }, /*#__PURE__*/React.createElement(Icon, {
+      n: "check",
+      s: 24,
+      style: {
+        color: "#059669",
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 15,
+        color: "#065f46"
+      }
+    }, "הטעינה של ", (cl && cl.name) || "לקוח", " הסתיימה"), kwh && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: "#047857"
+      }
+    }, kwh, " קוט״ש — מוכן לחיוב")), /*#__PURE__*/React.createElement("button", {
+      onClick: () => onComplete(o.id, o.clientId),
+      style: {
+        ...S.btnP,
+        background: "#059669",
+        minHeight: 48,
+        padding: "0 20px",
+        fontSize: 15,
+        flexShrink: 0
+      },
+      "data-testid": `ready-complete-${o.id}`
+    }, "השלם טעינה"));
+  }));
+}
+
 function ActiveChargeCards({ openCards, clients, onComplete, onDelOpen }) {
   if (!openCards || !openCards.length) return null;
   return /*#__PURE__*/React.createElement("div", {
