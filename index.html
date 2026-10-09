@@ -321,7 +321,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 </script>
 <script>
 /* === app version (injected) === */
-window.__APP_VERSION__ = {"commit":"221d760","builtAt":"2026-10-08T06:26:46.902Z"};
+window.__APP_VERSION__ = {"commit":"ea3dea0","builtAt":"2026-10-09T10:02:55.932Z"};
 /* === lib/ev-money (injected) === */
 var __EV_MONEY__ = (function () {
 /**
@@ -8074,6 +8074,25 @@ function WevoLivePanel({
   });
   // טוגל ״כולל תעריף יקר״ ליד כפתור האישור מראש — כבוי כברירת מחדל, פרימיום רק בהחלטה מפורשת
   const [preAuthPremium, setPreAuthPremium] = useState(false);
+  // אבחון זמני: גילוי פקודת הפרימיום האמיתית של Wevo
+  const [probeResults, setProbeResults] = useState(null);
+  const [probeBusy, setProbeBusy] = useState(false);
+  const runProbe = async () => {
+    if (probeBusy) return;
+    setProbeBusy(true);
+    setProbeResults(null);
+    setErr("");
+    try {
+      const data = await wevoApi("probe-commands");
+      setProbeResults(data.probeResults || []);
+      pushWevoLog("probe", `אבחון פקודות הושלם — נבדקו ${(data.probeResults || []).length} פקודות`, true);
+    } catch (e) {
+      setErr("אבחון נכשל: " + (e.message || "שגיאה"));
+      pushWevoLog("probe", "אבחון נכשל: " + (e.message || "שגיאה"), false);
+    } finally {
+      setProbeBusy(false);
+    }
+  };
   const openRef = useRef(openSess);
   openRef.current = openSess;
   const clientsRef = useRef(clients);
@@ -9200,7 +9219,47 @@ function WevoLivePanel({
       if (tryAuthKickRef.current) tryAuthKickRef.current();
     },
     "data-testid": "wevo-boost-try"
-  }, "נסה עקיפת פרימיום"), " — או הפעל “התחל טעינת פרימיום כעת” באפליקציית Wevo."),
+  }, "נסה עקיפת פרימיום"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...S.btnS,
+      padding: "6px 10px",
+      marginInlineStart: 6,
+      background: "#f3f4f6",
+      border: "1px dashed #9ca3af"
+    },
+    onClick: runProbe,
+    disabled: probeBusy,
+    "data-testid": "wevo-probe-commands"
+  }, probeBusy ? "מאבחן…" : "🔍 אבחן פקודת פרימיום"), " — או הפעל “התחל טעינת פרימיום כעת” באפליקציית Wevo."),
+  probeResults && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#f8fafc",
+      border: "1.5px solid #cbd5e1",
+      borderRadius: 12,
+      padding: "10px 12px",
+      marginBottom: 10,
+      fontSize: 12,
+      direction: "ltr",
+      textAlign: "left"
+    },
+    "data-testid": "wevo-probe-results"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 700, marginBottom: 6, direction: "rtl", textAlign: "right" }
+  }, "🔍 תוצאות אבחון פקודות (", probeResults.length, "):"), probeResults.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      padding: "4px 0",
+      borderBottom: i < probeResults.length - 1 ? "1px solid #e2e8f0" : "none",
+      color: r.status === "responded" ? "#047857" : "#92400e"
+    }
+  }, /*#__PURE__*/React.createElement("code", {
+    style: { fontWeight: 700 }
+  }, r.command), " → ", r.status === "responded" ? "✅ הגיב" : "❌ נכשל", r.response ? /*#__PURE__*/React.createElement("div", {
+    style: { color: "#475569", fontSize: 11, wordBreak: "break-all", marginTop: 2 }
+  }, r.response.slice(0, 200)) : null, r.error ? /*#__PURE__*/React.createElement("div", {
+    style: { color: "#92400e", fontSize: 11 }
+  }, r.error.slice(0, 150)) : null))),
   !isSelfSelected && cid && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",

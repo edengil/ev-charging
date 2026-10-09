@@ -606,7 +606,48 @@ export async function handleWevoRequest(body) {
     };
   }
 
-  const err = new Error("action לא מוכר (sync|state|authorize|inspect|tariff)");
+  if (action === "probe-commands") {
+    // כלי אבחון זמני: מנסה לגלות את פקודת הפרימיום האמיתית של Wevo.
+    // שולח פקודות WebSocket מועמדות אחת־אחת, עם timeout קצר, ומחזיר את התגובה הגולמית.
+    // בטיחות: לא מבצע retry, לא שולח פקודות הרסניות (stop/reset), וכל פקודה נשלחת פעם אחת בלבד.
+    const candidates = [
+      "startCharge",
+      "startCharging",
+      "startPremiumCharge",
+      "premiumCharge",
+      "boost",
+      "boostCharge",
+      "overrideSchedule",
+      "forceStart",
+      "immediateStart",
+      "startNow",
+      "skipSchedule",
+      "authorizePremium"
+    ];
+    const results = [];
+    for (const cmd of candidates) {
+      const entry = { command: cmd, status: "unknown", response: null, error: null };
+      try {
+        const resp = await wsCommand(
+          token,
+          { command: cmd, chargerIdentifier: charger, connector },
+          { matchCharger: charger, timeoutMs: 6000 }
+        );
+        entry.status = "responded";
+        // שומרים תקציר בלבד — לא את כל ה־payload הגולמי
+        entry.response = JSON.stringify(resp).slice(0, 500);
+      } catch (e) {
+        entry.status = "failed";
+        entry.error = String((e && e.message) || e).slice(0, 200);
+      }
+      results.push(entry);
+      // הפוגה קצרה בין פקודות כדי לא להעמיס
+      await new Promise(r => setTimeout(r, 800));
+    }
+    return { ok: true, action, user, probeResults: results };
+  }
+
+  const err = new Error("action לא מוכר (sync|state|authorize|inspect|tariff|probe-commands)");
   err.status = 400;
   throw err;
 }
