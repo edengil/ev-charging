@@ -186,9 +186,8 @@ export function wsAuthorizePremium(token, charger, connector, { gapMs = 4000, ti
     let lastState = null;
     let charged = false;
     let ws;
-    // boost: ניסיון עקיפת תזמון מטען — מקביל ל"התחל טעינת פרימיום כעת" באפליקציית Wevo.
-    // שדה לא מוכר מתעלם ע"י Wevo, כך שאין סיכון בהוספה.
-    const payload = { command: "authorize", chargerIdentifier: charger, connector, ...(boost ? { boost: true } : {}) };
+    // שולחים authorize נקי בלבד — בלי שדות נוספים (boost הוסר 09.10.2026 אחרי ששבר את האישור).
+    const payload = { command: "authorize", chargerIdentifier: charger, connector };
     const done = (fn, val) => {
       if (settled) return;
       settled = true;
