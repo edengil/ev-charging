@@ -613,6 +613,35 @@ export async function handleWevoRequest(body) {
     };
   }
 
+  if (action === "probe-tariff-write") {
+    // כלי אבחון: בודק אם ה־API של Wevo תומך בכתיבת תעריף (בלי לשנות כלום).
+    // משתמש ב־OPTIONS בלבד — לא שולח נתונים, לא משנה מחירים.
+    const paths = [
+      "/charger/rate-details",
+      "/charger/variable-cost-ranges",
+      "/charger/tariff",
+      "/charger/price",
+      "/charger/rates"
+    ];
+    const results = [];
+    for (const p of paths) {
+      const entry = { path: p, allow: null, status: null, error: null };
+      try {
+        const res = await fetch(`${API_BASE}/rest${p}`, {
+          method: "OPTIONS",
+          headers: authHeaders(token)
+        });
+        entry.status = res.status;
+        entry.allow = res.headers.get("allow") || res.headers.get("Access-Control-Allow-Methods") || "(no header)";
+      } catch (e) {
+        entry.error = String((e && e.message) || e).slice(0, 200);
+      }
+      results.push(entry);
+      await new Promise(r => setTimeout(r, 400));
+    }
+    return { ok: true, action, user, probeResults: results };
+  }
+
   if (action === "probe-commands") {
     // כלי אבחון זמני: מנסה לגלות את פקודת הפרימיום האמיתית של Wevo.
     // שולח פקודות WebSocket מועמדות אחת־אחת, עם timeout קצר, ומחזיר את התגובה הגולמית.
@@ -649,7 +678,7 @@ export async function handleWevoRequest(body) {
     return { ok: true, action, user, probeResults: results };
   }
 
-  const err = new Error("action לא מוכר (sync|state|authorize|inspect|tariff|probe-commands)");
+  const err = new Error("action לא מוכר (sync|state|authorize|inspect|tariff|probe-commands|probe-tariff-write)");
   err.status = 400;
   throw err;
 }

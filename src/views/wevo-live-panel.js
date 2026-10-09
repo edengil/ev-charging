@@ -47,6 +47,25 @@ function WevoLivePanel({
       setProbeBusy(false);
     }
   };
+  // אבחון כתיבת תעריף — בודק אם ה־API תומך בעדכון מחיר (בלי לשנות כלום)
+  const [tariffProbeResults, setTariffProbeResults] = useState(null);
+  const [tariffProbeBusy, setTariffProbeBusy] = useState(false);
+  const runTariffProbe = async () => {
+    if (tariffProbeBusy) return;
+    setTariffProbeBusy(true);
+    setTariffProbeResults(null);
+    setErr("");
+    try {
+      const data = await wevoApi("probe-tariff-write");
+      setTariffProbeResults(data.probeResults || []);
+      pushWevoLog("probe", "אבחון כתיבת תעריף הושלם", true);
+    } catch (e) {
+      setErr("אבחון תעריף נכשל: " + (e.message || "שגיאה"));
+      pushWevoLog("probe", "אבחון תעריף נכשל: " + (e.message || "שגיאה"), false);
+    } finally {
+      setTariffProbeBusy(false);
+    }
+  };
   const openRef = useRef(openSess);
   openRef.current = openSess;
   const clientsRef = useRef(clients);
@@ -943,7 +962,22 @@ function WevoLivePanel({
       color: "#6b7280",
       fontWeight: 600
     }
-  }, probeBusy ? "מאבחן…" : "🔍 אבחון פרימיום")), err && /*#__PURE__*/React.createElement("div", {
+  }, probeBusy ? "מאבחן…" : "🔍 אבחון פרימיום"), /*#__PURE__*/React.createElement("button", {
+    onClick: runTariffProbe,
+    disabled: tariffProbeBusy,
+    "data-testid": "wevo-probe-tariff",
+    title: "אבחון: בודק אם אפשר לעדכן מחיר בשרת Wevo (בלי לשנות כלום)",
+    style: {
+      background: "none",
+      border: "1px dashed #9ca3af",
+      borderRadius: 8,
+      padding: "5px 10px",
+      fontSize: 12,
+      cursor: "pointer",
+      color: "#6b7280",
+      fontWeight: 600
+    }
+  }, tariffProbeBusy ? "בודק…" : "💰 אבחון מחיר")), err && /*#__PURE__*/React.createElement("div", {
     style: {
       ...S.errMsg,
       marginBottom: 8
@@ -959,7 +993,20 @@ function WevoLivePanel({
       marginBottom: 8,
       lineHeight: 1.4
     }
-  }, hint), probeResults && /*#__PURE__*/React.createElement("div", {
+  }, hint), tariffProbeResults && tariffProbeResults.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    key: "tp" + i,
+    style: {
+      background: "#fffbeb",
+      border: "1px solid #fcd34d",
+      borderRadius: 8,
+      padding: "6px 10px",
+      marginBottom: 6,
+      fontSize: 12,
+      direction: "ltr",
+      textAlign: "left"
+    },
+    "data-testid": "wevo-tariff-probe-results"
+  }, /*#__PURE__*/React.createElement("code", { style: { fontWeight: 700 } }, r.path), " → ", r.error ? "❌ " + String(r.error).slice(0, 80) : "סטטוס " + r.status)), probeResults && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#f8fafc",
       border: "1.5px solid #cbd5e1",
