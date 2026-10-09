@@ -928,7 +928,22 @@ function WevoLivePanel({
   }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Icon, {
     n: "refresh",
     s: 13
-  }), " רענן"))), err && /*#__PURE__*/React.createElement("div", {
+  }), " רענן")), /*#__PURE__*/React.createElement("button", {
+    onClick: runProbe,
+    disabled: probeBusy,
+    "data-testid": "wevo-probe-commands",
+    title: "אבחון: בודק איזו פקודת פרימיום Wevo מקבלת",
+    style: {
+      background: "none",
+      border: "1px dashed #9ca3af",
+      borderRadius: 8,
+      padding: "5px 10px",
+      fontSize: 12,
+      cursor: "pointer",
+      color: "#6b7280",
+      fontWeight: 600
+    }
+  }, probeBusy ? "מאבחן…" : "🔍 אבחון פרימיום")), err && /*#__PURE__*/React.createElement("div", {
     style: {
       ...S.errMsg,
       marginBottom: 8
@@ -944,7 +959,34 @@ function WevoLivePanel({
       marginBottom: 8,
       lineHeight: 1.4
     }
-  }, hint), idleOpens.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, hint), probeResults && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#f8fafc",
+      border: "1.5px solid #cbd5e1",
+      borderRadius: 12,
+      padding: "10px 12px",
+      marginBottom: 10,
+      fontSize: 12,
+      direction: "ltr",
+      textAlign: "left"
+    },
+    "data-testid": "wevo-probe-results"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 700, marginBottom: 6, direction: "rtl", textAlign: "right" }
+  }, "🔍 תוצאות אבחון פקודות (", probeResults.length, "):"), probeResults.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      padding: "4px 0",
+      borderBottom: i < probeResults.length - 1 ? "1px solid #e2e8f0" : "none",
+      color: r.status === "responded" ? "#047857" : "#92400e"
+    }
+  }, /*#__PURE__*/React.createElement("code", {
+    style: { fontWeight: 700 }
+  }, r.command), " → ", r.status === "responded" ? "✅ הגיב" : "❌ נכשל", r.response ? /*#__PURE__*/React.createElement("div", {
+    style: { color: "#475569", fontSize: 11, wordBreak: "break-all", marginTop: 2 }
+  }, r.response.slice(0, 200)) : null, r.error ? /*#__PURE__*/React.createElement("div", {
+    style: { color: "#92400e", fontSize: 11 }
+  }, r.error.slice(0, 150)) : null))), idleOpens.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#fff7ed",
       border: "1.5px solid #fdba74",
@@ -1173,47 +1215,7 @@ function WevoLivePanel({
       if (tryAuthKickRef.current) tryAuthKickRef.current();
     },
     "data-testid": "wevo-boost-try"
-  }, "נסה עקיפת פרימיום"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: {
-      ...S.btnS,
-      padding: "6px 10px",
-      marginInlineStart: 6,
-      background: "#f3f4f6",
-      border: "1px dashed #9ca3af"
-    },
-    onClick: runProbe,
-    disabled: probeBusy,
-    "data-testid": "wevo-probe-commands"
-  }, probeBusy ? "מאבחן…" : "🔍 אבחן פקודת פרימיום"), " — או הפעל “התחל טעינת פרימיום כעת” באפליקציית Wevo."),
-  probeResults && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#f8fafc",
-      border: "1.5px solid #cbd5e1",
-      borderRadius: 12,
-      padding: "10px 12px",
-      marginBottom: 10,
-      fontSize: 12,
-      direction: "ltr",
-      textAlign: "left"
-    },
-    "data-testid": "wevo-probe-results"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { fontWeight: 700, marginBottom: 6, direction: "rtl", textAlign: "right" }
-  }, "🔍 תוצאות אבחון פקודות (", probeResults.length, "):"), probeResults.map((r, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    style: {
-      padding: "4px 0",
-      borderBottom: i < probeResults.length - 1 ? "1px solid #e2e8f0" : "none",
-      color: r.status === "responded" ? "#047857" : "#92400e"
-    }
-  }, /*#__PURE__*/React.createElement("code", {
-    style: { fontWeight: 700 }
-  }, r.command), " → ", r.status === "responded" ? "✅ הגיב" : "❌ נכשל", r.response ? /*#__PURE__*/React.createElement("div", {
-    style: { color: "#475569", fontSize: 11, wordBreak: "break-all", marginTop: 2 }
-  }, r.response.slice(0, 200)) : null, r.error ? /*#__PURE__*/React.createElement("div", {
-    style: { color: "#92400e", fontSize: 11 }
-  }, r.error.slice(0, 150)) : null))),
+  }, "נסה עקיפת פרימיום"), " — או הפעל “התחל טעינת פרימיום כעת” באפליקציית Wevo."),
   !isSelfSelected && cid && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
