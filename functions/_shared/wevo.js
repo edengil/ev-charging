@@ -641,6 +641,7 @@ export async function handleWevoRequest(body) {
     // בטיחות: לא מבצע retry, לא שולח פקודות הרסניות (stop/reset), וכל פקודה נשלחת פעם אחת בלבד.
     // מצומצם ל־6 המועמדות הסבירות ביותר עם timeout קצר כדי לא לחרוג ממגבלת השרת.
     const candidates = [
+      "authorize",
       "startCharge",
       "startCharging",
       "premiumCharge",
