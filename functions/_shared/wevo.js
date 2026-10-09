@@ -174,10 +174,11 @@ export function wsCommand(token, payload, { matchCharger, timeoutMs = 10000 } = 
 
 /**
  * אישור דו־שלבי כמו באפליקציית Wevo:
- * שלב 1 — "אישור טעינה" (לחיצה ראשונה).
- * שלב 2 — "אישור טעינת פרימיום" (לחיצה שנייה) — Wevo מציגה את האופציה הזו רק
- * אחרי שהראשונה עובדה, ורק בשעות הפרימיום. לכן לא יורים את כל הלחיצות ברצף —
- * מחכים בין השלבים ובודקים מצב. אותו WS נשאר פתוח בין השלבים.
+ * שלב 1 — "אישור טעינה" (authorize).
+ * שלב 2 — "התחל טעינת פרימיום כעת" (startPremiumCharge — אומתה באבחון 09.10.2026).
+ * Wevo מציגה את אופציית הפרימיום רק אחרי שהראשונה עובדה, ורק בשעות הפרימיום.
+ * לכן לא יורים את כל הלחיצות ברצף — מחכים בין השלבים ובודקים מצב.
+ * אותו WS נשאר פתוח בין השלבים.
  */
 export function wsAuthorizePremium(token, charger, connector, { gapMs = 4000, timeoutMs = 22000, boost = false } = {}) {
   return new Promise(async (resolve, reject) => {
@@ -202,6 +203,12 @@ export function wsAuthorizePremium(token, charger, connector, { gapMs = 4000, ti
     const sendAuthorize = () => {
       try {
         ws && ws.send(JSON.stringify(payload));
+      } catch {}
+    };
+    // פקודת הפרימיום האמיתית של Wevo (אומתה באבחון 09.10.2026) — מקבילה ל״התחל טעינת פרימיום כעת״
+    const sendPremium = () => {
+      try {
+        ws && ws.send(JSON.stringify({ command: "startPremiumCharge", chargerIdentifier: charger, connector }));
       } catch {}
     };
     const sendGetState = () => {
@@ -237,14 +244,14 @@ export function wsAuthorizePremium(token, charger, connector, { gapMs = 4000, ti
       // שלב 1: "אישור טעינה"
       sendAuthorize();
       setTimeout(sendGetState, 2500);
-      // שלב 2: "אישור פרימיום" — רק אם עדיין לא נטען (נותנים ל-Wevo זמן לעבד את הראשון)
+      // שלב 2: "התחל טעינת פרימיום כעת" — הפקודה האמיתית (אומתה באבחון), לא authorize חוזר
       setTimeout(() => {
-        if (!charged && !isChargingState(lastState)) sendAuthorize();
+        if (!charged && !isChargingState(lastState)) sendPremium();
       }, gapMs);
       setTimeout(sendGetState, gapMs + 2500);
-      // שלב 3 (גיבוי): לחיצה נוספת אם עדיין ממתין
+      // שלב 3 (גיבוי): ניסיון פרימיום נוסף אם עדיין ממתין
       setTimeout(() => {
-        if (!charged && !isChargingState(lastState)) sendAuthorize();
+        if (!charged && !isChargingState(lastState)) sendPremium();
       }, gapMs * 2);
       setTimeout(sendGetState, gapMs * 2 + 2500);
     } catch (e) {
