@@ -610,19 +610,14 @@ export async function handleWevoRequest(body) {
     // כלי אבחון זמני: מנסה לגלות את פקודת הפרימיום האמיתית של Wevo.
     // שולח פקודות WebSocket מועמדות אחת־אחת, עם timeout קצר, ומחזיר את התגובה הגולמית.
     // בטיחות: לא מבצע retry, לא שולח פקודות הרסניות (stop/reset), וכל פקודה נשלחת פעם אחת בלבד.
+    // מצומצם ל־6 המועמדות הסבירות ביותר עם timeout קצר כדי לא לחרוג ממגבלת השרת.
     const candidates = [
       "startCharge",
       "startCharging",
-      "startPremiumCharge",
       "premiumCharge",
       "boost",
       "boostCharge",
-      "overrideSchedule",
-      "forceStart",
-      "immediateStart",
-      "startNow",
-      "skipSchedule",
-      "authorizePremium"
+      "startPremiumCharge"
     ];
     const results = [];
     for (const cmd of candidates) {
@@ -631,7 +626,7 @@ export async function handleWevoRequest(body) {
         const resp = await wsCommand(
           token,
           { command: cmd, chargerIdentifier: charger, connector },
-          { matchCharger: charger, timeoutMs: 6000 }
+          { matchCharger: charger, timeoutMs: 4000 }
         );
         entry.status = "responded";
         // שומרים תקציר בלבד — לא את כל ה־payload הגולמי
@@ -642,7 +637,7 @@ export async function handleWevoRequest(body) {
       }
       results.push(entry);
       // הפוגה קצרה בין פקודות כדי לא להעמיס
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, 500));
     }
     return { ok: true, action, user, probeResults: results };
   }
