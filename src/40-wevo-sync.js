@@ -151,6 +151,7 @@ function clearFinishedIfStillCharging(payload, st) {
   return {
     ...payload,
     chargeEndedAt: null,
+    chargingFullTime: null,
     endDate: null,
     plugOutAt: null,
     readyToComplete: false,

@@ -321,7 +321,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 </script>
 <script>
 /* === app version (injected) === */
-window.__APP_VERSION__ = {"commit":"a29fbd7","builtAt":"2026-10-09T13:16:44.492Z"};
+window.__APP_VERSION__ = {"commit":"e073573","builtAt":"2026-10-10T08:12:03.830Z"};
 /* === lib/ev-money (injected) === */
 var __EV_MONEY__ = (function () {
 /**
@@ -3465,6 +3465,7 @@ function clearFinishedIfStillCharging(payload, st) {
   return {
     ...payload,
     chargeEndedAt: null,
+    chargingFullTime: null,
     endDate: null,
     plugOutAt: null,
     readyToComplete: false,
