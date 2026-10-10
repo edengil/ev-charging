@@ -1200,7 +1200,21 @@ function WevoLivePanel({
       fontWeight: 700,
       lineHeight: 1.45
     }
-  }, savedEcho ? "הטעינה האחרונה כבר אושרה ונשמרה. אין רכב חדש בעמדה." : "אין רכב בעמדה. התחברות עם המשתמש לא מסמנת רכב מחובר.")),
+  }, savedEcho ? "הטעינה האחרונה כבר אושרה ונשמרה. אין רכב חדש בעמדה." : "אין רכב בעמדה. התחברות עם המשתמש לא מסמנת רכב מחובר.")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => doAuthorize({ mode: "full-now" }),
+    disabled: authBusy || busy,
+    "data-testid": "wevo-force-connect",
+    title: "שולח אישור ל-Wevo בכוח — מעיר את המטען גם אם לא זוהה רכב",
+    style: {
+      ...S.btnS,
+      marginTop: 8,
+      background: "#fef3c7",
+      border: "1.5px dashed #f59e0b",
+      color: "#92400e",
+      fontWeight: 700
+    }
+  }, authBusy ? "מנסה לחבר…" : "🔌 נסה לחבר בכוח"),
 
   // בחירת לקוח לפני אישור
   /*#__PURE__*/React.createElement("div", {

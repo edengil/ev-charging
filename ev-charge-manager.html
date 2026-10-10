@@ -322,7 +322,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 </script>
 <script>
 /* === app version (injected) === */
-window.__APP_VERSION__ = {"commit":"e073573","builtAt":"2026-10-10T08:12:03.830Z"};
+window.__APP_VERSION__ = {"commit":"2847d0d","builtAt":"2026-10-10T17:28:20.337Z"};
 /* === lib/ev-money (injected) === */
 var __EV_MONEY__ = (function () {
 /**
@@ -9248,7 +9248,21 @@ function WevoLivePanel({
       fontWeight: 700,
       lineHeight: 1.45
     }
-  }, savedEcho ? "הטעינה האחרונה כבר אושרה ונשמרה. אין רכב חדש בעמדה." : "אין רכב בעמדה. התחברות עם המשתמש לא מסמנת רכב מחובר.")),
+  }, savedEcho ? "הטעינה האחרונה כבר אושרה ונשמרה. אין רכב חדש בעמדה." : "אין רכב בעמדה. התחברות עם המשתמש לא מסמנת רכב מחובר.")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => doAuthorize({ mode: "full-now" }),
+    disabled: authBusy || busy,
+    "data-testid": "wevo-force-connect",
+    title: "שולח אישור ל-Wevo בכוח — מעיר את המטען גם אם לא זוהה רכב",
+    style: {
+      ...S.btnS,
+      marginTop: 8,
+      background: "#fef3c7",
+      border: "1.5px dashed #f59e0b",
+      color: "#92400e",
+      fontWeight: 700
+    }
+  }, authBusy ? "מנסה לחבר…" : "🔌 נסה לחבר בכוח"),
 
   // בחירת לקוח לפני אישור
   /*#__PURE__*/React.createElement("div", {
