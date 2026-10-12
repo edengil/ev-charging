@@ -28,6 +28,7 @@ function WevoLivePanel({
   });
   // טוגל ״כולל תעריף יקר״ ליד כפתור האישור מראש — כבוי כברירת מחדל, פרימיום רק בהחלטה מפורשת
   const [preAuthPremium, setPreAuthPremium] = useState(false);
+  const [premiumContinue, setPremiumContinue] = useState(false);
   // אבחון זמני: גילוי פקודת הפרימיום האמיתית של Wevo
   const [probeResults, setProbeResults] = useState(null);
   const [probeBusy, setProbeBusy] = useState(false);
@@ -85,6 +86,7 @@ function WevoLivePanel({
   const autoAttemptsRef = useRef((authIntent && authIntent.attempts) || 0);
   const preAuthQueuedRef = useRef(!!(authIntent && authIntent.queued));
   const peakWasRef = useRef(isOwnerPeakNow());
+  const wasChargingRef = useRef(false);
   const tryAuthKickRef = useRef(null);
   const alertedReadyRef = useRef(new Set());
   const lastPhaseRef = useRef("");
@@ -140,6 +142,7 @@ function WevoLivePanel({
     }
     if (!isWevoAuthIntentMode(mode)) return;
     const silent = !!opts.silent;
+    const premiumContinue = !!opts.premiumContinue;
     const next = {
       clientId: targetId,
       mode,
@@ -147,7 +150,8 @@ function WevoLivePanel({
       queued: false,
       lastAttemptAt: null,
       lastError: null,
-      attempts: 0
+      attempts: 0,
+      premiumContinue
     };
     persistIntent(next);
     const name = (picked && picked.name) || targetId;
@@ -706,6 +710,17 @@ function WevoLivePanel({
         });
       }
       if (tryAuthKickRef.current) tryAuthKickRef.current();
+    }
+    // מעבר זול → פרימיום: אם הטעינה נעצרה והמשתמש אישר מראש המשך — מאשר אוטומטית
+    const chargingNow = !!(state && isActuallyCharging(state));
+    const wasCharging = wasChargingRef.current;
+    wasChargingRef.current = chargingNow;
+    if (!was && peak && wasCharging && !chargingNow && state && chargerReportsVehicle(state, sessions)) {
+      const cur = authIntentRef.current;
+      if (cur && cur.premiumContinue && !authBusyRef.current) {
+        pushWevoLog("authorize", "זוהה מעבר לפרימיום — מאשר אוטומטית המשך טעינה (אושר מראש)", true);
+        doAuthorize({ mode: "full-now" });
+      }
     }
   }, [isOffPeakIntent, state && state.state, lastAt]);
 
@@ -1348,7 +1363,30 @@ function WevoLivePanel({
     checked: preAuthPremium,
     onChange: e => setPreAuthPremium(e.target.checked),
     style: { width: 17, height: 17, accentColor: "#ea580c" }
-  }), `כולל תעריף יקר (₪${Number((getConfig() || {}).ratePremium || 0).toFixed(2)}/קוט״ש)`), /*#__PURE__*/React.createElement("button", {
+  }), `כולל תעריף יקר (₪${Number((getConfig() || {}).ratePremium || 0).toFixed(2)}/קוט״ש)`), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 7,
+      padding: "10px 12px",
+      background: premiumContinue ? "#fef3c7" : "#f8fafc",
+      border: premiumContinue ? "1.5px solid #f59e0b" : "1.5px solid #e2e8f0",
+      borderRadius: 12,
+      fontWeight: 700,
+      fontSize: 13,
+      color: premiumContinue ? "#92400e" : "#475569",
+      cursor: "pointer",
+      flex: "1 1 180px",
+      userSelect: "none"
+    },
+    "data-testid": "wevo-premium-continue-toggle",
+    title: "אם הטעינה תיעצר כשהתעריף יעבור לפרימיום — האפליקציה תאשר אוטומטית המשך בפרימיום"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: premiumContinue,
+    onChange: e => setPremiumContinue(e.target.checked),
+    style: { width: 17, height: 17, accentColor: "#f59e0b" }
+  }), "המשך אוטומטי בפרימיום"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     style: {
       ...S.btnP,
@@ -1357,7 +1395,7 @@ function WevoLivePanel({
       padding: "11px 12px",
       flex: "1 1 180px"
     },
-    onClick: () => armAuthIntent(preAuthPremium ? "full-now" : "offpeak-preauth"),
+    onClick: () => armAuthIntent(preAuthPremium ? "full-now" : "offpeak-preauth", null, { premiumContinue }),
     "data-testid": "wevo-preauth-arm"
   }, preAuthPremium ? "אשר מראש · כולל יקר" : "אשר מראש"))),
 
