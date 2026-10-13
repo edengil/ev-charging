@@ -298,6 +298,38 @@ function CompleteSession({
   if (!openSession) return null;
   const c = clients.find(x => x.id === openSession.clientId);
   const filledOk = Number(kwh) > 0 && !!edt;
+  // ארבעת חלונות החיוב (כלל עדן): חיבור/התחלת־זרם × סיום־זרם/הוצאה — תמיד מוצגים עם סכום, הגבוה מובחר ברירת מחדל
+  const billAlternatives = (() => {
+    const kwhN = parseFloat(kwh);
+    if (!timelineRelevant || !(kwhN > 0) || isSelf) return [];
+    const cr = fr === "custom" ? parseFloat(customRate) || null : null;
+    const labels = { plugIn: "חיבור כבל", chargeStart: "התחלת טעינה", chargeEnd: "סיום טעינה", plugOut: "הוצאת כבל" };
+    const out = [];
+    for (const sk of ["plugIn", "chargeStart"]) {
+      const sAt = pointAt(sessionTimeline, sk);
+      if (!sAt) continue;
+      for (const ek of ["chargeEnd", "plugOut"]) {
+        const eAt = pointAt(sessionTimeline, ek);
+        if (!eAt) continue;
+        const sm = toMs(sAt);
+        const em = toMs(eAt);
+        if (sm == null || em == null || em <= sm) continue;
+        const raw = calcSession(kwhN, new Date(sm), new Date(em), fr === "regular", fr === "premium", cr);
+        const billed = billingForClient(raw, c, { adjust: adjVal, actualCost: raw.costToOwner });
+        if (!billed) continue;
+        out.push({
+          sk,
+          ek,
+          label: `${labels[sk]} ← ${labels[ek]}`,
+          range: `${formatTimelineClock(sAt)} ← ${formatTimelineClock(eAt)}`,
+          mins: Math.round((em - sm) / 60000),
+          amount: billed.amountBilled
+        });
+      }
+    }
+    return out;
+  })();
+  const maxAltAmount = billAlternatives.length ? Math.max(...billAlternatives.map(a => a.amount)) : null;
   const onDurChange = val => {
     setDurInput(val);
     const mins = parseDurStr(val);
@@ -449,7 +481,69 @@ function CompleteSession({
     checked: preferMaxBill,
     onChange: e => setPreferMaxBill(e.target.checked),
     "data-testid": "prefer-max-bill"
-  }), "תמיד הסכום הגבוה יותר (בחירה אוטומטית)"), /*#__PURE__*/React.createElement(FG, {
+  }), "תמיד הסכום הגבוה יותר (בחירה אוטומטית)"), billAlternatives.length > 1 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    },
+    "data-testid": "bill-alternatives"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#475569",
+      marginBottom: 6
+    }
+  }, "חלונות חיוב — בחר חלון:"), billAlternatives.map(a => {
+    const selected = billStartKey === a.sk && billEndKey === a.ek;
+    const isMax = a.amount === maxAltAmount;
+    return /*#__PURE__*/React.createElement("button", {
+      key: `${a.sk}-${a.ek}`,
+      type: "button",
+      className: "ev-press",
+      "data-testid": `bill-alt-${a.sk}-${a.ek}`,
+      onClick: () => {
+        setPreferMaxBill(false);
+        applyWindowKeys(a.sk, a.ek, sessionTimeline);
+      },
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        width: "100%",
+        textAlign: "right",
+        padding: "9px 11px",
+        marginBottom: 6,
+        borderRadius: 10,
+        border: selected ? "1.5px solid #059669" : "1.5px solid #e2e8f0",
+        background: selected ? "#ecfdf5" : "#fff",
+        cursor: "pointer",
+        fontSize: 13
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: { flex: 1, lineHeight: 1.45 }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: { fontWeight: 700, color: "#0f172a" }
+    }, a.label), /*#__PURE__*/React.createElement("span", {
+      style: { display: "block", fontSize: 11, color: "#64748b" }
+    }, a.range, " · ", formatDurMins(a.mins))), isMax && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        fontWeight: 800,
+        color: "#047857",
+        background: "#d1fae5",
+        borderRadius: 999,
+        padding: "2px 7px",
+        whiteSpace: "nowrap"
+      }
+    }, "הגבוה ביותר"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 800,
+        fontSize: 15,
+        color: selected ? "#047857" : "#0f172a",
+        whiteSpace: "nowrap"
+      }
+    }, `₪${a.amount.toFixed(2)}`));
+  })), /*#__PURE__*/React.createElement(FG, {
     lbl: "התחלת חיוב"
   }, /*#__PURE__*/React.createElement("select", {
     style: S.inp,
