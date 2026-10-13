@@ -343,7 +343,7 @@ function CompleteSession({
     n: "check",
     s: 12
   }), "השלמת טעינה פתוחה", filledOk ? " · מוכן לאישור" : ""))), (isWevoLinked || readyFromWevo) && /*#__PURE__*/React.createElement("div", {
-    style: S.statusCard(filledOk ? C.ok : wevoFetch === "err" ? C.err : C.warn)
+    style: S.statusCard(filledOk && (wevoFetch === "ok" || readyFromWevo) ? C.ok : wevoFetch === "err" ? C.err : C.warn)
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
@@ -368,7 +368,7 @@ function CompleteSession({
     }
   }), /*#__PURE__*/React.createElement(Spinner, {
     s: 15
-  }), "שולף מ-Wevo שעת סיום טעינה וקוט״ש סופי...") : filledOk ? /*#__PURE__*/React.createElement("span", {
+  }), "שולף מ-Wevo שעת סיום טעינה וקוט״ש סופי...") : filledOk && (wevoFetch === "ok" || readyFromWevo) ? /*#__PURE__*/React.createElement("span", {
     style: {
       display: "inline-flex",
       alignItems: "center",
@@ -379,7 +379,18 @@ function CompleteSession({
   }, /*#__PURE__*/React.createElement(Icon, {
     n: "check",
     s: 16
-  }), timelineRelevant ? "הנתונים מולאו מ-Wevo — בחר נקודות לחיוב מתוך חלון הזמנים (מעבר בין יקרות לרגיל)." : "הנתונים מולאו מ-Wevo — אין מעבר בין שעות יקרות/רגילות, חיוב לפי חיבור→סיום.") : /*#__PURE__*/React.createElement(React.Fragment, null, wevoFetchErr ? /*#__PURE__*/React.createElement("span", {
+  }), timelineRelevant ? "הנתונים מולאו מ-Wevo — בחר נקודות לחיוב מתוך חלון הזמנים (מעבר בין יקרות לרגיל)." : "הנתונים מולאו מ-Wevo — אין מעבר בין שעות יקרות/רגילות, חיוב לפי חיבור→סיום.") : filledOk ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 7,
+      color: "#92400e",
+      fontWeight: 700
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "alert",
+    s: 16
+  }), "מוצגים נתוני מעקב חי אחרונים — עדיין לא אומתו מול Wevo. לחץ ״רענן מ-Wevo״ לפני שמירה.") : /*#__PURE__*/React.createElement(React.Fragment, null, wevoFetchErr ? /*#__PURE__*/React.createElement("span", {
     style: {
       color: C.errInk,
       fontWeight: 700

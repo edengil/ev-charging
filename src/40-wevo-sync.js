@@ -306,7 +306,7 @@ function txToEndFields(tx, fallback = {}) {
     plugOutAt: fallback.plugOutAt,
     chargeEndedAt: fallback.chargeEndedAt || fallback.endDate,
     chargeStartedAt: fallback.chargeStartedAt,
-    chargingFullTime: fallback.chargingFullTime || (tx && tx.chargingFullTime),
+    chargingFullTime: (tx && tx.chargingFullTime) || fallback.chargingFullTime,
     netDuration: tx && tx.netDuration != null ? tx.netDuration : fallback.netDuration
   });
   const maxWin = kwh > 0 ? pickMaxBillWindow(kwh, tl) : null;

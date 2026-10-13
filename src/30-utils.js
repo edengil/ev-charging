@@ -184,7 +184,7 @@ function resolveChargeTimeline(tx = {}, hints = {}) {
   const plugInMs = toMs(hints.plugInAt || hints.plugInTime || tx.plugInTime);
   const plugOutMs = toMs(hints.plugOutAt || hints.plugOutTime || tx.plugOutTime);
   const netSec = Number(hints.netDuration != null ? hints.netDuration : tx.netDuration) || 0;
-  const fullMs = toMs(hints.chargingFullTime || tx.chargingFullTime || hints.chargeEndedAt);
+  const fullMs = toMs(tx.chargingFullTime || hints.chargingFullTime || hints.chargeEndedAt);
   const liveStartMs = toMs(hints.chargeStartedAt || tx.chargeStartedAt);
 
   let chargeEndMs = null;
@@ -192,6 +192,9 @@ function resolveChargeTimeline(tx = {}, hints = {}) {
     chargeEndMs = fullMs;
   } else if (hints.chargeEndedAt) {
     chargeEndMs = toMs(hints.chargeEndedAt);
+  } else if (liveStartMs && netSec > 0) {
+    // שעת התחלת זרם ידועה (נצפתה חי) + משך נטו מ־Wevo → סיום מדויק, בלי ניחוש idle
+    chargeEndMs = liveStartMs + netSec * 1000;
   } else if (plugInMs && plugOutMs && netSec > 0) {
     const connectedSec = Math.max(0, (plugOutMs - plugInMs) / 1000);
     const idleSec = Math.max(0, connectedSec - netSec);

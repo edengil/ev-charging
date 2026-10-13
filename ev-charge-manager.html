@@ -322,7 +322,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 </script>
 <script>
 /* === app version (injected) === */
-window.__APP_VERSION__ = {"commit":"f753a1a","builtAt":"2026-10-12T14:06:44.169Z"};
+window.__APP_VERSION__ = {"commit":"de34edd","builtAt":"2026-10-13T05:59:23.025Z"};
 /* === lib/ev-money (injected) === */
 var __EV_MONEY__ = (function () {
 /**
@@ -1114,7 +1114,8 @@ function findChargeStillOnStation(opens, liveState, sessions) {
  * אם יש txn והוא לא ברשימה הסגורה — הוא עדיין רץ. לא לוקחים עסקה אחרת מהחלון.
  */
 function pickFinishedWevoTx(transactions, open) {
-  const list = (transactions || []).filter(t => t && !t.isOngoing);
+  // עסקה עם plugOutTime/stopReason הסתיימה בפועל — גם אם Wevo עדיין מסמנת isOngoing (דגל תקוע ידוע)
+  const list = (transactions || []).filter(t => t && (!t.isOngoing || t.plugOutTime || t.stopReason));
   if (!list.length || !open) return null;
   const tid = wevoOpenTxnId(open);
   if (tid) return list.find(t => String(t.transactionId) === tid) || null;
@@ -2869,7 +2870,7 @@ function resolveChargeTimeline(tx = {}, hints = {}) {
   const plugInMs = toMs(hints.plugInAt || hints.plugInTime || tx.plugInTime);
   const plugOutMs = toMs(hints.plugOutAt || hints.plugOutTime || tx.plugOutTime);
   const netSec = Number(hints.netDuration != null ? hints.netDuration : tx.netDuration) || 0;
-  const fullMs = toMs(hints.chargingFullTime || tx.chargingFullTime || hints.chargeEndedAt);
+  const fullMs = toMs(tx.chargingFullTime || hints.chargingFullTime || hints.chargeEndedAt);
   const liveStartMs = toMs(hints.chargeStartedAt || tx.chargeStartedAt);
 
   let chargeEndMs = null;
@@ -2877,6 +2878,9 @@ function resolveChargeTimeline(tx = {}, hints = {}) {
     chargeEndMs = fullMs;
   } else if (hints.chargeEndedAt) {
     chargeEndMs = toMs(hints.chargeEndedAt);
+  } else if (liveStartMs && netSec > 0) {
+    // שעת התחלת זרם ידועה (נצפתה חי) + משך נטו מ־Wevo → סיום מדויק, בלי ניחוש idle
+    chargeEndMs = liveStartMs + netSec * 1000;
   } else if (plugInMs && plugOutMs && netSec > 0) {
     const connectedSec = Math.max(0, (plugOutMs - plugInMs) / 1000);
     const idleSec = Math.max(0, connectedSec - netSec);
@@ -3622,7 +3626,7 @@ function txToEndFields(tx, fallback = {}) {
     plugOutAt: fallback.plugOutAt,
     chargeEndedAt: fallback.chargeEndedAt || fallback.endDate,
     chargeStartedAt: fallback.chargeStartedAt,
-    chargingFullTime: fallback.chargingFullTime || (tx && tx.chargingFullTime),
+    chargingFullTime: (tx && tx.chargingFullTime) || fallback.chargingFullTime,
     netDuration: tx && tx.netDuration != null ? tx.netDuration : fallback.netDuration
   });
   const maxWin = kwh > 0 ? pickMaxBillWindow(kwh, tl) : null;
@@ -7830,7 +7834,8 @@ function WevoOpenLiveSync({
       notes: txn ? `txn#${txn} | Wevo live` : existing && existing.notes || "Wevo live",
       wevoTxnId: txn || existing && existing.wevoTxnId || null,
       source: "wevo-live",
-      liveKwh: est.kwh,
+      // קוט״ש של טעינה אחת לא יורד לעולם — דגימת מצב ריקה (סשן שנסגר ב־Wevo) לא דורסת ערך שנצפה
+      liveKwh: Math.max(est.kwh || 0, Number(existing && existing.liveKwh) || 0),
       liveKw: st && st.rateKw != null ? Number(st.rateKw) : null,
       liveWevoCost: est.wevoCost,
       liveElecCost: est.elec,
@@ -7994,8 +7999,9 @@ function WevoOpenLiveSync({
               transactionId: txn
             }, txn);
           }
-        } else if (nowIdle || !st || !chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st)) {
-          // שחזור: טעינה פתוחה קיימת אבל פספסנו את רגע הניתוק (טלפון סגור וכו')
+        } else if (nowIdle || !st || !chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st) || st && chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st) && !isWaitingForAuthorize(st) && pendingWevo.length) {
+          // שחזור: טעינה פתוחה קיימת אבל פספסנו את רגע הסיום (טלפון סגור וכו') —
+          // כולל רכב שסיים לטעון אך הכבל עדיין מחובר (פתיחה קרה בלי prev)
           for (const o of pendingWevo) {
             if (cancelled) break;
             if (shouldDiscardOpen(o, sessionsRefLive.current)) continue;
@@ -13522,7 +13528,7 @@ function CompleteSession({
     n: "check",
     s: 12
   }), "השלמת טעינה פתוחה", filledOk ? " · מוכן לאישור" : ""))), (isWevoLinked || readyFromWevo) && /*#__PURE__*/React.createElement("div", {
-    style: S.statusCard(filledOk ? C.ok : wevoFetch === "err" ? C.err : C.warn)
+    style: S.statusCard(filledOk && (wevoFetch === "ok" || readyFromWevo) ? C.ok : wevoFetch === "err" ? C.err : C.warn)
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
@@ -13547,7 +13553,7 @@ function CompleteSession({
     }
   }), /*#__PURE__*/React.createElement(Spinner, {
     s: 15
-  }), "שולף מ-Wevo שעת סיום טעינה וקוט״ש סופי...") : filledOk ? /*#__PURE__*/React.createElement("span", {
+  }), "שולף מ-Wevo שעת סיום טעינה וקוט״ש סופי...") : filledOk && (wevoFetch === "ok" || readyFromWevo) ? /*#__PURE__*/React.createElement("span", {
     style: {
       display: "inline-flex",
       alignItems: "center",
@@ -13558,7 +13564,18 @@ function CompleteSession({
   }, /*#__PURE__*/React.createElement(Icon, {
     n: "check",
     s: 16
-  }), timelineRelevant ? "הנתונים מולאו מ-Wevo — בחר נקודות לחיוב מתוך חלון הזמנים (מעבר בין יקרות לרגיל)." : "הנתונים מולאו מ-Wevo — אין מעבר בין שעות יקרות/רגילות, חיוב לפי חיבור→סיום.") : /*#__PURE__*/React.createElement(React.Fragment, null, wevoFetchErr ? /*#__PURE__*/React.createElement("span", {
+  }), timelineRelevant ? "הנתונים מולאו מ-Wevo — בחר נקודות לחיוב מתוך חלון הזמנים (מעבר בין יקרות לרגיל)." : "הנתונים מולאו מ-Wevo — אין מעבר בין שעות יקרות/רגילות, חיוב לפי חיבור→סיום.") : filledOk ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 7,
+      color: "#92400e",
+      fontWeight: 700
+    }
+  }, /*#__PURE__*/React.createElement(Icon, {
+    n: "alert",
+    s: 16
+  }), "מוצגים נתוני מעקב חי אחרונים — עדיין לא אומתו מול Wevo. לחץ ״רענן מ-Wevo״ לפני שמירה.") : /*#__PURE__*/React.createElement(React.Fragment, null, wevoFetchErr ? /*#__PURE__*/React.createElement("span", {
     style: {
       color: C.errInk,
       fontWeight: 700

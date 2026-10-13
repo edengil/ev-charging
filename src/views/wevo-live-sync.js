@@ -106,7 +106,8 @@ function WevoOpenLiveSync({
       notes: txn ? `txn#${txn} | Wevo live` : existing && existing.notes || "Wevo live",
       wevoTxnId: txn || existing && existing.wevoTxnId || null,
       source: "wevo-live",
-      liveKwh: est.kwh,
+      // קוט״ש של טעינה אחת לא יורד לעולם — דגימת מצב ריקה (סשן שנסגר ב־Wevo) לא דורסת ערך שנצפה
+      liveKwh: Math.max(est.kwh || 0, Number(existing && existing.liveKwh) || 0),
       liveKw: st && st.rateKw != null ? Number(st.rateKw) : null,
       liveWevoCost: est.wevoCost,
       liveElecCost: est.elec,
@@ -270,8 +271,9 @@ function WevoOpenLiveSync({
               transactionId: txn
             }, txn);
           }
-        } else if (nowIdle || !st || !chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st)) {
-          // שחזור: טעינה פתוחה קיימת אבל פספסנו את רגע הניתוק (טלפון סגור וכו')
+        } else if (nowIdle || !st || !chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st) || st && chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st) && !isWaitingForAuthorize(st) && pendingWevo.length) {
+          // שחזור: טעינה פתוחה קיימת אבל פספסנו את רגע הסיום (טלפון סגור וכו') —
+          // כולל רכב שסיים לטעון אך הכבל עדיין מחובר (פתיחה קרה בלי prev)
           for (const o of pendingWevo) {
             if (cancelled) break;
             if (shouldDiscardOpen(o, sessionsRefLive.current)) continue;

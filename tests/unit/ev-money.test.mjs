@@ -572,9 +572,21 @@ describe("Wevo open session match", () => {
     const older = { transactionId: "1", isOngoing: false, plugInTime: Date.parse("2026-09-26T00:42"), totalEnergyKwh: 0.55 };
     assert.equal(pickFinishedWevoTx([older], { wevoTxnId: "88", plugInAt: "2026-09-26T00:42" }), null);
     assert.equal(pickFinishedWevoTx([older], { wevoTxnId: "1" }), older);
+    // עסקה שהסתיימה בפועל אך Wevo עוד מסמנת isOngoing (דגל תקוע) — נחשבת סגורה כשיש plugOutTime/stopReason
+    const stuck = { transactionId: "7", isOngoing: true, plugInTime: Date.parse("2026-10-11T15:27"), plugOutTime: Date.parse("2026-10-12T08:58"), totalEnergyKwh: 76.38 };
+    assert.equal(pickFinishedWevoTx([stuck], { wevoTxnId: "7" }), stuck);
+    const stuckStop = { transactionId: "8", isOngoing: true, plugInTime: Date.parse("2026-10-11T15:27"), stopReason: "EVDisconnected", totalEnergyKwh: 12 };
+    assert.equal(pickFinishedWevoTx([stuckStop], { wevoTxnId: "8" }), stuckStop);
+    // עסקה פעילה באמת (בלי סימני סיום) לא נבחרת כסגורה
+    const reallyOngoing = { transactionId: "9", isOngoing: true, plugInTime: Date.parse("2026-10-11T15:27"), totalEnergyKwh: 3 };
+    assert.equal(pickFinishedWevoTx([reallyOngoing], { wevoTxnId: "9" }), null);
     assert.equal(openChargeStatus({ wevoTxnId: "42", liveKw: 6 }, { state: "Finishing", transactionId: "42" }).kind, "cable");
     assert.match(readAppBundle(), /liveChargeEndStamp/);
     assert.match(readAppBundle(), /clearFinishedIfStillCharging/);
+    // שלמות נתונים (מקרה עידן 11.10): התחלת זרם ידועה + נטו מנצחים את ניחוש ה־idle; עסקת Wevo מנצחת רמז מקומי
+    assert.match(readAppBundle(), /liveStartMs \+ netSec \* 1000/);
+    assert.match(readAppBundle(), /tx\.chargingFullTime \|\| hints\.chargingFullTime/);
+    assert.match(readAppBundle(), /Math\.max\(est\.kwh \|\| 0, Number\(existing && existing\.liveKwh\) \|\| 0\)/);
   });
 
   it("טעינה שנשמרה לא חוזרת כממתינה גם כשהשעון שונה", () => {
