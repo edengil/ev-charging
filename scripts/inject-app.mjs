@@ -1,6 +1,8 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
+import { createRequire } from "module";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -241,7 +243,30 @@ function appVersionBanner() {
   const builtAt = new Date().toISOString();
   return `/* === app version (injected) === */\nwindow.__APP_VERSION__ = ${JSON.stringify({ commit, builtAt })};\n`;
 }
-const src = appVersionBanner() + money + "\n" + idle + "\n" + tariff + "\n" + app;
+const rawSrc = appVersionBanner() + money + "\n" + idle + "\n" + tariff + "\n" + app;
+
+// מיניפיקציה של הבאנדל (esbuild): שמות גלובליים נשמרים, רק לוקאליים מתקצרים.
+// target es2018 — לא מכניס תחביר חדש מהקלט (תאימות ספארי ישן).
+const requireHere = createRequire(import.meta.url);
+let transformSync = null;
+try {
+  ({ transformSync } = requireHere("esbuild"));
+} catch {}
+if (!transformSync) {
+  console.error("esbuild not found — run npm install (wrangler brings it) before inject");
+  process.exit(1);
+}
+const minified = transformSync(rawSrc, { minify: true, target: "es2018", loader: "js" }).code;
+// אימות תחביר של הפלט הממונפיק לפני כתיבה לדף
+const tmpBundle = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "ev-bundle-")), "bundle.js");
+fs.writeFileSync(tmpBundle, minified);
+const bundleCheck = spawnSync(process.execPath, ["--check", tmpBundle], { encoding: "utf8" });
+if (bundleCheck.status !== 0) {
+  console.error("minified bundle syntax check failed:\n" + (bundleCheck.stderr || bundleCheck.stdout));
+  process.exit(1);
+}
+console.log(`bundle minified: ${rawSrc.length} -> ${minified.length} bytes`);
+const src = minified;
 
 const checkMoney = spawnSync(process.execPath, ["--check", path.join(root, "lib/ev-money.mjs")], { encoding: "utf8" });
 if (checkMoney.status !== 0) {
