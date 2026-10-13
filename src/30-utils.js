@@ -186,9 +186,14 @@ function resolveChargeTimeline(tx = {}, hints = {}) {
   const netSec = Number(hints.netDuration != null ? hints.netDuration : tx.netDuration) || 0;
   const fullMs = toMs(tx.chargingFullTime || hints.chargingFullTime || hints.chargeEndedAt);
   const liveStartMs = toMs(hints.chargeStartedAt || tx.chargeStartedAt);
+  // סיום סופי שכבר אומת לרשומה שנסגרה (שחזור מעסקה גמורה) — גובר על כל גזירה
+  // ועל חותמות חיות מאוחרות, כדי שהאשף לא יציג שני סיומים סותרים לאותה טעינה.
+  const finalEndMs = toMs(hints.finalEndAt);
 
   let chargeEndMs = null;
-  if (fullMs && (!plugInMs || fullMs >= plugInMs)) {
+  if (finalEndMs && (!plugInMs || finalEndMs >= plugInMs)) {
+    chargeEndMs = finalEndMs;
+  } else if (fullMs && (!plugInMs || fullMs >= plugInMs)) {
     chargeEndMs = fullMs;
   } else if (hints.chargeEndedAt) {
     chargeEndMs = toMs(hints.chargeEndedAt);

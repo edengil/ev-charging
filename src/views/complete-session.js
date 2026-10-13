@@ -20,7 +20,7 @@ function CompleteSession({
   const readyFromWevo = !!(openSession && openSession.readyToComplete);
   const [durInput, setDurInput] = useState("");
   const [endDt, setEndDt] = useState(() => {
-    const src = openSession && (openSession.chargeEndedAt || openSession.endDate);
+    const src = openSession && ((openSession.wevoEnded && openSession.endDate) || openSession.chargeEndedAt || openSession.endDate);
     return src ? asLocalDT(src) : "";
   });
   const [useEnd, setUseEnd] = useState(!!(isWevoLinked || readyFromWevo || (openSession && (openSession.chargeEndedAt || openSession.endDate))));
@@ -49,6 +49,7 @@ function CompleteSession({
     plugInAt: openSession && (openSession.plugInAt || openSession.startDate),
     chargeStartedAt: openSession && openSession.chargeStartedAt,
     chargeEndedAt: openSession && (openSession.chargeEndedAt || openSession.endDate),
+    finalEndAt: openSession && openSession.wevoEnded && openSession.endDate ? openSession.endDate : null,
     plugOutAt: openSession && openSession.plugOutAt,
     chargingFullTime: openSession && openSession.chargingFullTime,
     netDuration: openSession && openSession.netDuration
@@ -229,6 +230,7 @@ function CompleteSession({
       plugInAt: openSession.plugInAt || openSession.startDate,
       chargeStartedAt: openSession.chargeStartedAt,
       chargeEndedAt: openSession.chargeEndedAt || openSession.endDate,
+      finalEndAt: openSession.wevoEnded && openSession.endDate ? openSession.endDate : null,
       plugOutAt: openSession.plugOutAt,
       chargingFullTime: openSession.chargingFullTime,
       netDuration: openSession.netDuration
@@ -240,7 +242,7 @@ function CompleteSession({
       const best = pickMaxBillWindow(kwhVal, tl);
       if (best) applyWindowKeys(best.startKey, best.endKey, tl);
     } else {
-      const endSrc = openSession.chargeEndedAt || openSession.endDate;
+      const endSrc = (openSession.wevoEnded && openSession.endDate) || openSession.chargeEndedAt || openSession.endDate;
       if (openSession.startDate) setStartEdit(asLocalDT(openSession.startDate) || openSession.startDate);
       if (endSrc) {
         const endLocal = asLocalDT(endSrc);

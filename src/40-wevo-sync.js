@@ -137,13 +137,9 @@ function readLiveStation() {
 
 /** חותמת סיום רק כשהעמדה כבר לא בטעינה. chargingFullTime באמצע טעינה אינו סיום. */
 function liveChargeEndStamp(st, existing, plugMs) {
-  if (stationStillCharging(st)) return null;
-  const fullMs = toMs(st && st.chargingFullTime);
-  if (fullMs && (!plugMs || fullMs >= plugMs)) return toLocalDT(fullMs);
-  if (existing && existing.chargeEndedAt && (!plugMs || toMs(existing.chargeEndedAt) >= plugMs)) {
-    return existing.chargeEndedAt;
-  }
-  return null;
+  // סיום שכבר נקבע על הרשומה לא זז — ראה pickLiveChargeEndMs ב־lib
+  const ms = pickLiveChargeEndMs(st, existing, plugMs);
+  return ms != null ? toLocalDT(ms) : null;
 }
 
 function clearFinishedIfStillCharging(payload, st) {
@@ -305,6 +301,7 @@ function txToEndFields(tx, fallback = {}) {
     plugInAt: fallback.startDate || fallback.plugInAt,
     plugOutAt: fallback.plugOutAt,
     chargeEndedAt: fallback.chargeEndedAt || fallback.endDate,
+    finalEndAt: fallback.wevoEnded && fallback.endDate ? fallback.endDate : null,
     chargeStartedAt: fallback.chargeStartedAt,
     chargingFullTime: (tx && tx.chargingFullTime) || fallback.chargingFullTime,
     netDuration: tx && tx.netDuration != null ? tx.netDuration : fallback.netDuration

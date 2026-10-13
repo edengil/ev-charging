@@ -41,6 +41,7 @@ import {
   shouldCloseStaleWevoOpen,
   openChargeStatus,
   stationStillCharging,
+  pickLiveChargeEndMs,
   isUsableStationSample,
   holdLiveStation,
   shouldShowNotifyEnable,
@@ -928,5 +929,44 @@ describe("כלל היומיים בחשד כפילות + שיוך מול טעינ
     assert.equal(e.cost, 15.3);
     assert.ok(String(e.key).startsWith("assigned:t9:"));
     assert.ok(e.archivedAt);
+  });
+});
+
+describe("pickLiveChargeEndMs — סיום חי לא דורס סיום אומת", () => {
+  const plugMs = new Date("2026-10-12T15:55").getTime();
+  const endMs = new Date("2026-10-12T23:20").getTime();
+  const lateMs = new Date("2026-10-13T06:43").getTime();
+
+  it("סיום קיים 23:20 גובר על חותמת חיה מאוחרת 06:43 למחרת (תרחיש עידן 13.10)", () => {
+    const st = { state: "Finishing", chargingFullTime: "2026-10-13T06:43" };
+    const existing = { chargeEndedAt: "2026-10-12T23:20" };
+    assert.equal(pickLiveChargeEndMs(st, existing, plugMs), endMs);
+  });
+
+  it("בלי סיום קיים — החותמת החיה נלקחת", () => {
+    const st = { state: "Finishing", chargingFullTime: "2026-10-12T23:20" };
+    assert.equal(pickLiveChargeEndMs(st, {}, plugMs), endMs);
+    assert.equal(pickLiveChargeEndMs(st, null, plugMs), endMs);
+  });
+
+  it("עמדה עדיין טוענת — אין סיום", () => {
+    const st = { state: "Charging", chargingFullTime: "2026-10-12T23:20" };
+    assert.equal(pickLiveChargeEndMs(st, { chargeEndedAt: "2026-10-12T23:20" }, plugMs), null);
+  });
+
+  it("סיום קיים ישן מעסקה קודמת (לפני החיבור) לא חוסם חותמת חיה תקפה", () => {
+    const st = { state: "Finishing", chargingFullTime: "2026-10-12T23:20" };
+    const existing = { chargeEndedAt: "2026-10-11T20:00" };
+    assert.equal(pickLiveChargeEndMs(st, existing, plugMs), endMs);
+  });
+
+  it("חותמת חיה לפני החיבור — נדחית", () => {
+    const st = { state: "Finishing", chargingFullTime: "2026-10-12T10:00" };
+    assert.equal(pickLiveChargeEndMs(st, {}, plugMs), null);
+  });
+
+  it("חותמת חיה כמספר ms מתקבלת", () => {
+    const st = { state: "Available", chargingFullTime: lateMs };
+    assert.equal(pickLiveChargeEndMs(st, {}, plugMs), lateMs);
   });
 });

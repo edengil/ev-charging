@@ -110,6 +110,46 @@ test.describe("complete-wizard", () => {
     expect(sessions[0].billEndKey).toBe("chargeEnd");
   });
 
+  test("סיום אומת מול חותמת חיה מאוחרת: האשף מציג סיום אחד עקבי (תרחיש עידן 13.10)", async ({ page }) => {
+    // הרשומה נסגרה בשחזור: סיום אומת 23:20. חותמת חיה מאוחרת הזיזה את chargeEndedAt ל־06:43 למחרת.
+    // האשף חייב להציג את הסיום האומת בכל מקום — לא שני סיומים סותרים.
+    const pad = n => String(n).padStart(2, "0");
+    const at = (dayOffset, h, m) => {
+      const d = new Date();
+      d.setDate(d.getDate() + dayOffset);
+      d.setHours(h, m, 0, 0);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    const open = {
+      id: "o-e2e-endconflict",
+      clientId: CLIENT_A.id,
+      startDate: at(-1, 15, 55),
+      plugInAt: at(-1, 15, 55),
+      chargeStartedAt: at(-1, 15, 55),
+      endDate: at(-1, 23, 20),
+      chargeEndedAt: at(0, 6, 43),
+      plugOutAt: at(0, 6, 43),
+      chargingFullTime: at(0, 6, 43),
+      wevoEnded: true,
+      readyToComplete: true,
+      liveKwh: 76.38,
+      wevoTxnId: "999002",
+      notes: "txn#999002 | Wevo live",
+      source: "wevo-live"
+    };
+    await openApp(page, { clients: [CLIENT_A, CLIENT_SELF], open: [open] });
+    const completeBtn = page.locator("[data-testid^=open-complete-]").first();
+    await expect(completeBtn).toBeVisible();
+    await completeBtn.click();
+    const endChoice = page.getByTestId("end-time-choice");
+    await expect(endChoice).toBeVisible({ timeout: 5000 });
+    const selectedText = await endChoice.evaluate(el => el.selectedOptions[0]?.textContent || "");
+    expect(selectedText).toContain("23:20");
+    expect(selectedText).not.toContain("06:43");
+    // משך החלון עקבי עם הסיום האומת: 15:55 + 7:25 = 23:20
+    await expect(page.getByTestId("complete-duration")).toHaveValue("7:25");
+  });
+
   test("שעת התחלה ידנית עם פורמט שגוי מציגה שגיאה", async ({ page }) => {
     await openApp(page, { clients: [CLIENT_A, CLIENT_SELF] });
     await openWizard(page, CLIENT_A.id);
