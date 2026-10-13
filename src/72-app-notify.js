@@ -10,7 +10,10 @@ function NotifyEnableButton() {
     let dead = false;
     const apply = perm => {
       if (dead) return;
-      if (perm === "granted") markNotifyEnabled();
+      if (perm === "granted") {
+        markNotifyEnabled();
+        if (typeof ensurePushSubscription === "function") ensurePushSubscription();
+      }
       setShow(shouldShowNotifyEnable(perm, notifyStoredOn()));
     };
     apply(windowNotifyPermission());

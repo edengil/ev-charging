@@ -34,6 +34,25 @@ self.addEventListener("message", event => {
   }
 });
 
+self.addEventListener("push", event => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {}
+  const title = data.title || "🔔 עדכון טעינה";
+  const tag = data.tag ? String(data.tag) : "ev-push";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || "",
+      tag,
+      lang: "he",
+      dir: "rtl",
+      renotify: true,
+      data: { tag }
+    })
+  );
+});
+
 self.addEventListener("notificationclick", event => {
   event.notification.close();
   const tag = event.notification && event.notification.data && event.notification.data.tag

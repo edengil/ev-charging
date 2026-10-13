@@ -1,4 +1,5 @@
 import { json, optionsResponse, handleWevoRequest, cognitoLogin } from "../_shared/wevo.js";
+import { pushToAllSubscribers } from "../_shared/push.js";
 
 // שומר צד־שרת להמשך טעינה במעבר לתעריף פרימיום.
 // המשתמש נרשם מהאפליקציה (opt-in) עם אישור מראש פעיל + premiumContinue.
@@ -201,6 +202,13 @@ async function handleTick(env, body) {
     await env.EV_BACKUP.delete(CFG_KEY);
     await env.EV_BACKUP.delete(STATUS_KEY);
     await pushLog(env, { kind: "expire", detail: "שומר כובה אוטומטית אחרי 24 שעות" });
+    try {
+      await pushToAllSubscribers(env, {
+        title: "🛰️ שומר הפרימיום כובה",
+        body: "השומר כובה אוטומטית אחרי 24 שעות. להפעלה מחדש — סמן שוב «המשך אוטומטי בפרימיום» באפליקציה.",
+        tag: "ev-watch-expired"
+      });
+    } catch {}
     return { ok: true, action: "tick", armed: false, expired: true };
   }
   const creds = await decryptJson(env, cfg.credsBlob);
@@ -231,6 +239,13 @@ async function handleTick(env, body) {
       chargingAfter: !!(res && res.state && res.state.charging)
     };
     await pushLog(env, action);
+    try {
+      await pushToAllSubscribers(env, {
+        title: "⚡ הטעינה ממשיכה בפרימיום",
+        body: `השומר זיהה מעבר לתעריף פרימיום וחידש את הטעינה אוטומטית${cfg.clientName ? ` (${cfg.clientName})` : ""}`,
+        tag: "ev-watch-premium"
+      });
+    } catch {}
   }
 
   cfg.wasCharging = charging;
