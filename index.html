@@ -321,7 +321,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 </script>
 <script>
 /* === app version (injected) === */
-window.__APP_VERSION__ = {"commit":"de34edd","builtAt":"2026-10-13T05:59:23.025Z"};
+window.__APP_VERSION__ = {"commit":"927c8ed","builtAt":"2026-10-13T06:06:37.868Z"};
 /* === lib/ev-money (injected) === */
 var __EV_MONEY__ = (function () {
 /**
@@ -8083,6 +8083,7 @@ function WevoLivePanel({
   // טוגל ״כולל תעריף יקר״ ליד כפתור האישור מראש — כבוי כברירת מחדל, פרימיום רק בהחלטה מפורשת
   const [preAuthPremium, setPreAuthPremium] = useState(false);
   const [premiumContinue, setPremiumContinue] = useState(false);
+  const [watchInfo, setWatchInfo] = useState(null);
   // אבחון זמני: גילוי פקודת הפרימיום האמיתית של Wevo
   const [probeResults, setProbeResults] = useState(null);
   const [probeBusy, setProbeBusy] = useState(false);
@@ -8182,9 +8183,63 @@ function WevoLivePanel({
     return norm;
   };
 
+  // שומר צד־שרת למעבר פרימיום: רישום/ביטול/סטטוס מול /api/wevo-watch.
+  // הפרטים נשלחים מהדפדפן (localStorage) ונשמרים בשרת מוצפנים — רק כשהמשתמש מפעיל במפורש.
+  const watchApi = async (action, extra = {}) => {
+    const creds = getWevoCreds();
+    if (!creds.email || !creds.password) throw new Error("NO_CREDS");
+    const res = await fetch("/api/wevo-watch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...creds, action, ...extra })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) throw new Error(data.error || `שגיאת שרת (${res.status})`);
+    return data;
+  };
+
+  const syncServerWatch = (intent) => {
+    (async () => {
+      try {
+        if (intent && intent.premiumContinue) {
+          const w = ownerPeakWindow();
+          const picked = (clientsRef.current || []).find(c => c.id === intent.clientId) || null;
+          await watchApi("register", {
+            clientId: intent.clientId,
+            clientName: picked && picked.name || intent.clientId,
+            peakStartMin: w.startMin,
+            peakEndMin: w.endMin
+          });
+          pushWevoLog("preauth", "שומר שרת הופעל — יאשר המשך במעבר לפרימיום גם כשהאפליקציה סגורה", true);
+          refreshWatchInfo();
+        } else {
+          await watchApi("deregister");
+          setWatchInfo(null);
+        }
+      } catch (e) {
+        if (intent && intent.premiumContinue) {
+          pushWevoLog("preauth", `שומר שרת לא הופעל: ${e && e.message || "שגיאה"}`, false);
+        }
+      }
+    })();
+  };
+
+  const refreshWatchInfo = () => {
+    (async () => {
+      try {
+        const data = await watchApi("status");
+        setWatchInfo(data && data.armed ? data : null);
+      } catch {
+        setWatchInfo(null);
+      }
+    })();
+  };
+
   const clearAuthIntent = (reason) => {
     persistIntent(null);
     if (reason) pushWevoLog("preauth", reason, true);
+    // ביטול ידני מפורש — מכבים גם את שומר השרת (ניקויים אוטומטיים בהתחלת טעינה לא מכבים אותו)
+    if (reason === "בוטל ידנית") syncServerWatch(null);
   };
 
   const armAuthIntent = (mode, clientIdOverride = null, opts = {}) => {
@@ -8208,6 +8263,8 @@ function WevoLivePanel({
       premiumContinue
     };
     persistIntent(next);
+    // שומר השרת עוקב אחרי הכוונה: נרשם כשיש המשך־פרימיום, מתבטל כשאין
+    syncServerWatch(next);
     const name = (picked && picked.name) || targetId;
     const label = mode === "offpeak-preauth"
       ? `אישור מראש לזול · ${name}`
@@ -8778,6 +8835,11 @@ function WevoLivePanel({
     }
   }, [isOffPeakIntent, state && state.state, lastAt]);
 
+  // סטטוס שומר השרת נטען בפתיחת הפאנל (הוא ממשיך לפעול גם אחרי שהכוונה המקומית התנקתה)
+  useEffect(() => {
+    if (hasCreds) refreshWatchInfo();
+  }, [hasCreds]);
+
   // המסך נשאר דלוק בזמן חיבור או אישור מראש, כדי שהסנכרון ימשיך
   useEffect(() => {
     const live = !!(state && (state.connected || state.charging || state.waitingAuthorize || isWaitingForAuthorize(state) || isActuallyCharging(state)));
@@ -9346,6 +9408,35 @@ function WevoLivePanel({
     },
     "data-testid": "wevo-boost-try"
   }, "נסה עקיפת פרימיום"), " — או הפעל “התחל טעינת פרימיום כעת” באפליקציית Wevo."),
+  watchInfo && watchInfo.armed && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      alignItems: "center",
+      marginBottom: 10,
+      background: "#fef3c7",
+      border: "1.5px solid #f59e0b",
+      borderRadius: 12,
+      padding: "10px 12px"
+    },
+    "data-testid": "wevo-watch-active"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: "1 1 200px",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#92400e"
+    }
+  }, "🛰️ שומר שרת פעיל · ", watchInfo.clientName || "", watchInfo.status && watchInfo.status.lastAction ? ` · פעל לאחרונה: ${watchInfo.status.lastAction.detail}` : " · יאשר המשך אוטומטית במעבר לפרימיום, גם כשהאפליקציה סגורה"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...S.btnS,
+      padding: "8px 10px"
+    },
+    onClick: () => syncServerWatch(null),
+    "data-testid": "wevo-watch-off"
+  }, "כבה שומר")),
   !isSelfSelected && cid && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
