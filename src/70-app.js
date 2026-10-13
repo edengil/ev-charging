@@ -1001,6 +1001,7 @@ function App() {
     openSess: openSess,
     clients: clients,
     sessions: sessions,
+    payments: payments,
     onDelOpen: delOpen,
     onUpsertOpen: upsertWevoOpen,
     onComplete: (id, c) => {

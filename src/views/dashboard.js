@@ -11,12 +11,14 @@ function Dashboard({
   openSess = [],
   clients = [],
   sessions = [],
+  payments = [],
   onDelOpen,
   onUpsertOpen,
   onComplete,
   onToggleArchive
 }) {
   const [sortBy, setSortBy] = useState("debt");
+  const [clientFilter, setClientFilter] = useState("all");
   const [liveStation, setLiveStation] = useState(() => readLiveStation());
   useEffect(() => {
     const sync = () => setLiveStation(readLiveStation());
@@ -104,6 +106,19 @@ function Dashboard({
     if (sortBy === "last") arr.sort((a, b) => (b.last ? new Date(b.last.date) : 0) - (a.last ? new Date(a.last.date) : 0));
     return arr;
   }, [stats, sortBy]);
+  // ── צ׳יפי סינון לקוחות (הצעת Stitch, בעיצוב שלנו): הכל / חייבים / מוסדרים / בזכות ──
+  const filterCounts = (() => {
+    const vis = stats.filter(c => !c.hidden && !c.isSelf);
+    return {
+      all: stats.filter(c => !c.hidden).length,
+      debt: vis.filter(c => hasDebt(c.balance)).length,
+      settled: vis.filter(c => !hasDebt(c.balance) && !hasCredit(c.balance)).length,
+      credit: vis.filter(c => hasCredit(c.balance)).length
+    };
+  })();
+  const visibleSorted = clientFilter === "all" ? sorted : sorted.filter(c => !c.isSelf && (clientFilter === "debt" ? hasDebt(c.balance) : clientFilter === "credit" ? hasCredit(c.balance) : !hasDebt(c.balance) && !hasCredit(c.balance)));
+  // ── גביית החודש: נגבה בפועל מול חויב (הצעת Stitch, בעיצוב שלנו) ──
+  const coll = monthlyCollection(sessions, payments, selfIdsHero, now.getFullYear(), now.getMonth());
   // מוסתרת מהרשימה רק כשהפאנל החי באמת מציג רכב — אחרת הטעינה נעלמת משני המקומות
   const liveOpen = chargerReportsVehicle(liveStation, sessions) ? findChargeStillOnStation(openSess, liveStation, sessions) : null;
   const openCards = dropOpensAlreadySaved(openSess, sessions).filter(o => !liveOpen || o.id !== liveOpen.id);
@@ -158,7 +173,65 @@ function Dashboard({
     val: ilsFull(totAllP),
     color: C.primaryStrong,
     icon: "zap"
+  })), (coll.billed > 0 || coll.collected > 0) && /*#__PURE__*/React.createElement("div", {
+    "data-testid": "collection-card",
+    style: {
+      background: "#fff",
+      border: "1px solid " + C.line,
+      borderRadius: 12,
+      padding: "12px 14px",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#334155"
+    }
+  }, "גבייה החודש"), coll.pct != null && /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: "#dcfce7",
+      color: "#065f46",
+      borderRadius: 999,
+      padding: "3px 10px",
+      fontSize: 12,
+      fontWeight: 800
+    }
+  }, coll.pct, "% שולם")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#334155",
+      marginBottom: 8
+    }
+  }, "נגבה ", ils(coll.collected), " מתוך ", ils(coll.billed), " שחויבו החודש"), coll.pct != null && /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 8,
+      borderRadius: 999,
+      background: "#e2e8f0",
+      overflow: "hidden",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    "data-testid": "collection-bar",
+    style: {
+      height: "100%",
+      width: coll.pct + "%",
+      background: "#10b981",
+      borderRadius: 999
+    }
   })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#94a3b8"
+    }
+  }, "חוב פתוח כולל (כל החודשים): ", ils(totBal))), /*#__PURE__*/React.createElement("div", {
     style: {
       background: paceDelta == null ? "#f8fafc" : paceDelta >= 0 ? "#f0fdf4" : "#fef2f2",
       border: `1px solid ${paceDelta == null ? "#e2e8f0" : paceDelta >= 0 ? "#bbf7d0" : "#fecaca"}`,
@@ -293,6 +366,32 @@ function Dashboard({
   }, "מיון: שם"), /*#__PURE__*/React.createElement("option", {
     value: "last"
   }, "מיון: טעינה אחרונה")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 12
+    },
+    "data-testid": "clients-filter"
+  }, [["all", "הכל"], ["debt", "חייבים"], ["settled", "מוסדרים"], ["credit", "בזכות"]].map(([fKey, fLabel]) => /*#__PURE__*/React.createElement("button", {
+    key: fKey,
+    type: "button",
+    onClick: () => setClientFilter(fKey),
+    "data-testid": `clients-filter-${fKey}`,
+    "aria-pressed": clientFilter === fKey,
+    style: {
+      border: "1.5px solid " + (clientFilter === fKey ? C.primary : C.line),
+      background: clientFilter === fKey ? C.primarySoft : "#fff",
+      color: clientFilter === fKey ? C.primaryInk : C.meta,
+      borderRadius: 999,
+      padding: "8px 14px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      minHeight: 40,
+      fontFamily: "inherit"
+    }
+  }, fLabel, " (", filterCounts[fKey], ")"))), /*#__PURE__*/React.createElement("div", {
     style: S.cGrid
   }, sorted.length === 0 && (archivedCount > 0 ? /*#__PURE__*/React.createElement(EmptyState, {
     icon: "archive",
@@ -306,7 +405,14 @@ function Dashboard({
     sub: "הוסף את השכנים שמטעינים בעמדה — כל טעינה תירשם אוטומטית בכרטיס שלהם.",
     actionLabel: "הוסף לקוח ראשון",
     onAction: () => go("add-c")
-  })), sorted.map((c, i) => /*#__PURE__*/React.createElement("div", {
+  })), sorted.length > 0 && visibleSorted.length === 0 && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: "#94a3b8",
+      margin: "4px 0 0"
+    },
+    "data-testid": "clients-filter-empty"
+  }, "אין לקוחות בקטגוריה זו"), visibleSorted.map((c, i) => /*#__PURE__*/React.createElement("div", {
     key: c.id,
     className: "ev-stagger",
     style: { ...S.cCard, animationDelay: Math.min(i * 40, 400) + "ms" },

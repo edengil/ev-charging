@@ -64,6 +64,7 @@ ${body}
     pickFinishedWevoTx: pickFinishedWevoTx,
     stationStillCharging: stationStillCharging,
     pickLiveChargeEndMs: pickLiveChargeEndMs,
+    monthlyCollection: monthlyCollection,
     isUsableStationSample: isUsableStationSample,
     holdLiveStation: holdLiveStation,
     openChargeStatus: openChargeStatus,
@@ -137,6 +138,7 @@ var findChargeStillOnStation = __EV_MONEY__.findChargeStillOnStation;
 var pickFinishedWevoTx = __EV_MONEY__.pickFinishedWevoTx;
 var stationStillCharging = __EV_MONEY__.stationStillCharging;
 var pickLiveChargeEndMs = __EV_MONEY__.pickLiveChargeEndMs;
+var monthlyCollection = __EV_MONEY__.monthlyCollection;
 var isUsableStationSample = __EV_MONEY__.isUsableStationSample;
 var holdLiveStation = __EV_MONEY__.holdLiveStation;
 var openChargeStatus = __EV_MONEY__.openChargeStatus;

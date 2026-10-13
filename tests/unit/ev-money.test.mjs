@@ -42,6 +42,7 @@ import {
   openChargeStatus,
   stationStillCharging,
   pickLiveChargeEndMs,
+  monthlyCollection,
   isUsableStationSample,
   holdLiveStation,
   shouldShowNotifyEnable,
@@ -968,5 +969,42 @@ describe("pickLiveChargeEndMs — סיום חי לא דורס סיום אומת"
   it("חותמת חיה כמספר ms מתקבלת", () => {
     const st = { state: "Available", chargingFullTime: lateMs };
     assert.equal(pickLiveChargeEndMs(st, {}, plugMs), lateMs);
+  });
+});
+
+describe("monthlyCollection — גביית החודש", () => {
+  const Y = 2026, M = 9; // אוקטובר
+  const sess = (clientId, day, billed) => ({ clientId, date: `2026-10-${day}T10:00`, amountBilled: billed });
+  const pay = (clientId, day, amount) => ({ clientId, date: `2026-10-${day}T12:00`, amount });
+
+  it("מחשב חויב/נגבה/אחוז לאותו חודש בלבד, בלי לקוח עצמי", () => {
+    const r = monthlyCollection(
+      [sess("a", "05", 200), sess("b", "06", 100), sess("self", "06", 999), sess("a", "05", 50)],
+      [pay("b", "07", 100), pay("c", "07", 50), pay("self", "07", 500)],
+      ["self"], Y, M
+    );
+    // billed: 200+100+50 (העצמי מוחרג); collected: 100+50
+    assert.equal(r.billed, 350);
+    assert.equal(r.collected, 150);
+    assert.equal(r.pct, 43);
+  });
+
+  it("חודש אחר לא נספר", () => {
+    const r = monthlyCollection(
+      [{ clientId: "a", date: "2026-09-30T23:00", amountBilled: 700 }],
+      [{ clientId: "a", date: "2026-11-01T09:00", amount: 700 }],
+      [], Y, M
+    );
+    assert.deepEqual(r, { billed: 0, collected: 0, pct: null });
+  });
+
+  it("אחוז מוגבל ל־100 גם כשנגבה יותר מהחיוב החודשי", () => {
+    const r = monthlyCollection([sess("a", "05", 100)], [pay("a", "06", 260)], [], Y, M);
+    assert.equal(r.pct, 100);
+  });
+
+  it("תשלום שלילי/אפס לא נספר כגבייה", () => {
+    const r = monthlyCollection([sess("a", "05", 100)], [pay("a", "06", 0), pay("a", "06", -30), pay("a", "06", 40)], [], Y, M);
+    assert.equal(r.collected, 40);
   });
 });
