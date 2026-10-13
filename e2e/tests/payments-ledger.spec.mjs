@@ -88,13 +88,15 @@ test.describe("payments-ledger", () => {
   });
 
   test("עובר ושב מציג טעינה והפקדה עם יתרה", async ({ page }) => {
+    // תאריכים יחסיים — תאריכים קבועים ישנים גורמים ללקוח להיארכב (30+ יום בלי פעילות) והבדיקה נשברת עם הזמן
+    const daysAgoIso = d => new Date(Date.now() - d * 86400000).toISOString();
     await openApp(page, {
       clients: [CLIENT_A, CLIENT_SELF],
       sessions: [
         {
           id: "s1",
           clientId: CLIENT_A.id,
-          date: "2026-09-10T10:00:00.000Z",
+          date: daysAgoIso(3),
           kwhRaw: 5,
           kwhInflated: 6,
           amountBilled: 80,
@@ -111,7 +113,7 @@ test.describe("payments-ledger", () => {
           clientId: CLIENT_A.id,
           amount: 80,
           method: "paybox",
-          date: "2026-09-11T10:00:00.000Z",
+          date: daysAgoIso(2),
           notes: ""
         }
       ]
