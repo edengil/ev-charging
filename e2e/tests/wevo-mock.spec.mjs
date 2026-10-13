@@ -213,6 +213,49 @@ test.describe("wevo-mock", () => {
     expect(sealed.readyToComplete).toBe(true);
   });
 
+  test("פתיחה קרה: טעינה שהסתיימה כשהאפליקציה סגורה — שחזור סמכותי מ־Wevo בלי מעבר נצפה", async ({ page }) => {
+    // תרחיש עידן (11.10): האפליקציה הייתה סגורה כשהטעינה הסתיימה בלילה.
+    // בפתיחה: open עם liveKwh חלקי קפוא, בלי שדות סיום; העמדה כבר מחובר־סיים מהדגימה הראשונה.
+    // בלי טריגר השחזור — ה־open נשאר תקוע עם הנתון החלקי לנצח.
+    const pad = n => String(n).padStart(2, "0");
+    const localDT = ms => {
+      const d = new Date(ms);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    const now = Date.now();
+    const coldOpen = {
+      id: "o-e2e-cold",
+      clientId: CLIENT_A.id,
+      startDate: localDT(now - 18 * 3600 * 1000),
+      plugInAt: localDT(now - 18 * 3600 * 1000),
+      chargeStartedAt: localDT(now - 17.5 * 3600 * 1000),
+      wevoTxnId: "999001",
+      notes: "txn#999001 | Wevo live",
+      source: "wevo-live",
+      liveKwh: 5.0
+    };
+    await resetWevoMock(page, "connected-done");
+    await openApp(page, {
+      clients: [CLIENT_A, CLIENT_SELF],
+      open: [coldOpen],
+      extra: {
+        ev_wevo_creds: JSON.stringify(WEVO_CREDS)
+      }
+    });
+    await expect(page.getByTestId("wevo-panel")).toBeVisible();
+    // השחזור חייב למשוך את העסקה הסגורה: קוט״ש סמכותי 12.5 (לא ה־5.0 הקפוא) + מוכן לאישור
+    let recovered = null;
+    await expect
+      .poll(async () => {
+        const opens = JSON.parse(await page.evaluate(() => localStorage.getItem("ev_open") || "[]"));
+        recovered = opens.find(o => o.id === "o-e2e-cold");
+        return recovered && recovered.readyToComplete === true && Number(recovered.liveKwh) === 12.5;
+      }, { timeout: 30000 })
+      .toBe(true);
+    expect(recovered.wevoEnded).toBe(true);
+    await expect(page.getByTestId("ready-complete-banner")).toBeVisible();
+  });
+
   test("סיום טעינה כשהכבל עדיין מחובר — מסומן כמוכן לאישור עם התראה", async ({ page }) => {
     await resetWevoMock(page, "charging");
     await openApp(page, {

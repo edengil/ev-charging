@@ -321,7 +321,7 @@ function(a,b,c){if(!Vd(b))throw Error(n(200));return Wd(null,a,b,!1,c)};Q.unmoun
 </script>
 <script>
 /* === app version (injected) === */
-window.__APP_VERSION__ = {"commit":"927c8ed","builtAt":"2026-10-13T06:06:37.868Z"};
+window.__APP_VERSION__ = {"commit":"0706c7f","builtAt":"2026-10-13T06:21:28.080Z"};
 /* === lib/ev-money (injected) === */
 var __EV_MONEY__ = (function () {
 /**
@@ -7998,9 +7998,11 @@ function WevoOpenLiveSync({
               transactionId: txn
             }, txn);
           }
-        } else if (nowIdle || !st || !chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st) || st && chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st) && !isWaitingForAuthorize(st) && pendingWevo.length) {
+        } else if (nowIdle || !st || !chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st) || st && chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st) && pendingWevo.some(o => o.chargeStartedAt || Number(o.liveKwh) > 0 || o.chargingFullTime)) {
           // שחזור: טעינה פתוחה קיימת אבל פספסנו את רגע הסיום (טלפון סגור וכו') —
-          // כולל רכב שסיים לטעון אך הכבל עדיין מחובר (פתיחה קרה בלי prev)
+          // כולל רכב שסיים לטעון אך הכבל עדיין מחובר (פתיחה קרה בלי prev).
+          // "מחובר־ממתין" (Occupied) דו־משמעי: רק open עם ראיות שטעינה כבר רצה
+          // (chargeStartedAt / liveKwh / chargingFullTime) נכנס לשחזור — רכב שרק חובר וממתין לאישור לא ייסגר בטעות.
           for (const o of pendingWevo) {
             if (cancelled) break;
             if (shouldDiscardOpen(o, sessionsRefLive.current)) continue;

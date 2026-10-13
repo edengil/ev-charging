@@ -271,9 +271,11 @@ function WevoOpenLiveSync({
               transactionId: txn
             }, txn);
           }
-        } else if (nowIdle || !st || !chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st) || st && chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st) && !isWaitingForAuthorize(st) && pendingWevo.length) {
+        } else if (nowIdle || !st || !chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st) || st && chargerReportsVehicle(st, sessionsRefLive.current) && !isActuallyCharging(st) && pendingWevo.some(o => o.chargeStartedAt || Number(o.liveKwh) > 0 || o.chargingFullTime)) {
           // שחזור: טעינה פתוחה קיימת אבל פספסנו את רגע הסיום (טלפון סגור וכו') —
-          // כולל רכב שסיים לטעון אך הכבל עדיין מחובר (פתיחה קרה בלי prev)
+          // כולל רכב שסיים לטעון אך הכבל עדיין מחובר (פתיחה קרה בלי prev).
+          // "מחובר־ממתין" (Occupied) דו־משמעי: רק open עם ראיות שטעינה כבר רצה
+          // (chargeStartedAt / liveKwh / chargingFullTime) נכנס לשחזור — רכב שרק חובר וממתין לאישור לא ייסגר בטעות.
           for (const o of pendingWevo) {
             if (cancelled) break;
             if (shouldDiscardOpen(o, sessionsRefLive.current)) continue;
