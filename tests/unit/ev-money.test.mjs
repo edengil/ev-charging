@@ -789,6 +789,13 @@ describe("app-source drift guards", () => {
     assert.match(inj, /copy of index\.html/);
   });
 
+  it("בונה payload חי אחד משותף למנוע הסנכרון ולפאנל (שלב A)", () => {
+    const src = readAppBundle();
+    assert.match(src, /function buildLiveOpenPayload/);
+    assert.equal((src.match(/delayCharge: !!\(st/g) || []).length, 1);
+    assert.equal((src.match(/buildLiveOpenPayload\(st, clientId, existing, clientsRef/g) || []).length, 2);
+  });
+
   it("יש כפתורי אישור ייעודיים + אישור ראשון אוטומטי + כפתור לקוח", () => {
     const src = readAppBundle();
     assert.match(src, /wevo-preauth-arm/);

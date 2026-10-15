@@ -155,6 +155,54 @@ function clearFinishedIfStillCharging(payload, st) {
   };
 }
 
+/**
+ * בונה ה־payload היחיד לרשומת טעינה פתוחה מדגימת מצב חיה.
+ * עד 16.10 היו שני בונים כמעט־זהים (במנוע הסנכרון ובפאנל) שסטו זה מזה
+ * (שמירת liveKwh מונוטונית רק באחד, שדות קצב/דגלים רק בשני) — מקור למחלקת
+ * תקלות הסיום הכפול. זו גרסת האיחוד: מונוטוניות + כל השדות.
+ */
+function buildLiveOpenPayload(st, clientId, existing, clients) {
+  const list = clients || [];
+  const plugIn = st && st.plugInTime ? toLocalDT(new Date(st.plugInTime)) : toLocalDT(new Date());
+  const txn = st && st.transactionId ? String(st.transactionId) : null;
+  const est = liveChargeEstimate(st || {}, list.find(c => c.id === clientId));
+  const fullMs = toMs(st && st.chargingFullTime);
+  const plugMs = toMs(existing && (existing.plugInAt || existing.startDate) || plugIn);
+  const chargeEndedAt = liveChargeEndStamp(st, existing, plugMs);
+  return clearFinishedIfStillCharging({
+    id: existing ? existing.id : uid(),
+    clientId,
+    startDate: existing && existing.startDate ? existing.startDate : plugIn,
+    plugInAt: existing && existing.plugInAt ? existing.plugInAt : plugIn,
+    chargeStartedAt: existing && existing.chargeStartedAt || null,
+    chargeEndedAt,
+    chargingFullTime: fullMs || existing && existing.chargingFullTime || null,
+    notes: txn ? `txn#${txn} | Wevo live` : existing && existing.notes || "Wevo live",
+    wevoTxnId: txn || existing && existing.wevoTxnId || null,
+    source: "wevo-live",
+    // קוט״ש של טעינה אחת לא יורד לעולם — דגימת מצב ריקה לא דורסת ערך שנצפה
+    liveKwh: Math.max(est.kwh || 0, Number(existing && existing.liveKwh) || 0),
+    liveKw: st && st.rateKw != null ? Number(st.rateKw) : null,
+    liveWevoCost: est.wevoCost,
+    liveElecCost: est.elec,
+    liveBilled: est.isSelf ? null : est.calc.amountBilled,
+    liveRate: est.isSelf ? null : est.calc.rate,
+    liveRateLabel: est.isSelf ? null : est.calc.rateLabel,
+    liveProfit: est.isSelf ? null : est.calc.profit,
+    updatedAt: new Date().toISOString(),
+    avgRateKW: st && st.avgRateKW != null ? Number(st.avgRateKW) : existing && existing.avgRateKW,
+    maxRateKW: st && st.maxRateKW != null ? Number(st.maxRateKW) : existing && existing.maxRateKW,
+    wevoFlags: {
+      delayCharge: !!(st && st.delayCharge),
+      manageCharge: !!(st && st.manageCharge),
+      isWaitingAllocation: !!(st && st.isWaitingAllocation),
+      isBoost: !!(st && st.isBoost),
+      inWindow: st && st.inWindow,
+      solarChargingType: st && st.solarChargingType || null
+    }
+  }, st);
+}
+
 /** אותה עסקה, גם אם סומנה בטעות כמוכנה לאישור בזמן שהעמדה עדיין טוענת. */
 function findLiveTxnOpen(opens, st) {
   const txn = st && st.transactionId != null && String(st.transactionId) !== "" ? String(st.transactionId) : null;

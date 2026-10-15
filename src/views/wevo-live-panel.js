@@ -232,46 +232,7 @@ function WevoLivePanel({
     if (tryAuthKickRef.current) tryAuthKickRef.current();
   };
 
-  const buildOpenPayload = (st, clientId, existing) => {
-    const list = clientsRef.current || [];
-    const plugIn = st && st.plugInTime ? toLocalDT(new Date(st.plugInTime)) : toLocalDT(new Date());
-    const txn = st && st.transactionId ? String(st.transactionId) : null;
-    const est = liveChargeEstimate(st || {}, list.find(c => c.id === clientId));
-    const fullMs = toMs(st && st.chargingFullTime);
-    const plugMs = toMs(existing && (existing.plugInAt || existing.startDate) || plugIn);
-    const chargeEndedAt = liveChargeEndStamp(st, existing, plugMs);
-    return clearFinishedIfStillCharging({
-      id: existing ? existing.id : uid(),
-      clientId,
-      startDate: existing && existing.startDate ? existing.startDate : plugIn,
-      plugInAt: existing && existing.plugInAt ? existing.plugInAt : plugIn,
-      chargeStartedAt: existing && existing.chargeStartedAt || null,
-      chargeEndedAt,
-      chargingFullTime: fullMs || existing && existing.chargingFullTime || null,
-      notes: txn ? `txn#${txn} | Wevo live` : existing && existing.notes || "Wevo live",
-      wevoTxnId: txn || existing && existing.wevoTxnId || null,
-      source: "wevo-live",
-      liveKwh: est.kwh,
-      liveKw: st && st.rateKw != null ? Number(st.rateKw) : null,
-      liveWevoCost: est.wevoCost,
-      liveElecCost: est.elec,
-      liveBilled: est.isSelf ? null : est.calc.amountBilled,
-      liveRate: est.isSelf ? null : est.calc.rate,
-      liveRateLabel: est.isSelf ? null : est.calc.rateLabel,
-      liveProfit: est.isSelf ? null : est.calc.profit,
-      updatedAt: new Date().toISOString(),
-      avgRateKW: st && st.avgRateKW != null ? Number(st.avgRateKW) : existing && existing.avgRateKW,
-      maxRateKW: st && st.maxRateKW != null ? Number(st.maxRateKW) : existing && existing.maxRateKW,
-      wevoFlags: {
-        delayCharge: !!(st && st.delayCharge),
-        manageCharge: !!(st && st.manageCharge),
-        isWaitingAllocation: !!(st && st.isWaitingAllocation),
-        isBoost: !!(st && st.isBoost),
-        inWindow: st && st.inWindow,
-        solarChargingType: st && st.solarChargingType || null
-      }
-    }, st);
-  };
+  const buildOpenPayload = (st, clientId, existing) => buildLiveOpenPayload(st, clientId, existing, clientsRef.current || []);
 
   const isActuallyCharging = st => {
     if (!st) return false;
