@@ -43,6 +43,7 @@ import {
   stationStillCharging,
   pickLiveChargeEndMs,
   monthlyCollection,
+  resolveChargeTimeline,
   isUsableStationSample,
   holdLiveStation,
   shouldShowNotifyEnable,
@@ -585,9 +586,10 @@ describe("Wevo open session match", () => {
     assert.equal(openChargeStatus({ wevoTxnId: "42", liveKw: 6 }, { state: "Finishing", transactionId: "42" }).kind, "cable");
     assert.match(readAppBundle(), /liveChargeEndStamp/);
     assert.match(readAppBundle(), /clearFinishedIfStillCharging/);
-    // שלמות נתונים (מקרה עידן 11.10): התחלת זרם ידועה + נטו מנצחים את ניחוש ה־idle; עסקת Wevo מנצחת רמז מקומי
-    assert.match(readAppBundle(), /liveStartMs \+ netSec \* 1000/);
-    assert.match(readAppBundle(), /tx\.chargingFullTime \|\| hints\.chargingFullTime/);
+    // שלמות נתונים (מקרה עידן 11.10): לוגיקת ציר הזמן עברה ל־lib (שלב C) ומכוסה שם
+    // בבדיקות התנהגות; כאן מוודאים שהבאנדל לא מגדיר אותה שוב ושה־lib חושף אותה.
+    assert.doesNotMatch(readAppBundle(), /function resolveChargeTimeline/);
+    assert.match(readFileSync(join(root, "lib/ev-money.mjs"), "utf8"), /export function resolveChargeTimeline/);
     assert.match(readAppBundle(), /Math\.max\(est\.kwh \|\| 0, Number\(existing && existing\.liveKwh\) \|\| 0\)/);
   });
 
@@ -1021,5 +1023,66 @@ describe("monthlyCollection — גביית החודש", () => {
   it("תשלום שלילי/אפס לא נספר כגבייה", () => {
     const r = monthlyCollection([sess("a", "05", 100)], [pay("a", "06", 0), pay("a", "06", -30), pay("a", "06", 40)], [], Y, M);
     assert.equal(r.collected, 40);
+  });
+});
+
+describe("resolveChargeTimeline (lib) — גזירת ציר זמן", () => {
+  it("עסקה גמורה: חותמת Wevo קובעת את הסיום (מקרה עידן)", () => {
+    const tl = resolveChargeTimeline(
+      { plugInTime: "2026-10-11T15:55", chargingFullTime: "2026-10-11T23:18", netDuration: 26740 },
+      {}
+    );
+    assert.equal(tl.chargeEndAt, "2026-10-11T23:18");
+    assert.equal(tl.plugInAt, "2026-10-11T15:55");
+    assert.equal(tl.billMins, 443);
+  });
+
+  it("התחלת זרם חיה + נטו: סיום = התחלה + נטו", () => {
+    const tl = resolveChargeTimeline({}, {
+      plugInAt: "2026-10-12T15:55",
+      chargeStartedAt: "2026-10-12T15:55",
+      netDuration: 26700
+    });
+    assert.equal(tl.chargeEndAt, "2026-10-12T23:20");
+    assert.equal(tl.chargeStartAt, "2026-10-12T15:55");
+  });
+
+  it("finalEndAt גובר על חותמת חיה מאוחרת (באג הסיום הכפול)", () => {
+    const tl = resolveChargeTimeline({}, {
+      plugInAt: "2026-10-12T15:55",
+      chargeStartedAt: "2026-10-12T15:55",
+      chargeEndedAt: "2026-10-13T06:43",
+      chargingFullTime: "2026-10-13T06:43",
+      finalEndAt: "2026-10-12T23:20"
+    });
+    assert.equal(tl.chargeEndAt, "2026-10-12T23:20");
+  });
+
+  it("חידוש אחרי הפסקת פרימיום: חותמת העסקה גוברת על התחלה+נטו", () => {
+    // זרם 15:00–17:00, הפסקה, חידוש 23:00–23:30. נטו 5 שעות היה נותן 20:00 — שגוי.
+    const tl = resolveChargeTimeline(
+      { plugInTime: "2026-10-12T15:00", chargingFullTime: "2026-10-12T23:30", netDuration: 5 * 3600 },
+      {}
+    );
+    assert.equal(tl.chargeEndAt, "2026-10-12T23:30");
+  });
+
+  it("המתנה ארוכה (idle ≥ 20 דק׳): סיום בניתוק, התחלה = ניתוק − נטו", () => {
+    const tl = resolveChargeTimeline({}, {
+      plugInAt: "2026-10-12T10:00",
+      plugOutAt: "2026-10-12T20:00",
+      netDuration: 2 * 3600
+    });
+    assert.equal(tl.chargeEndAt, "2026-10-12T20:00");
+    assert.equal(tl.chargeStartAt, "2026-10-12T18:00");
+  });
+
+  it("סיום לא יכול לעבור את הוצאת הכבל", () => {
+    const tl = resolveChargeTimeline({}, {
+      plugInAt: "2026-10-12T10:00",
+      plugOutAt: "2026-10-12T12:00",
+      chargeEndedAt: "2026-10-12T15:00"
+    });
+    assert.equal(tl.chargeEndAt, "2026-10-12T12:00");
   });
 });

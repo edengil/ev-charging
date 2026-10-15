@@ -176,74 +176,7 @@ function toMs(v) {
   return Number.isNaN(t) ? null : t;
 }
 
-/**
- * ארבע נקודות זמן לטעינה:
- * חיבור כבל → התחלת זרם → סיום זרם → הוצאת כבל
- */
-function resolveChargeTimeline(tx = {}, hints = {}) {
-  const plugInMs = toMs(hints.plugInAt || hints.plugInTime || tx.plugInTime);
-  const plugOutMs = toMs(hints.plugOutAt || hints.plugOutTime || tx.plugOutTime);
-  const netSec = Number(hints.netDuration != null ? hints.netDuration : tx.netDuration) || 0;
-  const fullMs = toMs(tx.chargingFullTime || hints.chargingFullTime || hints.chargeEndedAt);
-  const liveStartMs = toMs(hints.chargeStartedAt || tx.chargeStartedAt);
-  // סיום סופי שכבר אומת לרשומה שנסגרה (שחזור מעסקה גמורה) — גובר על כל גזירה
-  // ועל חותמות חיות מאוחרות, כדי שהאשף לא יציג שני סיומים סותרים לאותה טעינה.
-  const finalEndMs = toMs(hints.finalEndAt);
-
-  let chargeEndMs = null;
-  if (finalEndMs && (!plugInMs || finalEndMs >= plugInMs)) {
-    chargeEndMs = finalEndMs;
-  } else if (fullMs && (!plugInMs || fullMs >= plugInMs)) {
-    chargeEndMs = fullMs;
-  } else if (hints.chargeEndedAt) {
-    chargeEndMs = toMs(hints.chargeEndedAt);
-  } else if (liveStartMs && netSec > 0) {
-    // שעת התחלת זרם ידועה (נצפתה חי) + משך נטו מ־Wevo → סיום מדויק, בלי ניחוש idle
-    chargeEndMs = liveStartMs + netSec * 1000;
-  } else if (plugInMs && plugOutMs && netSec > 0) {
-    const connectedSec = Math.max(0, (plugOutMs - plugInMs) / 1000);
-    const idleSec = Math.max(0, connectedSec - netSec);
-    // המתנה ארוכה לפני זרם → סיום קרוב לניתוק; כבל אחרי סיום → חיבור+נטו
-    if (idleSec >= 20 * 60) chargeEndMs = plugOutMs;
-    else chargeEndMs = plugInMs + netSec * 1000;
-  } else if (plugInMs && netSec > 0) {
-    chargeEndMs = plugInMs + netSec * 1000;
-  } else if (plugOutMs) {
-    chargeEndMs = plugOutMs;
-  }
-
-  let chargeStartMs = liveStartMs;
-  if (!chargeStartMs && chargeEndMs && netSec > 0) {
-    chargeStartMs = chargeEndMs - netSec * 1000;
-  } else if (!chargeStartMs && plugInMs && plugOutMs && netSec > 0) {
-    const connectedSec = Math.max(0, (plugOutMs - plugInMs) / 1000);
-    const idleSec = Math.max(0, connectedSec - netSec);
-    if (idleSec >= 20 * 60) chargeStartMs = plugOutMs - netSec * 1000;
-    else chargeStartMs = plugInMs;
-  } else if (!chargeStartMs && plugInMs) {
-    chargeStartMs = plugInMs;
-  }
-
-  if (chargeStartMs && plugInMs && chargeStartMs < plugInMs) chargeStartMs = plugInMs;
-  if (chargeEndMs && plugInMs && chargeEndMs < plugInMs) chargeEndMs = plugInMs;
-  if (chargeStartMs && chargeEndMs && chargeStartMs > chargeEndMs) chargeStartMs = chargeEndMs;
-  if (plugOutMs && chargeEndMs && chargeEndMs > plugOutMs) chargeEndMs = plugOutMs;
-  if (plugOutMs && chargeStartMs && chargeStartMs > plugOutMs) chargeStartMs = plugOutMs;
-
-  const toLocal = ms => ms != null ? toLocalDT(ms) : null;
-  return {
-    plugInAt: toLocal(plugInMs),
-    chargeStartAt: toLocal(chargeStartMs),
-    chargeEndAt: toLocal(chargeEndMs),
-    plugOutAt: toLocal(plugOutMs),
-    plugInMs,
-    chargeStartMs,
-    chargeEndMs,
-    plugOutMs,
-    netMins: netSec > 0 ? Math.round(netSec / 60) : 0,
-    billMins: plugInMs && chargeEndMs ? Math.max(1, Math.round((chargeEndMs - plugInMs) / 60000)) : netSec > 0 ? Math.round(netSec / 60) : 0
-  };
-}
+/* resolveChargeTimeline עבר ל־lib/ev-money.mjs (שלב C) — נחשף כגלובל מהבאנדל */
 
 /** תאימות לאחור — חלון ברירת מחדל: חיבור → סיום טעינה */
 function resolveBillingWindow(tx = {}, hints = {}) {
