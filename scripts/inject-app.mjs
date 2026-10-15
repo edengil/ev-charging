@@ -299,8 +299,13 @@ function inject(file) {
     html.slice(0, idx) + "<script>\n" + src + "\n</script>" + html.slice(end + "</script>".length);
   fs.writeFileSync(abs, next);
   console.log("injected", file);
-  return true;
+  return next;
 }
 
-inject("index.html");
-inject("ev-charge-manager.html");
+// מקור אמת אחד: index.html. קובץ הכניסה השני נוצר ממנו כהעתק זהה,
+// כדי ששני הקבצים לעולם לא יסטו זה מזה שוב.
+const built = inject("index.html");
+if (built) {
+  fs.writeFileSync(path.join(root, "ev-charge-manager.html"), built);
+  console.log("injected ev-charge-manager.html (copy of index.html)");
+}

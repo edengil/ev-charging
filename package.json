@@ -22,7 +22,7 @@
     "ws": "^8.21.3"
   },
   "devDependencies": {
-    "@playwright/test": "^1.63.0",
-    "wrangler": "^4.28.0"
+    "@playwright/test": "^1.64.1",
+    "wrangler": "^4.151.0"
   }
 }

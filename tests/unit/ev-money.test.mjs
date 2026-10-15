@@ -781,6 +781,14 @@ describe("app-source drift guards", () => {
     assert.match(inj, /bundleMoneyLib|__EV_MONEY__/);
   });
 
+  it("שני קבצי הכניסה זהים — מקור אמת אחד ב־inject", () => {
+    const a = readFileSync(join(root, "index.html"), "utf8");
+    const b = readFileSync(join(root, "ev-charge-manager.html"), "utf8");
+    assert.equal(a, b);
+    const inj = readFileSync(join(root, "scripts/inject-app.mjs"), "utf8");
+    assert.match(inj, /copy of index\.html/);
+  });
+
   it("יש כפתורי אישור ייעודיים + אישור ראשון אוטומטי + כפתור לקוח", () => {
     const src = readAppBundle();
     assert.match(src, /wevo-preauth-arm/);
