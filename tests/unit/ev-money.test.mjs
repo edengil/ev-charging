@@ -791,6 +791,19 @@ describe("app-source drift guards", () => {
     assert.match(inj, /copy of index\.html/);
   });
 
+  it("חותמות זמן פיזיות לא נדרסות מחלון החיוב (רגרסיית 17.10)", () => {
+    const src = readAppBundle();
+    // כותבי הסגירה לא שמים את תחילת חלון החיוב היקר (fields.start) בתוך plugInAt
+    assert.doesNotMatch(src, /plugInAt: (fields|fetched)\.start \|\|/);
+    assert.match(src, /plugInAt: payload\.plugInAt \|\| fields\.plugInAt/);
+    assert.match(src, /plugInAt: o\.plugInAt \|\| fetched\.plugInAt/);
+    // סיום שנלכד לרכב מלא לא נמחק בזמן SuspendedEV, והדגל נשמר על הרשומה
+    assert.match(src, /st\.didCompleteFull\) return payload/);
+    assert.match(src, /didCompleteFull: !!\(st && st\.didCompleteFull\)/);
+    // חותמת ה־full מהשליפה הסופית חוזרת מהשדות ונשמרת על הרשומה
+    assert.match(src, /chargingFullTime: \(tx && tx\.chargingFullTime\) \|\| fallback\.chargingFullTime/);
+  });
+
   it("בונה payload חי אחד משותף למנוע הסנכרון ולפאנל (שלב A)", () => {
     const src = readAppBundle();
     assert.match(src, /function buildLiveOpenPayload/);
@@ -987,6 +1000,32 @@ describe("pickLiveChargeEndMs — סיום חי לא דורס סיום אומת"
     const st = { state: "Available", chargingFullTime: lateMs };
     assert.equal(pickLiveChargeEndMs(st, {}, plugMs), lateMs);
   });
+
+  it("רכב מלא אך מחובר (SuspendedEV + didCompleteFull): חותמת ה־full נלכדת כסיום (מקרה 17.10)", () => {
+    const plug1710 = new Date("2026-10-17T14:14").getTime();
+    const full1710 = new Date("2026-10-17T20:20").getTime();
+    const st = { state: "SuspendedEV", didCompleteFull: true, chargingFullTime: "2026-10-17T20:20" };
+    assert.equal(pickLiveChargeEndMs(st, {}, plug1710), full1710);
+  });
+
+  it("רכב מלא: סיום שמור גובר על חותמת ה־full (הגנת 13.10 נשמרת)", () => {
+    const plug1710 = new Date("2026-10-17T14:14").getTime();
+    const saved = new Date("2026-10-17T20:20").getTime();
+    const st = { state: "SuspendedEV", didCompleteFull: true, chargingFullTime: "2026-10-17T20:54" };
+    assert.equal(pickLiveChargeEndMs(st, { chargeEndedAt: "2026-10-17T20:20" }, plug1710), saved);
+  });
+
+  it("רכב מלא בלי חותמת full — לא ממציאים סיום", () => {
+    const plug1710 = new Date("2026-10-17T14:14").getTime();
+    const st = { state: "SuspendedEV", didCompleteFull: true, chargingFullTime: null };
+    assert.equal(pickLiveChargeEndMs(st, {}, plug1710), null);
+  });
+
+  it("SuspendedEV בלי didCompleteFull — עדיין נחשב טוען, אין סיום (התנהגות קודמת)", () => {
+    const plug1710 = new Date("2026-10-17T14:14").getTime();
+    const st = { state: "SuspendedEV", didCompleteFull: false, chargingFullTime: "2026-10-17T20:20" };
+    assert.equal(pickLiveChargeEndMs(st, {}, plug1710), null);
+  });
 });
 
 describe("monthlyCollection — גביית החודש", () => {
@@ -1075,6 +1114,23 @@ describe("resolveChargeTimeline (lib) — גזירת ציר זמן", () => {
     });
     assert.equal(tl.chargeEndAt, "2026-10-12T20:00");
     assert.equal(tl.chargeStartAt, "2026-10-12T18:00");
+  });
+
+  it("מקרה 17.10: חיבור 14:14, זרם 14:59, פול 20:20, הוצאה 20:54 — ארבע החותמות בנפרד", () => {
+    // חותמת ה־full שנלכדה חיה גוברת על היוריסטיקת ה־idle (34 דקות בין פול להוצאה),
+    // והתחלת הזרם נגזרת מסיום פחות נטו (5:21) בדיוק ל־14:59.
+    const tl = resolveChargeTimeline(
+      { plugOutTime: "2026-10-17T20:54", netDuration: 5 * 3600 + 21 * 60 },
+      {
+        plugInAt: "2026-10-17T14:14",
+        chargeEndedAt: "2026-10-17T20:20",
+        chargingFullTime: "2026-10-17T20:20"
+      }
+    );
+    assert.equal(tl.plugInAt, "2026-10-17T14:14");
+    assert.equal(tl.chargeEndAt, "2026-10-17T20:20");
+    assert.equal(tl.chargeStartAt, "2026-10-17T14:59");
+    assert.equal(tl.plugOutAt, "2026-10-17T20:54");
   });
 
   it("סיום לא יכול לעבור את הוצאת הכבל", () => {

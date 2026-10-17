@@ -103,7 +103,8 @@ function WevoOpenLiveSync({
     try {
       fetched = await fetchWevoFinalForOpen({
         ...existing,
-        wevoTxnId: txn != null ? txn : existing.wevoTxnId
+        wevoTxnId: txn != null ? txn : existing.wevoTxnId,
+        chargingFullTime: existing.chargingFullTime || snap.chargingFullTime || null
       }, {
         retries: 4,
         gapMs: 1200
@@ -128,7 +129,8 @@ function WevoOpenLiveSync({
       liveElecCost: fields.elec,
       endDate: fields.end,
       startDate: fields.start || payload.startDate,
-      plugInAt: fields.start || payload.plugInAt || payload.startDate,
+      plugInAt: payload.plugInAt || fields.plugInAt || payload.startDate,
+      chargingFullTime: fields.chargingFullTime || payload.chargingFullTime || null,
       chargeStartedAt: fields.chargeStartAt || existing.chargeStartedAt || null,
       chargeEndedAt: fields.chargeEndAt || fields.end,
       plugOutAt: fields.plugOutEnd || fields.plugOutAt || null,
@@ -263,7 +265,9 @@ function WevoOpenLiveSync({
                 liveElecCost: fetched.elec != null ? fetched.elec : o.liveElecCost,
                 endDate: fetched.end || o.endDate,
                 startDate: fetched.start || o.startDate,
-                plugInAt: fetched.start || o.plugInAt || o.startDate,
+                plugInAt: o.plugInAt || fetched.plugInAt || o.startDate,
+                chargingFullTime: fetched.chargingFullTime || o.chargingFullTime || null,
+                updatedAt: new Date().toISOString(),
                 chargeStartedAt: fetched.chargeStartAt || o.chargeStartedAt || null,
                 chargeEndedAt: fetched.chargeEndAt || fetched.end || o.chargeEndedAt,
                 plugOutAt: fetched.plugOutEnd || fetched.plugOutAt || o.plugOutAt || null,

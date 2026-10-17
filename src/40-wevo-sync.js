@@ -144,6 +144,9 @@ function liveChargeEndStamp(st, existing, plugMs) {
 
 function clearFinishedIfStillCharging(payload, st) {
   if (!stationStillCharging(st)) return payload;
+  // רכב שהגיע לפול — הסיום שנלכד מחותמת ה־full תקף גם כשהעמדה עדיין
+  // מדווחת SuspendedEV; מחיקתו כאן היא שאיבדה את סיום 17.10.
+  if (st && st.didCompleteFull) return payload;
   return {
     ...payload,
     chargeEndedAt: null,
@@ -177,6 +180,7 @@ function buildLiveOpenPayload(st, clientId, existing, clients) {
     chargeStartedAt: existing && existing.chargeStartedAt || null,
     chargeEndedAt,
     chargingFullTime: fullMs || existing && existing.chargingFullTime || null,
+    didCompleteFull: !!(st && st.didCompleteFull) || !!(existing && existing.didCompleteFull),
     notes: txn ? `txn#${txn} | Wevo live` : existing && existing.notes || "Wevo live",
     wevoTxnId: txn || existing && existing.wevoTxnId || null,
     source: "wevo-live",
@@ -378,6 +382,7 @@ function txToEndFields(tx, fallback = {}) {
     avgRateKW: tx && tx.avgRateKW != null ? Number(tx.avgRateKW) : fallback.avgRateKW != null ? Number(fallback.avgRateKW) : null,
     maxRateKW: tx && tx.maxRateKW != null ? Number(tx.maxRateKW) : fallback.maxRateKW != null ? Number(fallback.maxRateKW) : null,
     stopReason: tx && tx.stopReason || fallback.stopReason || null,
+    chargingFullTime: (tx && tx.chargingFullTime) || fallback.chargingFullTime || null,
     origin: tx && (tx.originStr || tx.origin) || fallback.origin || null,
     didCompleteFull: !!(tx && tx.didCompleteFull),
     isBoost: !!(tx && tx.isBoost),

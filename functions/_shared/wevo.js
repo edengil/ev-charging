@@ -357,7 +357,7 @@ export function normalizeState(raw, ongoingTx, charger, connector) {
     offPeakStartTime: tx.offPeakStartTime != null ? Number(tx.offPeakStartTime) : null,
     offPeakEndTime: tx.offPeakEndTime != null ? Number(tx.offPeakEndTime) : null,
     didCompleteFull: !!(tx.didCompleteFull || (liveOngoing && liveOngoing.didCompleteFull)),
-    chargingFullTime: tx.chargingFullTime || null,
+    chargingFullTime: tx.chargingFullTime || (liveOngoing && liveOngoing.chargingFullTime) || null,
     idleFeeApplied: !!tx.idleFeeApplied,
     stoppedDueToLimit: !!tx.stoppedDueToLimit,
     maxChargingDelay: tx.maxChargingDelay != null ? Number(tx.maxChargingDelay) : null,
