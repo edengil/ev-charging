@@ -388,6 +388,9 @@ function txToEndFields(tx, fallback = {}) {
     maxRateKW: tx && tx.maxRateKW != null ? Number(tx.maxRateKW) : fallback.maxRateKW != null ? Number(fallback.maxRateKW) : null,
     stopReason: tx && tx.stopReason || fallback.stopReason || null,
     chargingFullTime: (tx && tx.chargingFullTime) || fallback.chargingFullTime || null,
+    // ב2 (18.10): האם הסיום נגזר מקירוב — אין אף מקור סיום פיזי (לא חותמת
+    // full, לא סיום מאומת, לא סיום שמור). רשומה כזו מסומנת בתגית אזהרה.
+    endApprox: !(fallback.verifiedEndAt || fallback.chargeEndedAt || fallback.chargingFullTime || (tx && tx.chargingFullTime)),
     origin: tx && (tx.originStr || tx.origin) || fallback.origin || null,
     didCompleteFull: !!(tx && tx.didCompleteFull),
     isBoost: !!(tx && tx.isBoost),

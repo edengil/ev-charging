@@ -1,0 +1,29 @@
+{
+  "chargerIdentifier": "TACW9999999Z9999",
+  "state": "Charging",
+  "rawStatus": "Charging",
+  "isSecure": true,
+  "timeZone": "Asia/Jerusalem",
+  "transactionData": {
+    "transactionId": 9000002,
+    "totalEnergyKwh": 10.412,
+    "totalCost": 9.037618,
+    "rateKw": 10.42,
+    "isBoost": false,
+    "didCompleteFull": false,
+    "chargingFullTime": 1768484400000,
+    "isWaitingAllocation": false,
+    "offPeakStartTime": 82800,
+    "offPeakEndTime": 86400,
+    "delayCharge": true,
+    "manageCharge": true,
+    "maxChargingDelay": 0,
+    "idleFeeApplied": false,
+    "solarChargingType": "NOT_RESTRICTED",
+    "inWindow": true,
+    "stoppedDueToLimit": false
+  },
+  "connectorType": "TYPE2",
+  "isRoaming": false,
+  "success": true
+}

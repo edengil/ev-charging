@@ -408,6 +408,7 @@ function WevoLivePanel({
             startDate: fields.start || payload.startDate,
             plugInAt: payload.plugInAt || fields.plugInAt || payload.startDate,
             chargingFullTime: fields.chargingFullTime || payload.chargingFullTime || null,
+            endApprox: !!fields.endApprox,
             chargeStartedAt: fields.chargeStartAt || existing.chargeStartedAt || null,
             chargeEndedAt: fields.chargeEndAt || fields.end || existing.chargeEndedAt,
             plugOutAt: fields.plugOutEnd || fields.plugOutAt || null,

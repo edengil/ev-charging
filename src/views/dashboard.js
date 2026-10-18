@@ -846,7 +846,13 @@ function ReadyToCompleteBanner({ readyCards, clients, onComplete }) {
         fontSize: 13,
         color: "#047857"
       }
-    }, kwh, " קוט״ש — מוכן לחיוב")), /*#__PURE__*/React.createElement("button", {
+    }, kwh, " קוט״ש — מוכן לחיוב"), o.endApprox && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "#b45309",
+        fontWeight: 700
+      }
+    }, "⚠ שעת הסיום מקורבת — לא נלכדה חותמת סיום מ־Wevo, בדקו באשף")), /*#__PURE__*/React.createElement("button", {
       onClick: () => onComplete(o.id, o.clientId),
       style: {
         ...S.btnP,
