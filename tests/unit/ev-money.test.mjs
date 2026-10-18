@@ -804,6 +804,18 @@ describe("app-source drift guards", () => {
     assert.match(src, /chargingFullTime: \(tx && tx\.chargingFullTime\) \|\| fallback\.chargingFullTime/);
   });
 
+  it("סיום מאומת נפרד מסיום חלון החיוב — אין מעגל finalEndAt (רגרסיית 18.10)", () => {
+    const src = readAppBundle();
+    // הבונה החי שומר סיום מאומת מהלכידה החיה, ומחיקת "עדיין טוען" מאפסת גם אותו
+    assert.match(src, /verifiedEndAt: chargeEndedAt \|\| \(existing && existing\.verifiedEndAt\)/);
+    assert.match(src, /verifiedEndAt: null,/);
+    // שני מטפלי מעבר ה־Finishing (מנוע + פאנל) חותמים סיום מאומת
+    assert.equal((src.match(/verifiedEndAt: endedAt/g) || []).length, 2);
+    // הגזירה נותנת עדיפות לסיום המאומת; endDate נשאר גיבוי לרשומות ישנות בלבד
+    assert.match(src, /finalEndAt: fallback\.verifiedEndAt \|\| \(fallback\.wevoEnded/);
+    assert.equal((src.match(/verifiedEndAt \|\| \(openSession\.wevoEnded/g) || []).length, 2);
+  });
+
   it("בונה payload חי אחד משותף למנוע הסנכרון ולפאנל (שלב A)", () => {
     const src = readAppBundle();
     assert.match(src, /function buildLiveOpenPayload/);

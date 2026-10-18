@@ -150,6 +150,49 @@ test.describe("complete-wizard", () => {
     await expect(page.getByTestId("complete-duration")).toHaveValue("7:25");
   });
 
+  test("מעגל הסיום: endDate של חלון החיוב (הוצאת כבל) לא דורס סיום מאומת (רגרסיית 18.10)", async ({ page }) => {
+    // הרשומה נסגרה כשהחלון המתומחר הגבוה הסתיים בהוצאת הכבל 23:30 — endDate נשמר 23:30,
+    // אבל סיום הזרם המאומת (verifiedEndAt/chargeEndedAt) הוא 22:50. האשף חייב להציג
+    // את 22:50 כסיום הטעינה, לא את ה־23:30 של חלון החיוב.
+    const pad = n => String(n).padStart(2, "0");
+    const at = (dayOffset, h, m) => {
+      const d = new Date();
+      d.setDate(d.getDate() + dayOffset);
+      d.setHours(h, m, 0, 0);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    const open = {
+      id: "o-e2e-endloop",
+      clientId: CLIENT_A.id,
+      startDate: at(0, 15, 0),
+      plugInAt: at(0, 15, 0),
+      chargeStartedAt: at(0, 15, 10),
+      endDate: at(0, 23, 30),
+      chargeEndedAt: at(0, 22, 50),
+      verifiedEndAt: at(0, 22, 50),
+      plugOutAt: at(0, 23, 30),
+      chargingFullTime: at(0, 22, 50),
+      wevoEnded: true,
+      readyToComplete: true,
+      liveKwh: 40,
+      wevoTxnId: "999003",
+      notes: "txn#999003 | Wevo live",
+      source: "wevo-live"
+    };
+    await openApp(page, { clients: [CLIENT_A, CLIENT_SELF], open: [open] });
+    const completeBtn = page.locator("[data-testid^=open-complete-]").first();
+    await expect(completeBtn).toBeVisible();
+    await completeBtn.click();
+    const endChoice = page.getByTestId("end-time-choice");
+    await expect(endChoice).toBeVisible({ timeout: 5000 });
+    const selectedText = await endChoice.evaluate(el => el.selectedOptions[0]?.textContent || "");
+    expect(selectedText).toContain("22:50");
+    expect(selectedText).not.toContain("23:30");
+    // אפשרות "סיום טעינה" בציר הזמן היא 22:50 — לא שעת ההוצאה
+    const optionTexts = await endChoice.evaluate(el => Array.from(el.options).map(o => o.textContent || ""));
+    expect(optionTexts.some(t => t.includes("סיום טעינה") && t.includes("22:50"))).toBe(true);
+  });
+
   test("שעת התחלה ידנית עם פורמט שגוי מציגה שגיאה", async ({ page }) => {
     await openApp(page, { clients: [CLIENT_A, CLIENT_SELF] });
     await openWizard(page, CLIENT_A.id);

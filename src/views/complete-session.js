@@ -49,7 +49,7 @@ function CompleteSession({
     plugInAt: openSession && (openSession.plugInAt || openSession.startDate),
     chargeStartedAt: openSession && openSession.chargeStartedAt,
     chargeEndedAt: openSession && (openSession.chargeEndedAt || openSession.endDate),
-    finalEndAt: openSession && openSession.wevoEnded && openSession.endDate ? openSession.endDate : null,
+    finalEndAt: openSession && (openSession.verifiedEndAt || (openSession.wevoEnded && openSession.endDate ? openSession.endDate : null)),
     plugOutAt: openSession && openSession.plugOutAt,
     chargingFullTime: openSession && openSession.chargingFullTime,
     netDuration: openSession && openSession.netDuration
@@ -230,7 +230,7 @@ function CompleteSession({
       plugInAt: openSession.plugInAt || openSession.startDate,
       chargeStartedAt: openSession.chargeStartedAt,
       chargeEndedAt: openSession.chargeEndedAt || openSession.endDate,
-      finalEndAt: openSession.wevoEnded && openSession.endDate ? openSession.endDate : null,
+      finalEndAt: openSession.verifiedEndAt || (openSession.wevoEnded && openSession.endDate ? openSession.endDate : null),
       plugOutAt: openSession.plugOutAt,
       chargingFullTime: openSession.chargingFullTime,
       netDuration: openSession.netDuration

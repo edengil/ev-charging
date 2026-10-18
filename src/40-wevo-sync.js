@@ -151,6 +151,7 @@ function clearFinishedIfStillCharging(payload, st) {
     ...payload,
     chargeEndedAt: null,
     chargingFullTime: null,
+    verifiedEndAt: null,
     endDate: null,
     plugOutAt: null,
     readyToComplete: false,
@@ -181,6 +182,10 @@ function buildLiveOpenPayload(st, clientId, existing, clients) {
     chargeEndedAt,
     chargingFullTime: fullMs || existing && existing.chargingFullTime || null,
     didCompleteFull: !!(st && st.didCompleteFull) || !!(existing && existing.didCompleteFull),
+    // סיום זרם מאומת ממקור חי (חותמת full / מעבר Finishing) — נפרד מ־endDate
+    // שהוא סיום חלון החיוב. רק הוא רשאי להזין finalEndAt בעדיפות עליונה;
+    // endDate כגיבוי רק לרשומות ישנות בלי שדה זה (התנהגות 13.10).
+    verifiedEndAt: chargeEndedAt || (existing && existing.verifiedEndAt) || null,
     notes: txn ? `txn#${txn} | Wevo live` : existing && existing.notes || "Wevo live",
     wevoTxnId: txn || existing && existing.wevoTxnId || null,
     source: "wevo-live",
@@ -353,7 +358,7 @@ function txToEndFields(tx, fallback = {}) {
     plugInAt: fallback.startDate || fallback.plugInAt,
     plugOutAt: fallback.plugOutAt,
     chargeEndedAt: fallback.chargeEndedAt || fallback.endDate,
-    finalEndAt: fallback.wevoEnded && fallback.endDate ? fallback.endDate : null,
+    finalEndAt: fallback.verifiedEndAt || (fallback.wevoEnded && fallback.endDate ? fallback.endDate : null),
     chargeStartedAt: fallback.chargeStartedAt,
     chargingFullTime: (tx && tx.chargingFullTime) || fallback.chargingFullTime,
     netDuration: tx && tx.netDuration != null ? tx.netDuration : fallback.netDuration

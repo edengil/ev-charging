@@ -222,6 +222,7 @@ function WevoOpenLiveSync({
               ...buildPayload(st, existing.clientId, existing),
               chargeEndedAt: endedAt,
               endDate: endedAt,
+              verifiedEndAt: endedAt,
               chargingFullTime: toMs(st.chargingFullTime) || Date.now()
             }, {
               silent: true
