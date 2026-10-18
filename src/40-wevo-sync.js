@@ -829,6 +829,9 @@ function mergeWevoTransactions(clients, sessions, transactions, openSess = []) {
     const cost = Math.round(Number(tx.totalCost) * 100) / 100;
     const elec = Math.round(Number(tx.electricityCost) * 100) / 100;
     const win = resolveChargeTimeline(tx, {
+      // F1 (19.10): חותמות הלכידה החיה של הרשומה קודמות לחותמות העסקה — Wevo רושמת
+      // עסקאות קטעים עם שעת חיבור שגויה (6290638: ‏16:42 במקום 14:44)
+      plugInAt: openMatch && (openMatch.plugInAt || openMatch.startDate),
       chargeEndedAt: openMatch && openMatch.chargeEndedAt,
       chargeStartedAt: openMatch && openMatch.chargeStartedAt,
       chargingFullTime: openMatch && openMatch.chargingFullTime
@@ -861,7 +864,7 @@ function mergeWevoTransactions(clients, sessions, transactions, openSess = []) {
         endDate: end,
         startDate: openMatch.startDate || start,
         plugInAt: openMatch.plugInAt || win.plugInAt || start,
-        chargeStartedAt: win.chargeStartAt || openMatch.chargeStartedAt || null,
+        chargeStartedAt: openMatch.chargeStartedAt || win.chargeStartAt || null,
         chargeEndedAt: win.chargeEndAt || end,
         plugOutAt: win.plugOutAt || openMatch.plugOutAt || null,
         billStartKey: maxWin && maxWin.startKey || "plugIn",

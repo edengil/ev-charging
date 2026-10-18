@@ -9,7 +9,8 @@ import {
   wevoOpenLooksFinished,
   validChargeEndMs,
   openFollowsLiveCharge,
-  mergeWatchEvents
+  mergeWatchEvents,
+  preferLiveStamps
 } from "../../lib/ev-money.mjs";
 
 // ב7 (18.10.2026) — כיסוי לשלושה אזורים שלא נבדקו: מחזור חיי מנויי Push,
@@ -239,5 +240,44 @@ describe("ב3 — חיווט הבאנדל (שומר רגרסיה)", () => {
     assert.match(inject, /var mergeWatchEvents = __EV_MONEY__\.mergeWatchEvents;/);
     const panel = readFileSync(join(root, "src/views/wevo-live-panel.js"), "utf8");
     assert.match(panel, /mergeWatchEvents\(o, ev\)/);
+  });
+});
+
+describe("F1–F3 (19.10) — חותמות חיות גוברות על חותמות עסקת קטע של Wevo", () => {
+  const ms = (h, m) => new Date(2026, 9, 18, h, m).getTime();
+
+  it("preferLiveStamps: סטייה מעל 30 דקות — הלכידה החיה מנצחת; המקור לא משתנה", () => {
+    const tl = {
+      plugInAt: "2026-10-18T16:42", plugInMs: ms(16, 42),
+      chargeStartAt: "2026-10-18T16:42", chargeStartMs: ms(16, 42),
+      chargeEndAt: "2026-10-18T18:27", chargeEndMs: ms(18, 27),
+      plugOutAt: "2026-10-18T18:27", plugOutMs: ms(18, 27)
+    };
+    const open = { plugInAt: "2026-10-18T14:44", chargeStartedAt: "2026-10-18T14:45" };
+    const out = preferLiveStamps(tl, open);
+    assert.equal(out.plugInAt, "2026-10-18T14:44");
+    assert.equal(out.chargeStartAt, "2026-10-18T14:45");
+    assert.equal(out.chargeEndAt, "2026-10-18T18:27", "סיום לא נוגעים בו");
+    assert.equal(tl.plugInAt, "2026-10-18T16:42", "המקור לא שונה");
+  });
+
+  it("preferLiveStamps: סטייה קטנה (≤30 דקות) — ציר הזמן נשאר; בלי לכידה חיה — אין שינוי", () => {
+    const tl = { plugInAt: "2026-10-18T14:50", plugInMs: ms(14, 50), chargeStartAt: "2026-10-18T14:52", chargeStartMs: ms(14, 52) };
+    const out = preferLiveStamps(tl, { plugInAt: "2026-10-18T14:44", chargeStartedAt: "2026-10-18T14:45" });
+    assert.equal(out.plugInAt, "2026-10-18T14:50");
+    assert.equal(preferLiveStamps(tl, {}), tl);
+    assert.equal(preferLiveStamps(null, { plugInAt: "2026-10-18T14:44" }), null);
+  });
+
+  it("חיווט: F1 בבלוק הסנכרון ו־F3 באשף וב־inject", () => {
+    const sync = readFileSync(join(root, "src/40-wevo-sync.js"), "utf8");
+    assert.match(sync, /plugInAt: openMatch && \(openMatch\.plugInAt \|\| openMatch\.startDate\)/);
+    assert.match(sync, /chargeStartedAt: openMatch\.chargeStartedAt \|\| win\.chargeStartAt/);
+    const wizard = readFileSync(join(root, "src/views/complete-session.js"), "utf8");
+    assert.match(wizard, /preferLiveStamps\(sessionTimeline, openSession\)/);
+    assert.match(wizard, /preferLiveStamps\(fields\.timeline, openSession\)/);
+    const inject = readFileSync(join(root, "scripts/inject-app.mjs"), "utf8");
+    assert.match(inject, /preferLiveStamps: preferLiveStamps,/);
+    assert.match(inject, /var preferLiveStamps = __EV_MONEY__\.preferLiveStamps;/);
   });
 });

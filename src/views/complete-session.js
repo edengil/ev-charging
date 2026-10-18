@@ -144,7 +144,7 @@ function CompleteSession({
   const applyWevoFields = fields => {
     if (!fields) return;
     if (fields.kwh > 0) setKwh(Number(fields.kwh).toFixed(2));
-    const tl = fields.timeline || resolveChargeTimeline({}, {
+    const tl = fields.timeline ? preferLiveStamps(fields.timeline, openSession) : resolveChargeTimeline({}, {
       plugInAt: fields.plugInAt || fields.start,
       chargeStartedAt: fields.chargeStartAt,
       chargeEndedAt: fields.chargeEndAt || fields.end,
@@ -841,15 +841,16 @@ function CompleteSession({
         appAlert("אין קוט״ש — לא נשמר חיוב. אפשר למחוק את הטעינה הריקה.", "err", 6500);
         return;
       }
+      const saveTl = preferLiveStamps(sessionTimeline, openSession);
       onSave(openSession.id, {
       id: uid(),
       clientId: openSession.clientId,
       date: effectiveStart,
       endDate: edt || null,
-      plugInAt: sessionTimeline.plugInAt || openSession.plugInAt || effectiveStart,
-      chargeStartedAt: sessionTimeline.chargeStartAt || openSession.chargeStartedAt || null,
-      chargeEndedAt: sessionTimeline.chargeEndAt || openSession.chargeEndedAt || edt || null,
-      plugOutAt: sessionTimeline.plugOutAt || openSession.plugOutAt || null,
+      plugInAt: saveTl.plugInAt || openSession.plugInAt || effectiveStart,
+      chargeStartedAt: saveTl.chargeStartAt || openSession.chargeStartedAt || null,
+      chargeEndedAt: saveTl.chargeEndAt || openSession.chargeEndedAt || edt || null,
+      plugOutAt: saveTl.plugOutAt || openSession.plugOutAt || null,
       billStartKey,
       billEndKey,
       preferMaxBill,

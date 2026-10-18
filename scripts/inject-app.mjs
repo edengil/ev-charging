@@ -65,6 +65,7 @@ ${body}
     stationStillCharging: stationStillCharging,
     pickLiveChargeEndMs: pickLiveChargeEndMs,
     mergeWatchEvents: mergeWatchEvents,
+    preferLiveStamps: preferLiveStamps,
     monthlyCollection: monthlyCollection,
     resolveChargeTimeline: resolveChargeTimeline,
     isUsableStationSample: isUsableStationSample,
@@ -141,6 +142,7 @@ var pickFinishedWevoTx = __EV_MONEY__.pickFinishedWevoTx;
 var stationStillCharging = __EV_MONEY__.stationStillCharging;
 var pickLiveChargeEndMs = __EV_MONEY__.pickLiveChargeEndMs;
 var mergeWatchEvents = __EV_MONEY__.mergeWatchEvents;
+var preferLiveStamps = __EV_MONEY__.preferLiveStamps;
 var monthlyCollection = __EV_MONEY__.monthlyCollection;
 var resolveChargeTimeline = __EV_MONEY__.resolveChargeTimeline;
 var isUsableStationSample = __EV_MONEY__.isUsableStationSample;

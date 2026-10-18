@@ -583,6 +583,17 @@ describe("Wevo open session match", () => {
     // עסקה פעילה באמת (בלי סימני סיום) לא נבחרת כסגורה
     const reallyOngoing = { transactionId: "9", isOngoing: true, plugInTime: Date.parse("2026-10-11T15:27"), totalEnergyKwh: 3 };
     assert.equal(pickFinishedWevoTx([reallyOngoing], { wevoTxnId: "9" }), null);
+    // F2 (19.10): חותמת חיבור שגויה ב־Wevo (עסקת קטע) — שיוך לפי אנרגיה ואותו יום
+    const segTx = { transactionId: "6290638", isOngoing: false, plugInTime: Date.parse("2026-10-18T13:42:00Z"), plugOutTime: Date.parse("2026-10-18T15:27:00Z"), totalEnergyKwh: 18.45 };
+    const liveOpen = { plugInAt: "2026-10-18T14:44", startDate: "2026-10-18T14:44", liveKwh: 18.45 };
+    assert.equal(pickFinishedWevoTx([segTx], liveOpen), segTx);
+    // אנרגיה שונה / יום שונה / בלי אנרגיה חיה — אין שיוך מהגיבוי
+    assert.equal(pickFinishedWevoTx([{ ...segTx, totalEnergyKwh: 9.1 }], liveOpen), null);
+    assert.equal(pickFinishedWevoTx([{ ...segTx, plugInTime: Date.parse("2026-10-19T13:42:00Z") }], liveOpen), null);
+    assert.equal(pickFinishedWevoTx([segTx], { plugInAt: "2026-10-18T14:44" }), null);
+    // חלון 30 הדקות נשאר קודם לגיבוי האנרגיה
+    const nearTx = { transactionId: "11", isOngoing: false, plugInTime: Date.parse("2026-10-18T11:50:00Z"), totalEnergyKwh: 3.3 };
+    assert.equal(pickFinishedWevoTx([segTx, nearTx], liveOpen), nearTx);
     assert.equal(openChargeStatus({ wevoTxnId: "42", liveKw: 6 }, { state: "Finishing", transactionId: "42" }).kind, "cable");
     assert.match(readAppBundle(), /liveChargeEndStamp/);
     assert.match(readAppBundle(), /clearFinishedIfStillCharging/);
