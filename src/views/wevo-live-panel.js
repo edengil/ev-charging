@@ -170,6 +170,28 @@ function WevoLivePanel({
     })();
   };
 
+  // שומר התראות (notifyOnly): חימוש שרת לכל לקוח — כולל עדן עצמו — להתראות
+  // סיום/עצירה/ניתוק בלבד, בלי אישורי פרימיום אוטומטיים ובלי תלות בכוונת אישור־מראש.
+  const armNotifyWatch = () => {
+    (async () => {
+      try {
+        const w = ownerPeakWindow();
+        const picked = (clientsRef.current || []).find(c => c.id === cid) || null;
+        await watchApi("register", {
+          clientId: cid,
+          clientName: picked && picked.name || cid,
+          peakStartMin: w.startMin,
+          peakEndMin: w.endMin,
+          notifyOnly: true
+        });
+        pushWevoLog("preauth", "שומר התראות הופעל — התראות על סיום, עצירת שיא וניתוק כבל גם כשהאפליקציה סגורה", true);
+        refreshWatchInfo();
+      } catch (e) {
+        pushWevoLog("preauth", `שומר התראות לא הופעל: ${e && e.message || "שגיאה"}`, false);
+      }
+    })();
+  };
+
   const refreshWatchInfo = () => {
     (async () => {
       try {
@@ -1351,7 +1373,7 @@ function WevoLivePanel({
       fontSize: 13,
       color: "#92400e"
     }
-  }, "🛰️ שומר שרת פעיל · ", watchInfo.clientName || "", watchInfo.status && watchInfo.status.lastAction ? ` · פעל לאחרונה: ${watchInfo.status.lastAction.detail}` : " · יאשר המשך אוטומטית במעבר לפרימיום, גם כשהאפליקציה סגורה"), /*#__PURE__*/React.createElement("button", {
+  }, "🛰️ שומר שרת פעיל · ", watchInfo.clientName || "", watchInfo.status && watchInfo.status.lastAction ? ` · פעל לאחרונה: ${watchInfo.status.lastAction.detail}` : watchInfo.notifyOnly ? " · שומר התראות — מתריע על סיום, עצירת שיא וניתוק, גם כשהאפליקציה סגורה (בלי אישורי פרימיום)" : " · יאשר המשך אוטומטית במעבר לפרימיום, גם כשהאפליקציה סגורה"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     style: {
       ...S.btnS,
@@ -1360,6 +1382,30 @@ function WevoLivePanel({
     onClick: () => syncServerWatch(null),
     "data-testid": "wevo-watch-off"
   }, "כבה שומר")),
+  !watchInfo && cid && hasCreds && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      alignItems: "center",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...S.btnS,
+      padding: "8px 12px"
+    },
+    onClick: armNotifyWatch,
+    "data-testid": "wevo-watch-notify-arm"
+  }, "🛰️ הפעל שומר התראות"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#64748b",
+      lineHeight: 1.4,
+      flex: "1 1 200px"
+    }
+  }, "התראות על סיום טעינה, עצירת שיא וניתוק כבל — גם כשהאפליקציה סגורה. התראות בלבד, בלי אישורי פרימיום אוטומטיים.")),
   !isSelfSelected && cid && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",

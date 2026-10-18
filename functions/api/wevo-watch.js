@@ -130,6 +130,11 @@ export function eventsFromStateDiff(prev, st, nowMs) {
   if (!p.charging && charging && txnId) out.chargeStart = { txnId, atMs: nowMs };
   const fullMs = st && st.chargingFullTime != null && Number(st.chargingFullTime) > 0 ? Number(st.chargingFullTime) : null;
   if (txnId && fullMs && fullMs !== (p.lastFullMs || null)) out.full = { txnId, atMs: fullMs };
+  // עצירת זרם כשהכבל עדיין מחובר ואין חותמת full באותה דגימה — מועמד להתראת עצירה.
+  // evsePaused (SuspendedEVSE) = העמדה עצרה (למשל מעבר לתעריף שיא); שאר המצבים לא מתריעים.
+  if (p.charging && !charging && connected && txnId && !out.full) {
+    out.chargeStop = { txnId, atMs: nowMs, evsePaused: !!(st && st.state === "SuspendedEVSE") };
+  }
   if (p.connected && !connected && p.lastTxnId) out.plugOut = { txnId: String(p.lastTxnId), atMs: nowMs };
   return out;
 }
@@ -143,7 +148,7 @@ async function recordWatchEvents(env, cfg, diff, nowMs) {
       const e = all[txnId] || (all[txnId] = {
         txnId, clientId: cfg.clientId || null,
         plugInAt: null, chargeStartedAt: null, chargingFullTime: null,
-        chargeEndedAt: null, plugOutAt: null, updatedAt: 0, source: "watch"
+        chargeEndedAt: null, chargeStoppedAt: null, plugOutAt: null, updatedAt: 0, source: "watch"
       });
       e.updatedAt = nowMs;
       return e;
@@ -151,6 +156,7 @@ async function recordWatchEvents(env, cfg, diff, nowMs) {
     if (diff.plugIn) { const e = touch(diff.plugIn.txnId); if (e.plugInAt == null) e.plugInAt = diff.plugIn.atMs; }
     if (diff.chargeStart) { const e = touch(diff.chargeStart.txnId); if (e.chargeStartedAt == null) e.chargeStartedAt = diff.chargeStart.atMs; }
     if (diff.full) { const e = touch(diff.full.txnId); e.chargingFullTime = diff.full.atMs; e.chargeEndedAt = diff.full.atMs; }
+    if (diff.chargeStop) { const e = touch(diff.chargeStop.txnId); if (e.chargeStoppedAt == null) e.chargeStoppedAt = diff.chargeStop.atMs; }
     if (diff.plugOut) { const e = touch(diff.plugOut.txnId); if (e.plugOutAt == null) e.plugOutAt = diff.plugOut.atMs; }
     const kept = Object.entries(all)
       .filter(([, e]) => nowMs - (e.updatedAt || 0) < 48 * 3600 * 1000)
@@ -178,6 +184,8 @@ async function handleRegister(env, body) {
     armed: true,
     clientId: body.clientId != null ? String(body.clientId) : null,
     clientName: body.clientName != null ? String(body.clientName) : null,
+    // notifyOnly: חימוש להתראות בלבד (גם ללקוח עצמי) — בלי אישורי פרימיום אוטומטיים בטיק
+    notifyOnly: body.notifyOnly === true,
     peakStartMin: Number(body.peakStartMin),
     peakEndMin: Number(body.peakEndMin),
     armedAt: Date.now(),
@@ -232,6 +240,7 @@ async function handleStatus(env, body) {
     ok: true,
     action: "status",
     armed: !!cfg.armed,
+    notifyOnly: !!cfg.notifyOnly,
     clientName: cfg.clientName,
     armedAt: cfg.armedAt,
     status,
@@ -277,7 +286,7 @@ async function handleTick(env, body) {
   const flip = cfg.wasPeak === false && peak === true;
   const key = peakKey(cfg, parts, now);
   let action = null;
-  if (flip && cfg.wasCharging === true && !charging && connected && cfg.actedKey !== key) {
+  if (!cfg.notifyOnly && flip && cfg.wasCharging === true && !charging && connected && cfg.actedKey !== key) {
     const res = await handleWevoRequest({
       email: creds.email,
       password: creds.password,
@@ -310,8 +319,40 @@ async function handleTick(env, body) {
     st,
     Date.now()
   );
-  if (diff.plugIn || diff.chargeStart || diff.full || diff.plugOut) {
+  if (diff.plugIn || diff.chargeStart || diff.full || diff.chargeStop || diff.plugOut) {
     await recordWatchEvents(env, cfg, diff, Date.now());
+  }
+  // התראות על אירועי הטעינה (אותם אירועים שנלכדו) — גם בחימוש פרימיום וגם ב־notifyOnly
+  const hhmm = (ms) => new Intl.DateTimeFormat("he-IL", {
+    timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+  }).format(new Date(ms));
+  const who = cfg.clientName ? `${cfg.clientName} · ` : "";
+  if (diff.full) {
+    try {
+      await pushToAllSubscribers(env, {
+        title: "🔋 הטעינה הסתיימה",
+        body: `${who}הטעינה הסתיימה ב־${hhmm(diff.full.atMs)}`,
+        tag: "ev-watch-full"
+      });
+    } catch {}
+  }
+  if (diff.chargeStop && diff.chargeStop.evsePaused) {
+    try {
+      await pushToAllSubscribers(env, {
+        title: "⏸️ הטעינה הופסקה",
+        body: `${who}הטעינה הופסקה מצד העמדה — ככל הנראה מעבר לתעריף שיא`,
+        tag: "ev-watch-stop"
+      });
+    } catch {}
+  }
+  if (diff.plugOut) {
+    try {
+      await pushToAllSubscribers(env, {
+        title: "🔌 הכבל נותק",
+        body: `${who}הכבל נותק מהעמדה`,
+        tag: "ev-watch-unplug"
+      });
+    } catch {}
   }
   cfg.wasConnected = connected;
   if (stTxnId) {

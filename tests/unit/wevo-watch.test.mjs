@@ -217,4 +217,64 @@ describe("ב3 — eventsFromStateDiff (לכידת אירועי טעינה)", () 
     assert.match(src, /delete\(EVENTS_KEY\)/);
     assert.match(src, /recordWatchEvents\(env, cfg, diff/);
   });
+
+  it("עצירת זרם כשהכבל מחובר: chargeStop; SuspendedEVSE מסומן evsePaused", () => {
+    const prev = { connected: true, charging: true, lastTxnId: "777", lastFullMs: null };
+    const d = diff(prev, { connected: true, charging: false, transactionId: 777, state: "SuspendedEVSE" }, T0 + 3600000);
+    assert.ok(d.chargeStop, "chargeStop קיים");
+    assert.equal(d.chargeStop.evsePaused, true);
+    assert.equal(d.full, undefined);
+    const d2 = diff(prev, { connected: true, charging: false, transactionId: 777, state: "Finishing" }, T0 + 3600000);
+    assert.ok(d2.chargeStop);
+    assert.equal(d2.chargeStop.evsePaused, false);
+  });
+
+  it("full באותה דגימה מדכא chargeStop; בלי טעינה קודמת אין chargeStop", () => {
+    const prev = { connected: true, charging: true, lastTxnId: "777", lastFullMs: null };
+    const d = diff(prev, { connected: true, charging: false, transactionId: 777, chargingFullTime: FULL, state: "SuspendedEV" }, FULL + 60000);
+    assert.ok(d.full);
+    assert.equal(d.chargeStop, undefined);
+    const idle = diff({ connected: true, charging: false, lastTxnId: "777", lastFullMs: null },
+      { connected: true, charging: false, transactionId: 777, state: "SuspendedEVSE" }, T0 + 3600000);
+    assert.equal(idle.chargeStop, undefined);
+  });
+
+  it("chargeStoppedAt מחווט ברישום האירועים (ראשון בלבד)", () => {
+    const src = readFileSync(join(root, "functions/api/wevo-watch.js"), "utf8");
+    assert.match(src, /chargeStoppedAt == null/);
+    assert.match(src, /e\.chargeStoppedAt = diff\.chargeStop\.atMs/);
+  });
+});
+
+describe("שומר התראות — notifyOnly (גם ללקוח עצמי)", () => {
+  it("register עם notifyOnly נשמר ב־cfg ומוחזר ב־status; בלי הדגל — false", async () => {
+    const env = makeEnv();
+    const r = await call(env, { ...REGISTER, clientId: "self-1", clientName: "עדן (עצמי)", notifyOnly: true });
+    assert.equal(r.status, 200);
+    const cfg = JSON.parse(env.EV_BACKUP._map.get("watch:cfg"));
+    assert.equal(cfg.notifyOnly, true);
+    const st = await call(env, { action: "status", ...CREDS });
+    assert.equal(st.body.notifyOnly, true);
+    const env2 = makeEnv();
+    await call(env2, REGISTER);
+    assert.equal(JSON.parse(env2.EV_BACKUP._map.get("watch:cfg")).notifyOnly, false);
+    const st2 = await call(env2, { action: "status", ...CREDS });
+    assert.equal(st2.body.notifyOnly, false);
+  });
+
+  it("שומרים: אישור הפרימיום בטיק כבוי ב־notifyOnly וההתראות מחווטות", () => {
+    const src = readFileSync(join(root, "functions/api/wevo-watch.js"), "utf8");
+    assert.match(src, /!cfg\.notifyOnly && flip/);
+    assert.match(src, /הטעינה הסתיימה ב־/);
+    assert.match(src, /הטעינה הופסקה/);
+    assert.match(src, /הכבל נותק/);
+  });
+
+  it("שומרי פאנל: חימוש שומר התראות וכפתור ההפעלה", () => {
+    const panel = readFileSync(join(root, "src/views/wevo-live-panel.js"), "utf8");
+    assert.match(panel, /armNotifyWatch/);
+    assert.match(panel, /notifyOnly: true/);
+    assert.match(panel, /wevo-watch-notify-arm/);
+    assert.match(panel, /watchInfo\.notifyOnly/);
+  });
 });
