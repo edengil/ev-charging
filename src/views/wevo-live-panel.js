@@ -154,7 +154,8 @@ function WevoLivePanel({
             clientId: intent.clientId,
             clientName: picked && picked.name || intent.clientId,
             peakStartMin: w.startMin,
-            peakEndMin: w.endMin
+            peakEndMin: w.endMin,
+            premiumContinue: true
           });
           pushWevoLog("preauth", "שומר שרת הופעל — יאשר המשך במעבר לפרימיום גם כשהאפליקציה סגורה", true);
           refreshWatchInfo();
@@ -188,6 +189,29 @@ function WevoLivePanel({
         refreshWatchInfo();
       } catch (e) {
         pushWevoLog("preauth", `שומר התראות לא הופעל: ${e && e.message || "שגיאה"}`, false);
+      }
+    })();
+  };
+
+  // שומר קבוע: רישום persistent בשרת — התראות על חיבור/סיום/ניתוק + אישור
+  // ראשון אוטומטי בחיבור (לעולם לא בשעות שיא; שם נדרשת החלטת עדן באפליקציה).
+  const armGuard = () => {
+    (async () => {
+      try {
+        const w = ownerPeakWindow();
+        await watchApi("register", {
+          clientId: null,
+          clientName: "שומר קבוע",
+          peakStartMin: w.startMin,
+          peakEndMin: w.endMin,
+          persistent: true,
+          autoApprove: true,
+          premiumContinue: false
+        });
+        pushWevoLog("preauth", "שומר קבוע הופעל — התראות על כל חיבור, אישור ראשון אוטומטי (לא בפרימיום), בלי פקיעה", true);
+        refreshWatchInfo();
+      } catch (e) {
+        pushWevoLog("preauth", `שומר קבוע לא הופעל: ${e && e.message || "שגיאה"}`, false);
       }
     })();
   };
@@ -1373,7 +1397,7 @@ function WevoLivePanel({
       fontSize: 13,
       color: "#92400e"
     }
-  }, "🛰️ שומר שרת פעיל · ", watchInfo.clientName || "", watchInfo.status && watchInfo.status.lastAction ? ` · פעל לאחרונה: ${watchInfo.status.lastAction.detail}` : watchInfo.notifyOnly ? " · שומר התראות — מתריע על סיום, עצירת שיא וניתוק, גם כשהאפליקציה סגורה (בלי אישורי פרימיום)" : " · יאשר המשך אוטומטית במעבר לפרימיום, גם כשהאפליקציה סגורה"), /*#__PURE__*/React.createElement("button", {
+  }, "🛰️ שומר שרת פעיל · ", watchInfo.clientName || "", watchInfo.status && watchInfo.status.lastAction ? ` · פעל לאחרונה: ${watchInfo.status.lastAction.detail}` : watchInfo.notifyOnly ? " · שומר התראות — מתריע על סיום, עצירת שיא וניתוק, גם כשהאפליקציה סגורה (בלי אישורי פרימיום)" : watchInfo.persistent ? ` · שומר קבוע — מתריע על חיבור/סיום/ניתוק ומאשר חיבורים אוטומטית (לא בפרימיום)${watchInfo.premiumContinue ? " · כולל המשך פרימיום חמוש" : ""}` : " · יאשר המשך אוטומטית במעבר לפרימיום, גם כשהאפליקציה סגורה"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     style: {
       ...S.btnS,
@@ -1382,7 +1406,7 @@ function WevoLivePanel({
     onClick: () => syncServerWatch(null),
     "data-testid": "wevo-watch-off"
   }, "כבה שומר")),
-  !watchInfo && cid && hasCreds && /*#__PURE__*/React.createElement("div", {
+  !watchInfo && hasCreds && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -1396,16 +1420,24 @@ function WevoLivePanel({
       ...S.btnS,
       padding: "8px 12px"
     },
+    onClick: armGuard,
+    "data-testid": "wevo-watch-guard-arm"
+  }, "🛰️ הפעל שומר קבוע"), cid && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...S.btnS,
+      padding: "8px 12px"
+    },
     onClick: armNotifyWatch,
     "data-testid": "wevo-watch-notify-arm"
-  }, "🛰️ הפעל שומר התראות"), /*#__PURE__*/React.createElement("div", {
+  }, "🔔 שומר התראות ללקוח זה"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: "#64748b",
       lineHeight: 1.4,
       flex: "1 1 200px"
     }
-  }, "התראות על סיום טעינה, עצירת שיא וניתוק כבל — גם כשהאפליקציה סגורה. התראות בלבד, בלי אישורי פרימיום אוטומטיים.")),
+  }, "שומר קבוע: התראה על כל חיבור + אישור ראשון אוטומטי בתעריף רגיל (בשעות שיא — אתה מחליט), בלי פקיעת 24 שעות. שומר התראות: התראות בלבד ללקוח הנבחר.")),
   !isSelfSelected && cid && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",

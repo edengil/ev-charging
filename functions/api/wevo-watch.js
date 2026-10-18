@@ -139,6 +139,39 @@ export function eventsFromStateDiff(prev, st, nowMs) {
   return out;
 }
 
+// האם חימוש המשך־הפרימיום פעיל? רישומי מורשת (לפני שדה premiumContinue):
+// חימוש חולף שאינו notifyOnly היה תמיד חימוש פרימיום.
+export function premiumArmActive(cfg) {
+  if (!cfg || cfg.notifyOnly) return false;
+  if (cfg.premiumContinue === true) return true;
+  return cfg.premiumContinue == null && !cfg.persistent;
+}
+
+// החלטות השומר הקבוע/החמוש לטיק אחד — פונקציה טהורה (נבדקת ביחידה, בלי Wevo):
+// אישור ראשון אוטומטי בחיבור (לא בשיא), אישור המשך־פרימיום רק עם חימוש פרימיום,
+// ובשיא בלי חימוש — רק התראה להחלטת עדן.
+export function decideGuardActions(cfg, prev, st, diff, ctx) {
+  const out = { authorizeFirst: false, plugKey: null, authorizePremium: false, notifyPeakPlug: false, notifyPeakStop: false };
+  if (!cfg || cfg.notifyOnly) return out;
+  const peak = !!(ctx && ctx.peak);
+  const flip = !!(ctx && ctx.flip);
+  const connected = !!(st && st.connected);
+  const charging = !!(st && st.charging);
+  if (diff && diff.plugIn && cfg.autoApprove) {
+    out.plugKey = `plug:${diff.plugIn.txnId}:${diff.plugIn.atMs}`;
+    if (peak) out.notifyPeakPlug = true;
+    else if (!charging && cfg.plugActedKey !== out.plugKey) out.authorizeFirst = true;
+  }
+  if (flip && prev && prev.charging === true && !charging && connected) {
+    if (premiumArmActive(cfg)) {
+      if (cfg.actedKey !== (ctx && ctx.peakKey)) out.authorizePremium = true;
+    } else if (cfg.persistent) {
+      out.notifyPeakStop = true;
+    }
+  }
+  return out;
+}
+
 // שמירת האירועים ב־KV תחת watch:events (לפי transactionId), עם גיזום ל־48 שעות / 5 עסקאות.
 async function recordWatchEvents(env, cfg, diff, nowMs) {
   try {
@@ -180,22 +213,43 @@ async function handleRegister(env, body) {
   const password = String(body.password || "");
   await verifyCreds(email, password);
   const credsBlob = await encryptJson(env, { email, password });
+  const existing = await loadCfg(env);
+  const now = Date.now();
+  // שומר קבוע: persistent שורד חימושי פרימיום — חימוש פרימיום מתמזג לתוכו ולא דורס אותו.
+  const mergeIntoGuard = !!(existing && existing.persistent && body.premiumContinue === true);
+  const persistent = body.persistent === true || mergeIntoGuard;
+  let premiumContinue = body.premiumContinue === true;
+  let premiumArmedAt = premiumContinue ? now : null;
+  if (!premiumContinue && persistent && existing && existing.premiumContinue
+      && now - Number(existing.premiumArmedAt || 0) < 24 * 3600 * 1000) {
+    premiumContinue = true;
+    premiumArmedAt = existing.premiumArmedAt;
+  }
   const cfg = {
     armed: true,
     clientId: body.clientId != null ? String(body.clientId) : null,
     clientName: body.clientName != null ? String(body.clientName) : null,
     // notifyOnly: חימוש להתראות בלבד (גם ללקוח עצמי) — בלי אישורי פרימיום אוטומטיים בטיק
     notifyOnly: body.notifyOnly === true,
+    // persistent: שומר קבוע (התראות + אישור ראשון) בלי פקיעת 24 שעות;
+    // autoApprove: אישור ראשון אוטומטי בחיבור (לא בשעות שיא);
+    // premiumContinue: חימוש המשך־פרימיום ל־24 שעות (premiumArmedAt).
+    persistent,
+    autoApprove: persistent ? true : body.autoApprove === true,
+    premiumContinue,
+    premiumArmedAt,
     peakStartMin: Number(body.peakStartMin),
     peakEndMin: Number(body.peakEndMin),
-    armedAt: Date.now(),
+    armedAt: mergeIntoGuard ? Number(existing.armedAt || now) : now,
     credsBlob,
-    wasCharging: null,
-    wasPeak: null,
-    wasConnected: null,
-    lastTxnId: null,
-    lastFullMs: null,
-    actedKey: null
+    wasCharging: mergeIntoGuard ? existing.wasCharging : null,
+    wasPeak: mergeIntoGuard ? existing.wasPeak : null,
+    wasConnected: mergeIntoGuard ? existing.wasConnected : null,
+    lastTxnId: mergeIntoGuard ? existing.lastTxnId : null,
+    lastFullMs: mergeIntoGuard ? existing.lastFullMs : null,
+    actedKey: mergeIntoGuard ? existing.actedKey : null,
+    plugActedKey: mergeIntoGuard ? existing.plugActedKey : null,
+    lastPollAt: mergeIntoGuard ? existing.lastPollAt : null
   };
   if (!Number.isFinite(cfg.peakStartMin) || !Number.isFinite(cfg.peakEndMin)) {
     const err = new Error("חסר חלון תעריף פרימיום");
@@ -241,6 +295,9 @@ async function handleStatus(env, body) {
     action: "status",
     armed: !!cfg.armed,
     notifyOnly: !!cfg.notifyOnly,
+    persistent: !!cfg.persistent,
+    autoApprove: !!cfg.autoApprove,
+    premiumContinue: premiumArmActive(cfg),
     clientName: cfg.clientName,
     armedAt: cfg.armedAt,
     status,
@@ -258,8 +315,9 @@ async function handleTick(env, body) {
   }
   const cfg = await loadCfg(env);
   if (!cfg || !cfg.armed) return { ok: true, action: "tick", armed: false };
-  // פקיעה אוטומטית אחרי 24 שעות מההפעלה — השומר לא רץ לנצח בלי חידוש מהאפליקציה
-  if (Date.now() - Number(cfg.armedAt || 0) > 24 * 3600 * 1000) {
+  // פקיעה: רישום חולף פג כולו אחרי 24 שעות. שומר קבוע לא פג — רק חימוש
+  // המשך־הפרימיום שבתוכו מתבטל אחרי 24 שעות, והשומר ממשיך כהתראות + אישור ראשון.
+  if (!cfg.persistent && Date.now() - Number(cfg.armedAt || 0) > 24 * 3600 * 1000) {
     await env.EV_BACKUP.delete(CFG_KEY);
     await env.EV_BACKUP.delete(STATUS_KEY);
     await env.EV_BACKUP.delete(EVENTS_KEY);
@@ -273,6 +331,19 @@ async function handleTick(env, body) {
     } catch {}
     return { ok: true, action: "tick", armed: false, expired: true };
   }
+  if (cfg.persistent && cfg.premiumContinue
+      && Date.now() - Number(cfg.premiumArmedAt || cfg.armedAt || 0) > 24 * 3600 * 1000) {
+    cfg.premiumContinue = false;
+    cfg.premiumArmedAt = null;
+    cfg.actedKey = null;
+    await env.EV_BACKUP.put(CFG_KEY, JSON.stringify(cfg));
+    await pushLog(env, { kind: "premium-expire", detail: "חימוש המשך־הפרימיום פג אחרי 24 שעות — השומר הקבוע ממשיך" });
+  }
+  // שומר קבוע במנוחה: סריקה מדורגת (כל ~3 דקות כשאין רכב) כדי לא להציף את Wevo
+  if (cfg.persistent && !cfg.wasConnected && cfg.lastPollAt
+      && Date.now() - Number(cfg.lastPollAt) < 3 * 60 * 1000) {
+    return { ok: true, action: "tick", armed: true, throttled: true };
+  }
   const creds = await decryptJson(env, cfg.credsBlob);
 
   const stateRes = await handleWevoRequest({ email: creds.email, password: creds.password, action: "state" });
@@ -285,8 +356,21 @@ async function handleTick(env, body) {
 
   const flip = cfg.wasPeak === false && peak === true;
   const key = peakKey(cfg, parts, now);
+  cfg.lastPollAt = Date.now();
+
+  // ב3 + שומר קבוע: קודם מחשבים את אירועי המצב ואת החלטות השומר מהמצב שכבר
+  // נשלף, ורק אז מבצעים אישורים — ההחלטה עצמה פונקציה טהורה נבדקת.
+  const stTxnId = st.transactionId != null && String(st.transactionId) !== "" ? String(st.transactionId) : null;
+  const stFullMs = st.chargingFullTime != null && Number(st.chargingFullTime) > 0 ? Number(st.chargingFullTime) : null;
+  const diff = eventsFromStateDiff(
+    { connected: cfg.wasConnected, charging: cfg.wasCharging, lastTxnId: cfg.lastTxnId, lastFullMs: cfg.lastFullMs },
+    st,
+    Date.now()
+  );
+  const decide = decideGuardActions(cfg, { charging: cfg.wasCharging }, st, diff, { peak, flip, peakKey: key });
+
   let action = null;
-  if (!cfg.notifyOnly && flip && cfg.wasCharging === true && !charging && connected && cfg.actedKey !== key) {
+  if (decide.authorizePremium) {
     const res = await handleWevoRequest({
       email: creds.email,
       password: creds.password,
@@ -309,16 +393,30 @@ async function handleTick(env, body) {
       });
     } catch {}
   }
+  if (decide.authorizeFirst) {
+    const res = await handleWevoRequest({
+      email: creds.email,
+      password: creds.password,
+      action: "authorize",
+      confirmPremium: false
+    });
+    cfg.plugActedKey = decide.plugKey;
+    action = {
+      kind: "authorize-first",
+      at: Date.now(),
+      detail: "זוהה חיבור רכב — נשלח אישור ראשון אוטומטי (תעריף רגיל, לא פרימיום)",
+      chargingAfter: !!(res && res.state && res.state.charging)
+    };
+    await pushLog(env, action);
+    try {
+      await pushToAllSubscribers(env, {
+        title: "⚡ טעינה אושרה אוטומטית",
+        body: `רכב חובר לעמדה והשומר אישר טעינה בתעריף רגיל${cfg.clientName ? ` (${cfg.clientName})` : ""}. לאישור המשך גם בפרימיום — הפעל «אישור מראש כולל פרימיום» באפליקציה.`,
+        tag: "ev-watch-firstauth"
+      });
+    } catch {}
+  }
 
-  // ב3: לכידת אירועי טעינה מהמצב שכבר נשלף בטיק הזה — אפס קריאות Wevo נוספות.
-  // האירועים נשמרים ב־watch:events והאפליקציה ממזגת אותם לרשומות הפתוחות.
-  const stTxnId = st.transactionId != null && String(st.transactionId) !== "" ? String(st.transactionId) : null;
-  const stFullMs = st.chargingFullTime != null && Number(st.chargingFullTime) > 0 ? Number(st.chargingFullTime) : null;
-  const diff = eventsFromStateDiff(
-    { connected: cfg.wasConnected, charging: cfg.wasCharging, lastTxnId: cfg.lastTxnId, lastFullMs: cfg.lastFullMs },
-    st,
-    Date.now()
-  );
   if (diff.plugIn || diff.chargeStart || diff.full || diff.chargeStop || diff.plugOut) {
     await recordWatchEvents(env, cfg, diff, Date.now());
   }
@@ -327,6 +425,28 @@ async function handleTick(env, body) {
     timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
   }).format(new Date(ms));
   const who = cfg.clientName ? `${cfg.clientName} · ` : "";
+  if (diff.plugIn) {
+    try {
+      await pushToAllSubscribers(env, decide.notifyPeakPlug ? {
+        title: "🔌 רכב חובר בשעות שיא",
+        body: `${who}רכב חובר לעמדה בשעות תעריף שיא — השומר לא אישר אוטומטית. לאישור, פתחו את האפליקציה.`,
+        tag: "ev-watch-peakplug"
+      } : {
+        title: "🔌 רכב חובר לעמדה",
+        body: `${who}רכב חובר לעמדה`,
+        tag: "ev-watch-plugin"
+      });
+    } catch {}
+  }
+  if (decide.notifyPeakStop) {
+    try {
+      await pushToAllSubscribers(env, {
+        title: "⏸️ הטעינה הופסקה במעבר לשיא",
+        body: `${who}הטעינה הופסקה במעבר לתעריף שיא והשומר הקבוע לא מאשר פרימיום אוטומטית. לאישור המשך — הפעילו «אישור מראש כולל פרימיום» באפליקציה.`,
+        tag: "ev-watch-peakstop"
+      });
+    } catch {}
+  }
   if (diff.full) {
     try {
       await pushToAllSubscribers(env, {
@@ -336,7 +456,7 @@ async function handleTick(env, body) {
       });
     } catch {}
   }
-  if (diff.chargeStop && diff.chargeStop.evsePaused) {
+  if (diff.chargeStop && diff.chargeStop.evsePaused && !decide.notifyPeakStop) {
     try {
       await pushToAllSubscribers(env, {
         title: "⏸️ הטעינה הופסקה",

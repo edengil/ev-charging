@@ -262,9 +262,11 @@ describe("שומר התראות — notifyOnly (גם ללקוח עצמי)", () =
     assert.equal(st2.body.notifyOnly, false);
   });
 
-  it("שומרים: אישור הפרימיום בטיק כבוי ב־notifyOnly וההתראות מחווטות", () => {
+  it("שומרים: שערי האישור בטיק וההתראות מחווטים", () => {
     const src = readFileSync(join(root, "functions/api/wevo-watch.js"), "utf8");
-    assert.match(src, /!cfg\.notifyOnly && flip/);
+    assert.match(src, /decideGuardActions\(cfg/, "הטיק עובד דרך פונקציית ההחלטה");
+    assert.match(src, /if \(!cfg \|\| cfg\.notifyOnly\) return out/, "notifyOnly מכבה את כל האישורים בהחלטה");
+    assert.match(src, /premiumArmActive/, "שער חימוש הפרימיום מחווט");
     assert.match(src, /הטעינה הסתיימה ב־/);
     assert.match(src, /הטעינה הופסקה/);
     assert.match(src, /הכבל נותק/);
@@ -276,5 +278,102 @@ describe("שומר התראות — notifyOnly (גם ללקוח עצמי)", () =
     assert.match(panel, /notifyOnly: true/);
     assert.match(panel, /wevo-watch-notify-arm/);
     assert.match(panel, /watchInfo\.notifyOnly/);
+  });
+});
+
+describe("שומר קבוע — decideGuardActions", () => {
+  const decide = watch.decideGuardActions;
+  const GUARD = { persistent: true, autoApprove: true, premiumContinue: false, notifyOnly: false, plugActedKey: null, actedKey: null };
+  const plugDiff = { plugIn: { txnId: "9", atMs: 1000 } };
+  const idleSt = { connected: true, charging: false };
+  const flipCtx = { peak: true, flip: true, peakKey: "pk1" };
+
+  it("חיבור לא בשיא — אישור ראשון אוטומטי; אותו חיבור שוב — לא", () => {
+    const d = decide(GUARD, { charging: false }, idleSt, plugDiff, { peak: false, flip: false, peakKey: "pk0" });
+    assert.equal(d.authorizeFirst, true);
+    assert.equal(d.plugKey, "plug:9:1000");
+    const again = decide({ ...GUARD, plugActedKey: "plug:9:1000" }, { charging: false }, idleSt, plugDiff, { peak: false, flip: false, peakKey: "pk0" });
+    assert.equal(again.authorizeFirst, false);
+  });
+
+  it("חיבור בשעות שיא — אין אישור, רק התראה להחלטת עדן", () => {
+    const d = decide(GUARD, { charging: false }, idleSt, plugDiff, { peak: true, flip: false, peakKey: "pk1" });
+    assert.equal(d.authorizeFirst, false);
+    assert.equal(d.notifyPeakPlug, true);
+  });
+
+  it("מעבר לשיא באמצע טעינה: עם חימוש פרימיום — אישור המשך; בלעדיו (שומר קבוע) — התראת עצירה בלבד", () => {
+    const stopped = { connected: true, charging: false };
+    const withPrem = decide({ ...GUARD, premiumContinue: true }, { charging: true }, stopped, {}, flipCtx);
+    assert.equal(withPrem.authorizePremium, true);
+    const again = decide({ ...GUARD, premiumContinue: true, actedKey: "pk1" }, { charging: true }, stopped, {}, flipCtx);
+    assert.equal(again.authorizePremium, false, "actedKey מונע אישור כפול באותו חלון");
+    const guardOnly = decide(GUARD, { charging: true }, stopped, {}, flipCtx);
+    assert.equal(guardOnly.authorizePremium, false);
+    assert.equal(guardOnly.notifyPeakStop, true);
+  });
+
+  it("רישום מורשת (בלי שדות חדשים) נחשב חימוש פרימיום; notifyOnly מכבה הכול", () => {
+    const stopped = { connected: true, charging: false };
+    const legacy = decide({ notifyOnly: false }, { charging: true }, stopped, {}, flipCtx);
+    assert.equal(legacy.authorizePremium, true);
+    const notify = decide({ notifyOnly: true, autoApprove: true, persistent: true }, { charging: false }, idleSt, plugDiff, { peak: false, flip: false, peakKey: "x" });
+    assert.deepEqual(notify, { authorizeFirst: false, plugKey: null, authorizePremium: false, notifyPeakPlug: false, notifyPeakStop: false });
+  });
+
+  it("רישום שומר קבוע נשמר; חימוש פרימיום מתמזג לתוכו ולא דורס אותו; הסטטוס חושף את הדגלים", async () => {
+    const env = makeEnv();
+    const g = await call(env, { ...REGISTER, clientId: null, clientName: "שומר קבוע", persistent: true, autoApprove: true, premiumContinue: false });
+    assert.equal(g.status, 200);
+    let cfg = JSON.parse(env.EV_BACKUP._map.get("watch:cfg"));
+    assert.equal(cfg.persistent, true);
+    assert.equal(cfg.autoApprove, true);
+    assert.equal(cfg.premiumContinue, false);
+    const p = await call(env, { ...REGISTER, clientId: "c9", clientName: "שכן טעינה", premiumContinue: true });
+    assert.equal(p.status, 200);
+    cfg = JSON.parse(env.EV_BACKUP._map.get("watch:cfg"));
+    assert.equal(cfg.persistent, true, "השומר הקבוע שרד את חימוש הפרימיום");
+    assert.equal(cfg.premiumContinue, true);
+    assert.ok(cfg.premiumArmedAt > 0);
+    assert.equal(cfg.clientName, "שכן טעינה");
+    const st = await call(env, { action: "status", ...CREDS });
+    assert.equal(st.body.persistent, true);
+    assert.equal(st.body.premiumContinue, true);
+    assert.equal(st.body.autoApprove, true);
+  });
+
+  it("שומר קבוע במנוחה: טיק מדולג (throttled) בלי קריאת Wevo", async () => {
+    const env = makeEnv();
+    await call(env, { ...REGISTER, clientId: null, clientName: "שומר קבוע", persistent: true, autoApprove: true, premiumContinue: false });
+    const cfg = JSON.parse(env.EV_BACKUP._map.get("watch:cfg"));
+    cfg.wasConnected = false;
+    cfg.lastPollAt = Date.now();
+    env.EV_BACKUP._map.set("watch:cfg", JSON.stringify(cfg));
+    const r = await call(env, { action: "tick", secret: "tick-secret-1" });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.throttled, true);
+  });
+
+  it("פקיעת חימוש פרימיום בתוך שומר קבוע: החימוש מתבטל, השומר לא נמחק", async () => {
+    const env = makeEnv();
+    await call(env, { ...REGISTER, clientId: null, clientName: "שומר קבוע", persistent: true, autoApprove: true, premiumContinue: false });
+    await call(env, { ...REGISTER, clientId: "c9", clientName: "שכן", premiumContinue: true });
+    const cfg = JSON.parse(env.EV_BACKUP._map.get("watch:cfg"));
+    cfg.premiumArmedAt = Date.now() - 25 * 3600 * 1000;
+    cfg.lastPollAt = Date.now() - 10 * 60 * 1000;
+    env.EV_BACKUP._map.set("watch:cfg", JSON.stringify(cfg));
+    await call(env, { action: "tick", secret: "tick-secret-1" }); // ייכשל בשליפת מצב (fetch מדומה) — ההורדה קורית לפניה
+    const after = JSON.parse(env.EV_BACKUP._map.get("watch:cfg"));
+    assert.ok(after, "השומר הקבוע לא נמחק");
+    assert.equal(after.premiumContinue, false, "חימוש הפרימיום בוטל");
+    assert.equal(after.persistent, true);
+  });
+
+  it("שומרי פאנל: שומר קבוע + חימוש פרימיום מפורש ברישום", () => {
+    const panel = readFileSync(join(root, "src/views/wevo-live-panel.js"), "utf8");
+    assert.match(panel, /armGuard/);
+    assert.match(panel, /persistent: true/);
+    assert.match(panel, /wevo-watch-guard-arm/);
+    assert.match(panel, /premiumContinue: true/);
   });
 });
