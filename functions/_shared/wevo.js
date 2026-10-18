@@ -272,7 +272,9 @@ export function pickLiveOngoing(list, raw) {
   const ongoing = (list || []).filter(t => t && t.isOngoing);
   if (!ongoing.length) return null;
   const rawTx = raw && raw.transactionData ? raw.transactionData : null;
-  const rawId = rawTx && rawTx.transactionId != null && String(rawTx.transactionId) !== ""
+  // מזהה "0" מה־WS אינו מזהה אמיתי (העמדה מחזירה 0) — מתייחסים אליו כחסר,
+  // אחרת ההתאמה מול REST נכשלת תמיד והבחירה הטרייה למטה לעולם לא רצה.
+  const rawId = rawTx && rawTx.transactionId != null && String(rawTx.transactionId) !== "" && String(rawTx.transactionId) !== "0"
     ? String(rawTx.transactionId)
     : null;
   if (rawId) return ongoing.find(t => String(t.transactionId) === rawId) || null;

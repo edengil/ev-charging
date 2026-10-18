@@ -142,7 +142,8 @@ function prevWasFlowing(p, forStart) {
 export function eventsFromStateDiff(prev, st, nowMs) {
   const p = prev || {};
   const out = {};
-  const key = watchEventKey(st);
+  // זהות: מזהה/שעת־חיבור מהמצב; כשאין — מפתח המושב שהטיק מנפיק ושומר ב־cfg
+  const key = watchEventKey(st) || (st && st.connected ? (p.lastEventKey || null) : null);
   const connected = !!(st && st.connected);
   const active = stateActivelyCharging(st && st.state);
   if (!p.connected && connected && key) {
@@ -159,6 +160,11 @@ export function eventsFromStateDiff(prev, st, nowMs) {
     if ((fullFlag && p.didCompleteFull !== true) || endedByState) {
       out.full = { txnId: key, atMs: nowMs, approx: true };
     }
+  }
+  // סיום שכבר קרה לפני שהמעברים נצפו (למשל חימוש מאוחר או מעבר שנצרך בלי זהות):
+  // didCompleteFull דלוק ועוד לא דווח שום סיום בחיבור הזה — מדווחים פעם אחת.
+  if (key && connected && !out.full && st && st.didCompleteFull && p.fullNotifiedKey == null) {
+    out.full = { txnId: key, atMs: fullMs || nowMs, approx: !fullMs };
   }
   // עצירת עמדה (SuspendedEVSE) אחרי זרם פעיל — מועמד להתראת שיא (רק כשאין סיום באותה דגימה)
   if (prevWasFlowing(p, false) && !active && connected && key && !out.full && st.state === "SuspendedEVSE") {
@@ -403,11 +409,17 @@ async function handleTick(env, body) {
   // נשלף, ורק אז מבצעים אישורים — ההחלטה עצמה פונקציה טהורה נבדקת.
   const stTxnId = st.transactionId != null && String(st.transactionId) !== "" ? String(st.transactionId) : null;
   const stFullMs = st.chargingFullTime != null && Number(st.chargingFullTime) > 0 ? Number(st.chargingFullTime) : null;
+  // זהות מושב: אם לפיד אין שום זהות (העמדה מחזירה מזהה 0 ובלי שעת חיבור) —
+  // מנפיקים מפתח מקומי יציב לאורך החיבור, כדי שהאירועים וההתראות יעבדו בכל זאת.
+  if (connected && !watchEventKey(st) && !cfg.lastEventKey) {
+    cfg.lastEventKey = `watch-${Date.now()}`;
+  }
   const diff = eventsFromStateDiff(
     {
       connected: cfg.wasConnected, charging: cfg.wasCharging, state: cfg.wasState ?? null,
       lastTxnId: cfg.lastTxnId, lastEventKey: cfg.lastEventKey ?? null,
-      lastFullMs: cfg.lastFullMs, didCompleteFull: cfg.wasFull === true
+      lastFullMs: cfg.lastFullMs, didCompleteFull: cfg.wasFull === true,
+      fullNotifiedKey: cfg.fullNotifiedKey ?? null
     },
     st,
     Date.now()
@@ -464,6 +476,12 @@ async function handleTick(env, body) {
 
   if (diff.plugIn || diff.chargeStart || diff.full || diff.chargeStop || diff.plugOut) {
     await recordWatchEvents(env, cfg, diff, Date.now());
+  }
+  if (diff.plugIn) cfg.fullNotifiedKey = null;
+  if (diff.full) cfg.fullNotifiedKey = diff.full.txnId;
+  if (!connected) {
+    cfg.fullNotifiedKey = null;
+    cfg.lastEventKey = null;
   }
   // התראות על אירועי הטעינה (אותם אירועים שנלכדו) — גם בחימוש פרימיום וגם ב־notifyOnly
   const hhmm = (ms) => new Intl.DateTimeFormat("he-IL", {

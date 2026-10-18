@@ -129,4 +129,14 @@ describe("pickLiveOngoing", () => {
     });
     assert.equal(picked.transactionId, 9);
   });
+
+  it("מזהה WS ‏0 אינו חוסם את הבחירה הטרייה (רגרסיית 19.10: העמדה מחזירה transactionId=0)", () => {
+    const live = { isOngoing: true, transactionId: 77, plugInTime: Date.now() - 10 * 60 * 1000, plugOutTime: 0, stopReason: null };
+    const picked = pickLiveOngoing([live], {
+      state: "SuspendedEV",
+      transactionData: { transactionId: 0 }
+    });
+    assert.ok(picked, "נבחרה העסקה הטרייה למרות מזהה 0");
+    assert.equal(picked.transactionId, 77);
+  });
 });

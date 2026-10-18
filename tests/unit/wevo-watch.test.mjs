@@ -265,7 +265,8 @@ describe("ב3 v2 — זיהוי מבוסס מצב (רגרסיית 19.10: chargin
     const st = { connected: true, charging: true, state: "Charging", transactionId: 55, plugInTime: T0, didCompleteFull: true };
     const d = diff(prev, st, T0 + 7200000);
     assert.ok(d.full && d.full.approx);
-    const again = diff({ ...prev, didCompleteFull: true }, st, T0 + 7260000);
+    // הטיק מסמן fullNotifiedKey אחרי כל אירוע full — כך נראה ה־prev האמיתי בסיבוב הבא
+    const again = diff({ ...prev, didCompleteFull: true, fullNotifiedKey: "55" }, st, T0 + 7260000);
     assert.equal(again.full, undefined, "לא יורה פעמיים");
   });
 
@@ -289,6 +290,23 @@ describe("ב3 v2 — זיהוי מבוסס מצב (רגרסיית 19.10: chargin
     const src = readFileSync(join(root, "functions/api/wevo-watch.js"), "utf8");
     assert.match(src, /diff\.full\.approx/);
     assert.match(src, /e\.endApprox = true/);
+  });
+
+  it("סיום שכבר קרה (didCompleteFull דלוק, מעברים נצרכו) מדווח פעם אחת לפי fullNotifiedKey", () => {
+    const prev = { connected: true, charging: true, state: "SuspendedEV", lastEventKey: "plug-5", lastFullMs: null, didCompleteFull: true, fullNotifiedKey: null };
+    const st = { connected: true, charging: true, state: "SuspendedEV", transactionId: null, plugInTime: 5, didCompleteFull: true };
+    const d = diff(prev, st, T0 + 8000000);
+    assert.ok(d.full && d.full.approx, "דווח סיום מאוחר");
+    const again = diff({ ...prev, fullNotifiedKey: "plug-5" }, st, T0 + 8060000);
+    assert.equal(again.full, undefined, "לא מדווח שוב באותו חיבור");
+  });
+
+  it("זהות מושב מקומית (watch-*) מה־cfg משמשת כשאין שום זהות מהפיד", () => {
+    const prev = { connected: true, charging: true, state: "Charging", lastEventKey: "watch-123", lastFullMs: null, didCompleteFull: false, fullNotifiedKey: null };
+    const st = { connected: true, charging: true, state: "SuspendedEV", transactionId: 0, plugInTime: 0, didCompleteFull: true };
+    const d = diff(prev, st, T0 + 8000000);
+    assert.ok(d.full);
+    assert.equal(d.full.txnId, "watch-123");
   });
 });
 
