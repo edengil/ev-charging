@@ -231,3 +231,13 @@ describe("ב3 — mergeWatchEvents (מיזוג חותמות שרת לרשומה 
     assert.equal(mergeWatchEvents(null, ev), null);
   });
 });
+
+describe("ב3 — חיווט הבאנדל (שומר רגרסיה)", () => {
+  it("mergeWatchEvents מיוצא מהספרייה ומחווט ב־inject-app כשם גלובלי", () => {
+    const inject = readFileSync(join(root, "scripts/inject-app.mjs"), "utf8");
+    assert.match(inject, /mergeWatchEvents: mergeWatchEvents,/);
+    assert.match(inject, /var mergeWatchEvents = __EV_MONEY__\.mergeWatchEvents;/);
+    const panel = readFileSync(join(root, "src/views/wevo-live-panel.js"), "utf8");
+    assert.match(panel, /mergeWatchEvents\(o, ev\)/);
+  });
+});
