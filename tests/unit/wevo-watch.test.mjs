@@ -171,3 +171,50 @@ describe("watcher worker — טריגר הטיק", () => {
     assert.ok(txt.startsWith("tick status 200"));
   });
 });
+
+describe("ב3 — eventsFromStateDiff (לכידת אירועי טעינה)", () => {
+  const diff = watch.eventsFromStateDiff;
+  const T0 = 1768479240000; // plugInTime
+  const FULL = 1768501200000;
+
+  it("חיבור חדש מייצר אירוע plugIn עם plugInTime של Wevo", () => {
+    const d = diff({ connected: false, charging: false, lastTxnId: null, lastFullMs: null },
+      { connected: true, charging: false, transactionId: 777, plugInTime: T0 }, T0 + 60000);
+    assert.equal(d.plugIn.txnId, "777");
+    assert.equal(d.plugIn.atMs, T0);
+    assert.equal(d.chargeStart, undefined);
+    assert.equal(d.plugOut, undefined);
+  });
+
+  it("מעבר לטעינה מייצר chargeStart בזמן התצפית; בלי שינוי — אין אירועים", () => {
+    const prev = { connected: true, charging: false, lastTxnId: "777", lastFullMs: null };
+    const d = diff(prev, { connected: true, charging: true, transactionId: 777, plugInTime: T0 }, T0 + 120000);
+    assert.equal(d.chargeStart.atMs, T0 + 120000);
+    const none = diff({ connected: true, charging: true, lastTxnId: "777", lastFullMs: null },
+      { connected: true, charging: true, transactionId: 777, plugInTime: T0 }, T0 + 180000);
+    assert.deepEqual(none, {});
+  });
+
+  it("חותמת full חדשה מייצרת אירוע full; אותה חותמת שוב — לא", () => {
+    const prev = { connected: true, charging: true, lastTxnId: "777", lastFullMs: null };
+    const st = { connected: true, charging: false, transactionId: 777, chargingFullTime: FULL };
+    const d = diff(prev, st, FULL + 60000);
+    assert.equal(d.full.atMs, FULL);
+    const again = diff({ ...prev, lastFullMs: FULL }, st, FULL + 120000);
+    assert.equal(again.full, undefined);
+  });
+
+  it("ניתוק מייחס plugOut לעסקה הקודמת גם כשהמצב החדש בלי עסקה", () => {
+    const d = diff({ connected: true, charging: false, lastTxnId: "777", lastFullMs: FULL },
+      { connected: false, charging: false, transactionId: null }, FULL + 3600000);
+    assert.equal(d.plugOut.txnId, "777");
+  });
+
+  it("שילוב חיווט בשומר: status מחזיר events, ו־deregister מוחק את מפתח האירועים", () => {
+    const src = readFileSync(join(root, "functions/api/wevo-watch.js"), "utf8");
+    assert.match(src, /EVENTS_KEY = "watch:events"/);
+    assert.match(src, /events,/);
+    assert.match(src, /delete\(EVENTS_KEY\)/);
+    assert.match(src, /recordWatchEvents\(env, cfg, diff/);
+  });
+});

@@ -175,6 +175,19 @@ function WevoLivePanel({
       try {
         const data = await watchApi("status");
         setWatchInfo(data && data.armed ? data : null);
+        // ב3: מיזוג חותמות שומר השרת לרשומות הפתוחות (מילוי שדות ריקים בלבד)
+        if (data && data.events) {
+          const patches = [];
+          for (const o of openRef.current || []) {
+            const ev = o && o.wevoTxnId ? data.events[String(o.wevoTxnId)] : null;
+            const patch = ev ? mergeWatchEvents(o, ev) : null;
+            if (patch) patches.push({ ...o, ...patch, updatedAt: Date.now() });
+          }
+          if (patches.length) {
+            dataStore.upsertOpenSessions(patches);
+            pushWevoLog("sync", "התקבלו חותמות טעינה משומר השרת", true);
+          }
+        }
       } catch {
         setWatchInfo(null);
       }

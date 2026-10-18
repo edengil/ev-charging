@@ -8,7 +8,8 @@ import {
   shouldCloseStaleWevoOpen,
   wevoOpenLooksFinished,
   validChargeEndMs,
-  openFollowsLiveCharge
+  openFollowsLiveCharge,
+  mergeWatchEvents
 } from "../../lib/ev-money.mjs";
 
 // ב7 (18.10.2026) — כיסוי לשלושה אזורים שלא נבדקו: מחזור חיי מנויי Push,
@@ -187,5 +188,46 @@ describe("שומר — טיק חמוש כשה־Wevo לא נגיש", () => {
     assert.equal(log.some(e => e.kind === "authorize"), false);
     const after = JSON.parse(env.EV_BACKUP._map.get("watch:cfg"));
     assert.ok(!after.actedKey, "actedKey לא סומן — האישור לא בוצע");
+  });
+});
+
+describe("ב3 — mergeWatchEvents (מיזוג חותמות שרת לרשומה פתוחה)", () => {
+  const ev = {
+    txnId: "777",
+    plugInAt: new Date("2026-01-15T14:14").getTime(),
+    chargeStartedAt: new Date("2026-01-15T14:59").getTime(),
+    chargingFullTime: new Date("2026-01-15T20:20").getTime(),
+    chargeEndedAt: new Date("2026-01-15T20:20").getTime(),
+    plugOutAt: new Date("2026-01-15T20:54").getTime()
+  };
+
+  it("ממלא את כל החותמות החסרות ומנפיק verifiedEndAt מחותמת ה־full", () => {
+    const patch = mergeWatchEvents({ id: "o1", wevoTxnId: "777" }, ev);
+    assert.equal(patch.plugInAt, "2026-01-15T14:14");
+    assert.equal(patch.chargeStartedAt, "2026-01-15T14:59");
+    assert.equal(patch.chargingFullTime, "2026-01-15T20:20");
+    assert.equal(patch.chargeEndedAt, "2026-01-15T20:20");
+    assert.equal(patch.verifiedEndAt, "2026-01-15T20:20");
+    assert.equal(patch.plugOutAt, "2026-01-15T20:54");
+  });
+
+  it("לעולם לא דורס ערכים שהאפליקציה כבר לכדה", () => {
+    const open = {
+      id: "o1", wevoTxnId: "777",
+      plugInAt: "2026-01-15T14:10", chargeEndedAt: "2026-01-15T20:15",
+      verifiedEndAt: "2026-01-15T20:15", chargingFullTime: "2026-01-15T20:15"
+    };
+    const patch = mergeWatchEvents(open, ev);
+    assert.equal(patch.plugInAt, undefined);
+    assert.equal(patch.chargeEndedAt, undefined);
+    assert.equal(patch.verifiedEndAt, undefined);
+    assert.equal(patch.chargingFullTime, undefined);
+    assert.equal(patch.chargeStartedAt, "2026-01-15T14:59"); // היחיד שהיה חסר
+  });
+
+  it("בלי אירועים או בלי חותמות — null", () => {
+    assert.equal(mergeWatchEvents({ id: "o1" }, null), null);
+    assert.equal(mergeWatchEvents({ id: "o1" }, { txnId: "777" }), null);
+    assert.equal(mergeWatchEvents(null, ev), null);
   });
 });

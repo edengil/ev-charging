@@ -8,7 +8,7 @@
     "inject": "node scripts/inject-app.mjs",
     "deploy": "npm run inject && npm run build && wrangler pages deploy dist --project-name=eden-ev-charge --branch=main",
     "cf:kv": "wrangler kv namespace create EV_BACKUP",
-    "test:unit": "node --test tests/unit/*.mjs",
+    "test:unit": "TZ=Asia/Jerusalem node --test tests/unit/*.mjs",
     "test:e2e": "npm run inject && playwright test --config e2e/playwright.config.mjs",
     "test:e2e:ui": "npm run inject && playwright test --config e2e/playwright.config.mjs --ui",
     "test": "npm run test:unit && npm run test:e2e",

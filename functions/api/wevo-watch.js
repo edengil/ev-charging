@@ -9,6 +9,7 @@ import { pushToAllSubscribers } from "../_shared/push.js";
 const CFG_KEY = "watch:cfg";
 const STATUS_KEY = "watch:status";
 const LOG_KEY = "watch:log";
+const EVENTS_KEY = "watch:events";
 
 function b64encode(bytes) {
   let s = "";
@@ -114,6 +115,51 @@ async function pushLog(env, entry) {
   } catch {}
 }
 
+// ב3 — גזירת אירועי טעינה מהפרש בין דגימת מצב קודמת לנוכחית (פונקציה טהורה).
+// prev: {connected, charging, lastTxnId, lastFullMs} מתוך cfg; st: מצב מנורמל נוכחי.
+export function eventsFromStateDiff(prev, st, nowMs) {
+  const p = prev || {};
+  const out = {};
+  const txnId = st && st.transactionId != null && String(st.transactionId) !== "" ? String(st.transactionId) : null;
+  const connected = !!(st && st.connected);
+  const charging = !!(st && st.charging);
+  if (!p.connected && connected && txnId) {
+    const at = st.plugInTime != null && Number(st.plugInTime) > 0 ? Number(st.plugInTime) : nowMs;
+    out.plugIn = { txnId, atMs: at };
+  }
+  if (!p.charging && charging && txnId) out.chargeStart = { txnId, atMs: nowMs };
+  const fullMs = st && st.chargingFullTime != null && Number(st.chargingFullTime) > 0 ? Number(st.chargingFullTime) : null;
+  if (txnId && fullMs && fullMs !== (p.lastFullMs || null)) out.full = { txnId, atMs: fullMs };
+  if (p.connected && !connected && p.lastTxnId) out.plugOut = { txnId: String(p.lastTxnId), atMs: nowMs };
+  return out;
+}
+
+// שמירת האירועים ב־KV תחת watch:events (לפי transactionId), עם גיזום ל־48 שעות / 5 עסקאות.
+async function recordWatchEvents(env, cfg, diff, nowMs) {
+  try {
+    const kv = env.EV_BACKUP;
+    const all = (await kv.get(EVENTS_KEY, { type: "json" })) || {};
+    const touch = (txnId) => {
+      const e = all[txnId] || (all[txnId] = {
+        txnId, clientId: cfg.clientId || null,
+        plugInAt: null, chargeStartedAt: null, chargingFullTime: null,
+        chargeEndedAt: null, plugOutAt: null, updatedAt: 0, source: "watch"
+      });
+      e.updatedAt = nowMs;
+      return e;
+    };
+    if (diff.plugIn) { const e = touch(diff.plugIn.txnId); if (e.plugInAt == null) e.plugInAt = diff.plugIn.atMs; }
+    if (diff.chargeStart) { const e = touch(diff.chargeStart.txnId); if (e.chargeStartedAt == null) e.chargeStartedAt = diff.chargeStart.atMs; }
+    if (diff.full) { const e = touch(diff.full.txnId); e.chargingFullTime = diff.full.atMs; e.chargeEndedAt = diff.full.atMs; }
+    if (diff.plugOut) { const e = touch(diff.plugOut.txnId); if (e.plugOutAt == null) e.plugOutAt = diff.plugOut.atMs; }
+    const kept = Object.entries(all)
+      .filter(([, e]) => nowMs - (e.updatedAt || 0) < 48 * 3600 * 1000)
+      .sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0))
+      .slice(0, 5);
+    await kv.put(EVENTS_KEY, JSON.stringify(Object.fromEntries(kept)));
+  } catch {}
+}
+
 async function verifyCreds(email, password) {
   if (!email || !password) {
     const err = new Error("חסרים אימייל או סיסמה");
@@ -138,6 +184,9 @@ async function handleRegister(env, body) {
     credsBlob,
     wasCharging: null,
     wasPeak: null,
+    wasConnected: null,
+    lastTxnId: null,
+    lastFullMs: null,
     actedKey: null
   };
   if (!Number.isFinite(cfg.peakStartMin) || !Number.isFinite(cfg.peakEndMin)) {
@@ -165,6 +214,7 @@ async function handleDeregister(env, body) {
   }
   await env.EV_BACKUP.delete(CFG_KEY);
   await env.EV_BACKUP.delete(STATUS_KEY);
+  await env.EV_BACKUP.delete(EVENTS_KEY);
   await pushLog(env, { kind: "deregister", detail: "שומר כובה והפרטים נמחקו מהשרת" });
   return { ok: true, action: "deregister", armed: false };
 }
@@ -177,6 +227,7 @@ async function handleStatus(env, body) {
   if (!cfg) return { ok: true, action: "status", armed: false };
   const status = (await env.EV_BACKUP.get(STATUS_KEY, { type: "json" })) || null;
   const log = (await env.EV_BACKUP.get(LOG_KEY, { type: "json" })) || [];
+  const events = (await env.EV_BACKUP.get(EVENTS_KEY, { type: "json" })) || {};
   return {
     ok: true,
     action: "status",
@@ -184,6 +235,7 @@ async function handleStatus(env, body) {
     clientName: cfg.clientName,
     armedAt: cfg.armedAt,
     status,
+    events,
     log: log.slice(0, 5)
   };
 }
@@ -201,6 +253,7 @@ async function handleTick(env, body) {
   if (Date.now() - Number(cfg.armedAt || 0) > 24 * 3600 * 1000) {
     await env.EV_BACKUP.delete(CFG_KEY);
     await env.EV_BACKUP.delete(STATUS_KEY);
+    await env.EV_BACKUP.delete(EVENTS_KEY);
     await pushLog(env, { kind: "expire", detail: "שומר כובה אוטומטית אחרי 24 שעות" });
     try {
       await pushToAllSubscribers(env, {
@@ -246,6 +299,25 @@ async function handleTick(env, body) {
         tag: "ev-watch-premium"
       });
     } catch {}
+  }
+
+  // ב3: לכידת אירועי טעינה מהמצב שכבר נשלף בטיק הזה — אפס קריאות Wevo נוספות.
+  // האירועים נשמרים ב־watch:events והאפליקציה ממזגת אותם לרשומות הפתוחות.
+  const stTxnId = st.transactionId != null && String(st.transactionId) !== "" ? String(st.transactionId) : null;
+  const stFullMs = st.chargingFullTime != null && Number(st.chargingFullTime) > 0 ? Number(st.chargingFullTime) : null;
+  const diff = eventsFromStateDiff(
+    { connected: cfg.wasConnected, charging: cfg.wasCharging, lastTxnId: cfg.lastTxnId, lastFullMs: cfg.lastFullMs },
+    st,
+    Date.now()
+  );
+  if (diff.plugIn || diff.chargeStart || diff.full || diff.plugOut) {
+    await recordWatchEvents(env, cfg, diff, Date.now());
+  }
+  cfg.wasConnected = connected;
+  if (stTxnId) {
+    if (cfg.lastTxnId !== stTxnId) cfg.lastFullMs = stFullMs;
+    else if (stFullMs != null) cfg.lastFullMs = stFullMs;
+    cfg.lastTxnId = stTxnId;
   }
 
   cfg.wasCharging = charging;
