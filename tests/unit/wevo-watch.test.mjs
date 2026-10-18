@@ -187,11 +187,11 @@ describe("ב3 — eventsFromStateDiff (לכידת אירועי טעינה)", () 
   });
 
   it("מעבר לטעינה מייצר chargeStart בזמן התצפית; בלי שינוי — אין אירועים", () => {
-    const prev = { connected: true, charging: false, lastTxnId: "777", lastFullMs: null };
-    const d = diff(prev, { connected: true, charging: true, transactionId: 777, plugInTime: T0 }, T0 + 120000);
+    const prev = { connected: true, charging: false, state: "Preparing", lastTxnId: "777", lastFullMs: null };
+    const d = diff(prev, { connected: true, charging: true, state: "Charging", transactionId: 777, plugInTime: T0 }, T0 + 120000);
     assert.equal(d.chargeStart.atMs, T0 + 120000);
-    const none = diff({ connected: true, charging: true, lastTxnId: "777", lastFullMs: null },
-      { connected: true, charging: true, transactionId: 777, plugInTime: T0 }, T0 + 180000);
+    const none = diff({ connected: true, charging: true, state: "Charging", lastTxnId: "777", lastFullMs: null },
+      { connected: true, charging: true, state: "Charging", transactionId: 777, plugInTime: T0 }, T0 + 180000);
     assert.deepEqual(none, {});
   });
 
@@ -225,8 +225,8 @@ describe("ב3 — eventsFromStateDiff (לכידת אירועי טעינה)", () 
     assert.equal(d.chargeStop.evsePaused, true);
     assert.equal(d.full, undefined);
     const d2 = diff(prev, { connected: true, charging: false, transactionId: 777, state: "Finishing" }, T0 + 3600000);
-    assert.ok(d2.chargeStop);
-    assert.equal(d2.chargeStop.evsePaused, false);
+    assert.ok(d2.full && d2.full.approx, "Finishing אחרי זרם = סיום מקורב, לא עצירת שיא");
+    assert.equal(d2.chargeStop, undefined);
   });
 
   it("full באותה דגימה מדכא chargeStop; בלי טעינה קודמת אין chargeStop", () => {
@@ -243,6 +243,52 @@ describe("ב3 — eventsFromStateDiff (לכידת אירועי טעינה)", () 
     const src = readFileSync(join(root, "functions/api/wevo-watch.js"), "utf8");
     assert.match(src, /chargeStoppedAt == null/);
     assert.match(src, /e\.chargeStoppedAt = diff\.chargeStop\.atMs/);
+  });
+});
+
+describe("ב3 v2 — זיהוי מבוסס מצב (רגרסיית 19.10: charging לא נופל ב־SuspendedEV)", () => {
+  const diff = watch.eventsFromStateDiff;
+  const T0 = 1768479240000;
+
+  it("סיום מזוהה ממעבר Charging→SuspendedEV גם בלי מזהה עסקה ובלי חותמת (זהות לפי שעת חיבור)", () => {
+    const prev = { connected: true, charging: true, state: "Charging", lastEventKey: `plug-${T0}`, lastFullMs: null, didCompleteFull: false };
+    const st = { connected: true, charging: true, state: "SuspendedEV", transactionId: 0, plugInTime: T0, rateKw: 0 };
+    const d = diff(prev, st, T0 + 7200000);
+    assert.ok(d.full, "אירוע סיום נוצר");
+    assert.equal(d.full.approx, true);
+    assert.equal(d.full.txnId, `plug-${T0}`);
+    assert.equal(d.chargeStop, undefined);
+  });
+
+  it("didCompleteFull שהתהפך מייצר סיום גם אם המצב עוד לא השתנה", () => {
+    const prev = { connected: true, charging: true, state: "Charging", lastEventKey: "55", lastFullMs: null, didCompleteFull: false };
+    const st = { connected: true, charging: true, state: "Charging", transactionId: 55, plugInTime: T0, didCompleteFull: true };
+    const d = diff(prev, st, T0 + 7200000);
+    assert.ok(d.full && d.full.approx);
+    const again = diff({ ...prev, didCompleteFull: true }, st, T0 + 7260000);
+    assert.equal(again.full, undefined, "לא יורה פעמיים");
+  });
+
+  it("SuspendedEV בלי זרם קודם (הושהה מההתחלה) — אין סיום כוזב", () => {
+    const prev = { connected: true, charging: true, state: "SuspendedEV", lastEventKey: `plug-${T0}`, lastFullMs: null, didCompleteFull: false };
+    const st = { connected: true, charging: true, state: "SuspendedEV", transactionId: null, plugInTime: T0, rateKw: 0 };
+    const d = diff(prev, st, T0 + 7200000);
+    assert.equal(d.full, undefined);
+  });
+
+  it("חיבור בלי מזהה עסקה — plugIn עם זהות שעת־חיבור; ניתוק מיוחס לאותה זהות", () => {
+    const d = diff({ connected: false, charging: false, state: null, lastEventKey: null },
+      { connected: true, charging: false, state: "Preparing", transactionId: 0, plugInTime: T0 }, T0 + 60000);
+    assert.equal(d.plugIn.txnId, `plug-${T0}`);
+    const out = diff({ connected: true, charging: true, state: "SuspendedEV", lastEventKey: `plug-${T0}` },
+      { connected: false, charging: false, state: "Available", transactionId: null }, T0 + 7300000);
+    assert.equal(out.plugOut.txnId, `plug-${T0}`);
+  });
+
+  it("שומר מקור: סיום מקורב לא כותב chargingFullTime ברישום האירועים", () => {
+    const src = readFileSync(join(root, "functions/api/wevo-watch.js"), "utf8");
+    assert.match(src, /diff\.full\.approx/);
+    assert.match(src, /e\.endApprox = true/);
   });
 });
 

@@ -116,26 +116,56 @@ async function pushLog(env, entry) {
 }
 
 // ב3 — גזירת אירועי טעינה מהפרש בין דגימת מצב קודמת לנוכחית (פונקציה טהורה).
-// prev: {connected, charging, lastTxnId, lastFullMs} מתוך cfg; st: מצב מנורמל נוכחי.
+// לקח משטח (18–19.10): הדגל st.charging של normalizeState נשאר true גם ב־SuspendedEV
+// (רכב מלא ומחובר), ומזהה העסקה חוזר ריק בעמדה הזו — לכן הזיהוי מבוסס מצב OCPP,
+// חותמת full, ‏didCompleteFull וזהות לפי שעת חיבור, ולא על הדגל/המזהה בלבד.
+// prev: {connected, charging, state, lastTxnId, lastEventKey, lastFullMs, didCompleteFull} מתוך cfg.
+export function watchEventKey(st) {
+  if (!st) return null;
+  if (st.transactionId != null && String(st.transactionId) !== "" && String(st.transactionId) !== "0") {
+    return String(st.transactionId);
+  }
+  if (st.plugInTime != null && Number(st.plugInTime) > 0) return `plug-${Number(st.plugInTime)}`;
+  return null;
+}
+
+function stateActivelyCharging(state) {
+  return state === "Charging";
+}
+
+// האם בדגימה הקודמת זרם באמת — לפי state אם נרשם, אחרת לפי הדגל הישן (תאימות לאחור)
+function prevWasFlowing(p, forStart) {
+  if (p.state != null) return stateActivelyCharging(p.state);
+  return forStart ? false : !!p.charging;
+}
+
 export function eventsFromStateDiff(prev, st, nowMs) {
   const p = prev || {};
   const out = {};
-  const txnId = st && st.transactionId != null && String(st.transactionId) !== "" ? String(st.transactionId) : null;
+  const key = watchEventKey(st);
   const connected = !!(st && st.connected);
-  const charging = !!(st && st.charging);
-  if (!p.connected && connected && txnId) {
+  const active = stateActivelyCharging(st && st.state);
+  if (!p.connected && connected && key) {
     const at = st.plugInTime != null && Number(st.plugInTime) > 0 ? Number(st.plugInTime) : nowMs;
-    out.plugIn = { txnId, atMs: at };
+    out.plugIn = { txnId: key, atMs: at };
   }
-  if (!p.charging && charging && txnId) out.chargeStart = { txnId, atMs: nowMs };
+  if (!prevWasFlowing(p, true) && active && key) out.chargeStart = { txnId: key, atMs: nowMs };
   const fullMs = st && st.chargingFullTime != null && Number(st.chargingFullTime) > 0 ? Number(st.chargingFullTime) : null;
-  if (txnId && fullMs && fullMs !== (p.lastFullMs || null)) out.full = { txnId, atMs: fullMs };
-  // עצירת זרם כשהכבל עדיין מחובר ואין חותמת full באותה דגימה — מועמד להתראת עצירה.
-  // evsePaused (SuspendedEVSE) = העמדה עצרה (למשל מעבר לתעריף שיא); שאר המצבים לא מתריעים.
-  if (p.charging && !charging && connected && txnId && !out.full) {
-    out.chargeStop = { txnId, atMs: nowMs, evsePaused: !!(st && st.state === "SuspendedEVSE") };
+  if (key && fullMs && fullMs !== (p.lastFullMs || null)) out.full = { txnId: key, atMs: fullMs };
+  // סיום בלי חותמת: didCompleteFull התהפך, או מעבר ל־SuspendedEV/Finishing אחרי זרם פעיל
+  if (key && connected && !out.full) {
+    const fullFlag = !!(st && st.didCompleteFull);
+    const endedByState = (st.state === "SuspendedEV" || st.state === "Finishing") && prevWasFlowing(p, false);
+    if ((fullFlag && p.didCompleteFull !== true) || endedByState) {
+      out.full = { txnId: key, atMs: nowMs, approx: true };
+    }
   }
-  if (p.connected && !connected && p.lastTxnId) out.plugOut = { txnId: String(p.lastTxnId), atMs: nowMs };
+  // עצירת עמדה (SuspendedEVSE) אחרי זרם פעיל — מועמד להתראת שיא (רק כשאין סיום באותה דגימה)
+  if (prevWasFlowing(p, false) && !active && connected && key && !out.full && st.state === "SuspendedEVSE") {
+    out.chargeStop = { txnId: key, atMs: nowMs, evsePaused: true };
+  }
+  const prevKey = p.lastEventKey || (p.lastTxnId ? String(p.lastTxnId) : null);
+  if (p.connected && !connected && prevKey) out.plugOut = { txnId: prevKey, atMs: nowMs };
   return out;
 }
 
@@ -156,13 +186,14 @@ export function decideGuardActions(cfg, prev, st, diff, ctx) {
   const peak = !!(ctx && ctx.peak);
   const flip = !!(ctx && ctx.flip);
   const connected = !!(st && st.connected);
-  const charging = !!(st && st.charging);
+  const activeNow = !!(st && st.state === "Charging");
+  const flowedBefore = prev && prev.state != null ? prev.state === "Charging" : !!(prev && prev.charging);
   if (diff && diff.plugIn && cfg.autoApprove) {
     out.plugKey = `plug:${diff.plugIn.txnId}:${diff.plugIn.atMs}`;
     if (peak) out.notifyPeakPlug = true;
-    else if (!charging && cfg.plugActedKey !== out.plugKey) out.authorizeFirst = true;
+    else if (!activeNow && cfg.plugActedKey !== out.plugKey) out.authorizeFirst = true;
   }
-  if (flip && prev && prev.charging === true && !charging && connected) {
+  if (flip && flowedBefore && !activeNow && connected) {
     if (premiumArmActive(cfg)) {
       if (cfg.actedKey !== (ctx && ctx.peakKey)) out.authorizePremium = true;
     } else if (cfg.persistent) {
@@ -188,7 +219,17 @@ async function recordWatchEvents(env, cfg, diff, nowMs) {
     };
     if (diff.plugIn) { const e = touch(diff.plugIn.txnId); if (e.plugInAt == null) e.plugInAt = diff.plugIn.atMs; }
     if (diff.chargeStart) { const e = touch(diff.chargeStart.txnId); if (e.chargeStartedAt == null) e.chargeStartedAt = diff.chargeStart.atMs; }
-    if (diff.full) { const e = touch(diff.full.txnId); e.chargingFullTime = diff.full.atMs; e.chargeEndedAt = diff.full.atMs; }
+    if (diff.full) {
+      const e = touch(diff.full.txnId);
+      if (diff.full.approx) {
+        // סיום שנגזר ממעבר מצב (בלי חותמת Wevo) — chargeEndedAt מקורב, בלי chargingFullTime
+        if (e.chargeEndedAt == null) e.chargeEndedAt = diff.full.atMs;
+        e.endApprox = true;
+      } else {
+        e.chargingFullTime = diff.full.atMs;
+        e.chargeEndedAt = diff.full.atMs;
+      }
+    }
     if (diff.chargeStop) { const e = touch(diff.chargeStop.txnId); if (e.chargeStoppedAt == null) e.chargeStoppedAt = diff.chargeStop.atMs; }
     if (diff.plugOut) { const e = touch(diff.plugOut.txnId); if (e.plugOutAt == null) e.plugOutAt = diff.plugOut.atMs; }
     const kept = Object.entries(all)
@@ -363,11 +404,15 @@ async function handleTick(env, body) {
   const stTxnId = st.transactionId != null && String(st.transactionId) !== "" ? String(st.transactionId) : null;
   const stFullMs = st.chargingFullTime != null && Number(st.chargingFullTime) > 0 ? Number(st.chargingFullTime) : null;
   const diff = eventsFromStateDiff(
-    { connected: cfg.wasConnected, charging: cfg.wasCharging, lastTxnId: cfg.lastTxnId, lastFullMs: cfg.lastFullMs },
+    {
+      connected: cfg.wasConnected, charging: cfg.wasCharging, state: cfg.wasState ?? null,
+      lastTxnId: cfg.lastTxnId, lastEventKey: cfg.lastEventKey ?? null,
+      lastFullMs: cfg.lastFullMs, didCompleteFull: cfg.wasFull === true
+    },
     st,
     Date.now()
   );
-  const decide = decideGuardActions(cfg, { charging: cfg.wasCharging }, st, diff, { peak, flip, peakKey: key });
+  const decide = decideGuardActions(cfg, { charging: cfg.wasCharging, state: cfg.wasState ?? null }, st, diff, { peak, flip, peakKey: key });
 
   let action = null;
   if (decide.authorizePremium) {
@@ -475,6 +520,10 @@ async function handleTick(env, body) {
     } catch {}
   }
   cfg.wasConnected = connected;
+  cfg.wasState = st.state || null;
+  cfg.wasFull = !!st.didCompleteFull;
+  const evKey = watchEventKey(st);
+  if (evKey) cfg.lastEventKey = evKey;
   if (stTxnId) {
     if (cfg.lastTxnId !== stTxnId) cfg.lastFullMs = stFullMs;
     else if (stFullMs != null) cfg.lastFullMs = stFullMs;

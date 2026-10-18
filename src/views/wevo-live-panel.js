@@ -225,7 +225,12 @@ function WevoLivePanel({
         if (data && data.events) {
           const patches = [];
           for (const o of openRef.current || []) {
-            const ev = o && o.wevoTxnId ? data.events[String(o.wevoTxnId)] : null;
+            let ev = o && o.wevoTxnId ? data.events[String(o.wevoTxnId)] : null;
+            if (!ev && o && o.plugInAt) {
+              // גיבוי: אירועי שומר בלי מזהה עסקה ממופים לפי שעת החיבור של הרשומה
+              const plugMs = new Date(o.plugInAt).getTime();
+              ev = Object.values(data.events).find(e => e && e.plugInAt != null && Math.abs(Number(e.plugInAt) - plugMs) < 120000) || null;
+            }
             const patch = ev ? mergeWatchEvents(o, ev) : null;
             if (patch) patches.push({ ...o, ...patch, updatedAt: Date.now() });
           }
