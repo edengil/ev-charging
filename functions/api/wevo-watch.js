@@ -518,7 +518,10 @@ async function handleTick(env, body) {
     timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
   }).format(new Date(ms));
   const who = cfg.clientName ? `${cfg.clientName} · ` : "";
-  if (diff.plugIn) {
+  // הגנת טריות גם לחיבור: חיבור ש־Wevo מתארכת ללפני 10+ דקות הוא קו־בסיס של
+  // חימוש/מצב קפוא, לא אירוע חדש (אותה משפחת שידורים חוזרים כמו בניתוק).
+  const plugFresh = !st.plugInTime || Date.now() - Number(st.plugInTime) <= 10 * 60 * 1000;
+  if (diff.plugIn && plugFresh) {
     try {
       await pushToAllSubscribers(env, decide.notifyPeakPlug ? {
         title: "🔌 רכב חובר בשעות שיא",
@@ -566,13 +569,27 @@ async function handleTick(env, body) {
     }
   }
   if (diff.plugOut) {
+    // הגנת טריות (19.10): כשהשמירה ל־KV חסומה (מכסה), המצב השמור קופא וכל טיק
+    // "מגלה" את הניתוק מחדש. אם זמן הניתוק האמיתי מ־Wevo ישן מ־5 דקות — זהו
+    // שידור חוזר, לא אירוע חדש, ולא דוחפים שוב.
+    let staleReplay = false;
     try {
-      await pushToAllSubscribers(env, {
-        title: "🔌 הכבל נותק",
-        body: `${who}הכבל נותק מהעמדה`,
-        tag: "ev-watch-unplug"
-      });
+      const sync = await handleWevoRequest({ email: creds.email, password: creds.password, action: "sync" });
+      const txs = Array.isArray(sync.transactions) ? sync.transactions : [];
+      const withOut = txs.filter(t => Number(t.plugOutTime) > 0)
+        .sort((a, b) => Number(b.plugOutTime) - Number(a.plugOutTime));
+      const outMs = withOut.length ? Number(withOut[0].plugOutTime) : 0;
+      if (outMs && Date.now() - outMs > 5 * 60 * 1000) staleReplay = true;
     } catch {}
+    if (!staleReplay) {
+      try {
+        await pushToAllSubscribers(env, {
+          title: "🔌 הכבל נותק",
+          body: `${who}הכבל נותק מהעמדה`,
+          tag: "ev-watch-unplug"
+        });
+      } catch {}
+    }
   }
   cfg.wasConnected = connected;
   cfg.wasState = st.state || null;

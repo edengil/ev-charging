@@ -334,6 +334,12 @@ describe("ב3 v2 — זיהוי מבוסס מצב (רגרסיית 19.10: chargin
     assert.match(src, /lastStopPushAtMs/);
   });
 
+  it("שומר מקור: הגנות טריות על התראות חיבור/ניתוק (שידור חוזר ממצב קפוא)", () => {
+    const src = readFileSync(join(root, "functions/api/wevo-watch.js"), "utf8");
+    assert.match(src, /staleReplay/);
+    assert.match(src, /plugFresh/);
+  });
+
   it("חותמת full מתקדמת כל דקה אינה יורה; חותמת יציבה או עם didCompleteFull כן (רגרסיית הצפה 19.10)", () => {
     const base = { connected: true, charging: true, state: "SuspendedEV", lastEventKey: "55", lastFullMs: null, lastFullSeenMs: null, didCompleteFull: false, fullNotifiedKey: null };
     const stAt = (full) => ({ connected: true, charging: true, state: "SuspendedEV", transactionId: 55, plugInTime: T0, chargingFullTime: full, didCompleteFull: false });
