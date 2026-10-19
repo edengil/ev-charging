@@ -11,6 +11,15 @@ const STATUS_KEY = "watch:status";
 const LOG_KEY = "watch:log";
 const EVENTS_KEY = "watch:events";
 
+// תיקון מכסת KV (19.10.2026): השוואת cfg בלי שדות הזמן התנודתיים (lastTickAt/lastPollAt),
+// כדי לזהות אם טיק שינה משהו מהותי. בעבר כל טיק כתב cfg+status מחדש (2 כתיבות לטיק,
+// ~1,000+ ביום) ושרף את מכסת הכתיבה היומית של Workers KV — הכתיבה עכשיו רק על שינוי.
+function stableCfgJson(cfg) {
+  if (!cfg) return "";
+  const { lastTickAt, lastPollAt, ...rest } = cfg;
+  return JSON.stringify(rest);
+}
+
 function b64encode(bytes) {
   let s = "";
   for (const b of bytes) s += String.fromCharCode(b);
@@ -371,6 +380,7 @@ async function handleTick(env, body) {
   }
   const cfg = await loadCfg(env);
   if (!cfg || !cfg.armed) return { ok: true, action: "tick", armed: false };
+  let cfgBefore = stableCfgJson(cfg);
   // פקיעה: רישום חולף פג כולו אחרי 24 שעות. שומר קבוע לא פג — רק חימוש
   // המשך־הפרימיום שבתוכו מתבטל אחרי 24 שעות, והשומר ממשיך כהתראות + אישור ראשון.
   if (!cfg.persistent && Date.now() - Number(cfg.armedAt || 0) > 24 * 3600 * 1000) {
@@ -393,11 +403,15 @@ async function handleTick(env, body) {
     cfg.premiumArmedAt = null;
     cfg.actedKey = null;
     await env.EV_BACKUP.put(CFG_KEY, JSON.stringify(cfg));
+    cfgBefore = stableCfgJson(cfg);
     await pushLog(env, { kind: "premium-expire", detail: "חימוש המשך־הפרימיום פג אחרי 24 שעות — השומר הקבוע ממשיך" });
   }
-  // שומר קבוע במנוחה: סריקה מדורגת (כל ~3 דקות כשאין רכב) כדי לא להציף את Wevo
-  if (cfg.persistent && !cfg.wasConnected && cfg.lastPollAt
-      && Date.now() - Number(cfg.lastPollAt) < 3 * 60 * 1000) {
+  // שומר קבוע במנוחה: סריקה מדורגת (כל ~3 דקות כשאין רכב) כדי לא להציף את Wevo.
+  // תיקון מכסת KV (19.10.2026): נוסף שער דקת־שעון — סריקה מלאה רק בדקות שמתחלקות
+  // ב־3, כך שהמצערת לא תלויה בשמירת lastPollAt בכל טיק (מה שאילץ כתיבת cfg בכל סריקה).
+  const lastPollFresh = cfg.lastPollAt && Date.now() - Number(cfg.lastPollAt) < 3 * 60 * 1000;
+  if (cfg.persistent && !cfg.wasConnected
+      && (lastPollFresh || Math.floor(Date.now() / 60000) % 3 !== 0)) {
     return { ok: true, action: "tick", armed: true, throttled: true };
   }
   const creds = await decryptJson(env, cfg.credsBlob);
@@ -584,7 +598,10 @@ async function handleTick(env, body) {
   cfg.wasCharging = charging;
   cfg.wasPeak = peak;
   cfg.lastTickAt = Date.now();
-  await env.EV_BACKUP.put(CFG_KEY, JSON.stringify(cfg));
+  // תיקון מכסת KV (19.10.2026): כותבים את cfg רק אם שדה מהותי השתנה בטיק הזה.
+  if (stableCfgJson(cfg) !== cfgBefore) {
+    await env.EV_BACKUP.put(CFG_KEY, JSON.stringify(cfg));
+  }
 
   const status = {
     lastTickAt: cfg.lastTickAt,
@@ -594,7 +611,19 @@ async function handleTick(env, body) {
     peak,
     lastAction: action || null
   };
-  await env.EV_BACKUP.put(STATUS_KEY, JSON.stringify(status));
+  // וגם את הסטטוס כותבים רק על שינוי מהותי, או דופק־חיים כל ~10 דקות לכל היותר.
+  let prevStatus = null;
+  try { prevStatus = await env.EV_BACKUP.get(STATUS_KEY, { type: "json" }); } catch {}
+  const statusChanged = !prevStatus
+    || prevStatus.state !== status.state
+    || prevStatus.charging !== status.charging
+    || prevStatus.connected !== status.connected
+    || prevStatus.peak !== status.peak
+    || JSON.stringify(prevStatus.lastAction || null) !== JSON.stringify(status.lastAction || null)
+    || Date.now() - Number(prevStatus.lastTickAt || 0) >= 10 * 60 * 1000;
+  if (statusChanged) {
+    await env.EV_BACKUP.put(STATUS_KEY, JSON.stringify(status));
+  }
   return { ok: true, action: "tick", armed: true, ...status };
 }
 
