@@ -402,8 +402,8 @@ async function handleTick(env, body) {
     cfg.premiumContinue = false;
     cfg.premiumArmedAt = null;
     cfg.actedKey = null;
-    await env.EV_BACKUP.put(CFG_KEY, JSON.stringify(cfg));
-    cfgBefore = stableCfgJson(cfg);
+    try { await env.EV_BACKUP.put(CFG_KEY, JSON.stringify(cfg)); cfgBefore = stableCfgJson(cfg); }
+    catch { /* כשל כתיבה לא עוצר את הטיק — הפקיעה תתמיד בטיק הבא */ }
     await pushLog(env, { kind: "premium-expire", detail: "חימוש המשך־הפרימיום פג אחרי 24 שעות — השומר הקבוע ממשיך" });
   }
   // שומר קבוע במנוחה: סריקה מדורגת (כל ~3 דקות כשאין רכב) כדי לא להציף את Wevo.
@@ -598,9 +598,12 @@ async function handleTick(env, body) {
   cfg.wasCharging = charging;
   cfg.wasPeak = peak;
   cfg.lastTickAt = Date.now();
-  // תיקון מכסת KV (19.10.2026): כותבים את cfg רק אם שדה מהותי השתנה בטיק הזה.
+  // תיקון מכסת KV (19.10.2026): כותבים את cfg רק אם שדה מהותי השתנה בטיק הזה,
+  // וכשל כתיבה (למשל מכסה יומית שנוצלה) לא מפיל את הטיק — השומר ממשיך לפעול.
+  let kvWriteFailed = false;
   if (stableCfgJson(cfg) !== cfgBefore) {
-    await env.EV_BACKUP.put(CFG_KEY, JSON.stringify(cfg));
+    try { await env.EV_BACKUP.put(CFG_KEY, JSON.stringify(cfg)); }
+    catch { kvWriteFailed = true; }
   }
 
   const status = {
@@ -622,9 +625,10 @@ async function handleTick(env, body) {
     || JSON.stringify(prevStatus.lastAction || null) !== JSON.stringify(status.lastAction || null)
     || Date.now() - Number(prevStatus.lastTickAt || 0) >= 10 * 60 * 1000;
   if (statusChanged) {
-    await env.EV_BACKUP.put(STATUS_KEY, JSON.stringify(status));
+    try { await env.EV_BACKUP.put(STATUS_KEY, JSON.stringify(status)); }
+    catch { kvWriteFailed = true; }
   }
-  return { ok: true, action: "tick", armed: true, ...status };
+  return { ok: true, action: "tick", armed: true, ...(kvWriteFailed ? { kvWriteFailed: true } : {}), ...status };
 }
 
 export async function onRequestPost(context) {
