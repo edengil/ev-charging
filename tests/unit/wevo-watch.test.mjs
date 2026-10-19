@@ -195,12 +195,13 @@ describe("ב3 — eventsFromStateDiff (לכידת אירועי טעינה)", () 
     assert.deepEqual(none, {});
   });
 
-  it("חותמת full חדשה מייצרת אירוע full; אותה חותמת שוב — לא", () => {
-    const prev = { connected: true, charging: true, lastTxnId: "777", lastFullMs: null };
+  it("חותמת full יציבה מייצרת אירוע full; אותה חותמת שוב — לא", () => {
+    // חותמת שנראתה גם בדגימה הקודמת (lastFullSeenMs) = יציבה → יורה מיד
+    const prev = { connected: true, charging: true, lastTxnId: "777", lastFullMs: null, lastFullSeenMs: FULL, fullNotifiedKey: null };
     const st = { connected: true, charging: false, transactionId: 777, chargingFullTime: FULL };
     const d = diff(prev, st, FULL + 60000);
     assert.equal(d.full.atMs, FULL);
-    const again = diff({ ...prev, lastFullMs: FULL }, st, FULL + 120000);
+    const again = diff({ ...prev, lastFullMs: FULL, fullNotifiedKey: "777" }, st, FULL + 120000);
     assert.equal(again.full, undefined);
   });
 
@@ -331,6 +332,27 @@ describe("ב3 v2 — זיהוי מבוסס מצב (רגרסיית 19.10: chargin
     assert.match(src, /cfg\.flowSinceMs/);
     assert.match(src, /cfg\.lastFullAtMs = Date\.now\(\)/);
     assert.match(src, /lastStopPushAtMs/);
+  });
+
+  it("חותמת full מתקדמת כל דקה אינה יורה; חותמת יציבה או עם didCompleteFull כן (רגרסיית הצפה 19.10)", () => {
+    const base = { connected: true, charging: true, state: "SuspendedEV", lastEventKey: "55", lastFullMs: null, lastFullSeenMs: null, didCompleteFull: false, fullNotifiedKey: null };
+    const stAt = (full) => ({ connected: true, charging: true, state: "SuspendedEV", transactionId: 55, plugInTime: T0, chargingFullTime: full, didCompleteFull: false });
+    // חותמת חדשה בכל דגימה — לעולם לא יציבה, לעולם לא יורה
+    let d = diff(base, stAt(T0 + 3600000), T0 + 3600000);
+    assert.equal(d.full, undefined);
+    d = diff({ ...base, lastFullSeenMs: T0 + 3600000 }, stAt(T0 + 3660000), T0 + 3660000);
+    assert.equal(d.full, undefined, "חותמת שזזה שוב — לא יורה");
+    // אותה חותמת שתי דגימות רצופות — יורה
+    d = diff({ ...base, lastFullSeenMs: T0 + 3600000 }, stAt(T0 + 3600000), T0 + 3720000);
+    assert.ok(d.full && !d.full.approx, "חותמת יציבה יורה כסיום מדויק");
+    assert.equal(d.full.atMs, T0 + 3600000);
+    // חותמת + didCompleteFull — יורה מיד, גם בלי יציבות
+    const stFull = { ...stAt(T0 + 3600000), didCompleteFull: true };
+    d = diff(base, stFull, T0 + 3600000);
+    assert.ok(d.full && !d.full.approx);
+    // שער החיבור סגור (כבר דווח סיום) — חותמת חדשה לא יורה שוב
+    d = diff({ ...base, fullNotifiedKey: "55" }, stFull, T0 + 3800000);
+    assert.equal(d.full, undefined);
   });
 });
 

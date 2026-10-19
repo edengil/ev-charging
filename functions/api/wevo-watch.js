@@ -152,7 +152,14 @@ export function eventsFromStateDiff(prev, st, nowMs) {
   }
   if (!prevWasFlowing(p, true) && active && key) out.chargeStart = { txnId: key, atMs: nowMs };
   const fullMs = st && st.chargingFullTime != null && Number(st.chargingFullTime) > 0 ? Number(st.chargingFullTime) : null;
-  if (key && fullMs && fullMs !== (p.lastFullMs || null)) out.full = { txnId: key, atMs: fullMs };
+  // כלל החותמת — מוגבל בשער הסיום של החיבור (fullNotifiedKey): העמדה מחזירה
+  // chargingFullTime שמתקדם מדקה לדקה בטעינה חיה (רגרסיית הצפה 19.10), ולכן
+  // חותמת לבדה אינה הוכחה. חותמת אמיתית מתקבלת מיד כש־didCompleteFull דלוק,
+  // או כשהיא יציבה שתי דגימות רצופות (lastFullSeenMs) — חותמת אמיתית לא זזה.
+  if (key && connected && p.fullNotifiedKey == null && fullMs && fullMs !== (p.lastFullMs || null) &&
+      (st.didCompleteFull || fullMs === (p.lastFullSeenMs || null))) {
+    out.full = { txnId: key, atMs: fullMs };
+  }
   // סיום בלי חותמת: didCompleteFull התהפך, או מעבר ל־SuspendedEV/Finishing אחרי זרם פעיל.
   // שער fullNotifiedKey: סיום מקורב מדווח פעם אחת לחיבור — מצב שמתהפך
   // Charging↔SuspendedEV (טעינה איטית/איזון עומסים) לא יורה שוב ושוב (רגרסיית 19.10).
@@ -420,7 +427,8 @@ async function handleTick(env, body) {
     {
       connected: cfg.wasConnected, charging: cfg.wasCharging, state: cfg.wasState ?? null,
       lastTxnId: cfg.lastTxnId, lastEventKey: cfg.lastEventKey ?? null,
-      lastFullMs: cfg.lastFullMs, didCompleteFull: cfg.wasFull === true,
+      lastFullMs: cfg.lastFullMs, lastFullSeenMs: cfg.lastFullSeenMs ?? null,
+      didCompleteFull: cfg.wasFull === true,
       fullNotifiedKey: cfg.fullNotifiedKey ?? null
     },
     st,
@@ -571,6 +579,7 @@ async function handleTick(env, body) {
     else if (stFullMs != null) cfg.lastFullMs = stFullMs;
     cfg.lastTxnId = stTxnId;
   }
+  cfg.lastFullSeenMs = stFullMs || null;
 
   cfg.wasCharging = charging;
   cfg.wasPeak = peak;
