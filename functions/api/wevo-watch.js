@@ -153,8 +153,10 @@ export function eventsFromStateDiff(prev, st, nowMs) {
   if (!prevWasFlowing(p, true) && active && key) out.chargeStart = { txnId: key, atMs: nowMs };
   const fullMs = st && st.chargingFullTime != null && Number(st.chargingFullTime) > 0 ? Number(st.chargingFullTime) : null;
   if (key && fullMs && fullMs !== (p.lastFullMs || null)) out.full = { txnId: key, atMs: fullMs };
-  // סיום בלי חותמת: didCompleteFull התהפך, או מעבר ל־SuspendedEV/Finishing אחרי זרם פעיל
-  if (key && connected && !out.full) {
+  // סיום בלי חותמת: didCompleteFull התהפך, או מעבר ל־SuspendedEV/Finishing אחרי זרם פעיל.
+  // שער fullNotifiedKey: סיום מקורב מדווח פעם אחת לחיבור — מצב שמתהפך
+  // Charging↔SuspendedEV (טעינה איטית/איזון עומסים) לא יורה שוב ושוב (רגרסיית 19.10).
+  if (key && connected && !out.full && p.fullNotifiedKey == null) {
     const fullFlag = !!(st && st.didCompleteFull);
     const endedByState = (st.state === "SuspendedEV" || st.state === "Finishing") && prevWasFlowing(p, false);
     if ((fullFlag && p.didCompleteFull !== true) || endedByState) {
@@ -478,7 +480,13 @@ async function handleTick(env, body) {
     await recordWatchEvents(env, cfg, diff, Date.now());
   }
   if (diff.plugIn) cfg.fullNotifiedKey = null;
-  if (diff.full) cfg.fullNotifiedKey = diff.full.txnId;
+  if (diff.full) {
+    cfg.fullNotifiedKey = diff.full.txnId;
+    cfg.lastFullAtMs = Date.now();
+  }
+  // חימוש־מחדש של שער הסיום: קטע זרם חדש ויציב (3+ דקות Charging רצוף) שזורם
+  // 10+ דקות אחרי הסיום הקודם מאפשר דיווח סיום נוסף באותו חיבור (חידוש אחרי
+  // שיא). היפוכי מצב מאפסים את מונה היציבות — ולכן לא מחמשים מחדש לעולם.
   if (!connected) {
     cfg.fullNotifiedKey = null;
     cfg.lastEventKey = null;
@@ -520,13 +528,20 @@ async function handleTick(env, body) {
     } catch {}
   }
   if (diff.chargeStop && diff.chargeStop.evsePaused && !decide.notifyPeakStop) {
-    try {
-      await pushToAllSubscribers(env, {
-        title: "⏸️ הטעינה הופסקה",
-        body: `${who}הטעינה הופסקה מצד העמדה — ככל הנראה מעבר לתעריף שיא`,
-        tag: "ev-watch-stop"
-      });
-    } catch {}
+    // דיכוי חזרות: היפוכי Charging↔SuspendedEVSE לא מציפים — עצירה אחת ל־15 דקות לעסקה
+    const stopKey = diff.chargeStop.txnId;
+    const lastStop = cfg.lastStopPushAtMs && cfg.lastStopPushKey === stopKey ? cfg.lastStopPushAtMs : 0;
+    if (Date.now() - lastStop >= 900000) {
+      cfg.lastStopPushKey = stopKey;
+      cfg.lastStopPushAtMs = Date.now();
+      try {
+        await pushToAllSubscribers(env, {
+          title: "⏸️ הטעינה הופסקה",
+          body: `${who}הטעינה הופסקה מצד העמדה — ככל הנראה מעבר לתעריף שיא`,
+          tag: "ev-watch-stop"
+        });
+      } catch {}
+    }
   }
   if (diff.plugOut) {
     try {
@@ -540,6 +555,15 @@ async function handleTick(env, body) {
   cfg.wasConnected = connected;
   cfg.wasState = st.state || null;
   cfg.wasFull = !!st.didCompleteFull;
+  if (st.state === "Charging") {
+    if (!cfg.flowSinceMs) cfg.flowSinceMs = Date.now();
+  } else {
+    cfg.flowSinceMs = null;
+  }
+  if (cfg.fullNotifiedKey != null && cfg.lastFullAtMs && Date.now() - cfg.lastFullAtMs >= 600000 &&
+      cfg.flowSinceMs && Date.now() - cfg.flowSinceMs >= 180000) {
+    cfg.fullNotifiedKey = null;
+  }
   const evKey = watchEventKey(st);
   if (evKey) cfg.lastEventKey = evKey;
   if (stTxnId) {

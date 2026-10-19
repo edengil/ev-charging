@@ -308,6 +308,30 @@ describe("ב3 v2 — זיהוי מבוסס מצב (רגרסיית 19.10: chargin
     assert.ok(d.full);
     assert.equal(d.full.txnId, "watch-123");
   });
+
+  it("היפוכי מצב Charging↔SuspendedEV: סיום מקורב אחד בלבד לחיבור (רגרסיית הצפת 19.10)", () => {
+    // מדמה את שרשור ה־prev שהטיק שומר: אחרי ירייה ראשונה fullNotifiedKey נטבע
+    let prev = { connected: true, charging: true, state: "Charging", lastEventKey: "6301736", lastFullMs: null, didCompleteFull: false, fullNotifiedKey: null };
+    let fulls = 0;
+    const seq = ["SuspendedEV", "Charging", "SuspendedEV", "Charging", "SuspendedEV", "Charging"];
+    seq.forEach((state, i) => {
+      const st = { connected: true, charging: true, state, transactionId: 6301736, plugInTime: T0, didCompleteFull: false };
+      const d = diff(prev, st, T0 + (i + 1) * 60000);
+      if (d.full) {
+        fulls++;
+        prev = { ...prev, fullNotifiedKey: d.full.txnId };
+      }
+      prev = { ...prev, state, charging: true };
+    });
+    assert.equal(fulls, 1, "בדיוק התראת סיום אחת למרות ההיפוכים");
+  });
+
+  it("שומר מקור: שער הסיום וחימוש־המחדש מחווטים בטיק", () => {
+    const src = readFileSync(join(root, "functions/api/wevo-watch.js"), "utf8");
+    assert.match(src, /cfg\.flowSinceMs/);
+    assert.match(src, /cfg\.lastFullAtMs = Date\.now\(\)/);
+    assert.match(src, /lastStopPushAtMs/);
+  });
 });
 
 describe("שומר התראות — notifyOnly (גם ללקוח עצמי)", () => {
