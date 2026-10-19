@@ -493,3 +493,30 @@ describe("שומר קבוע — decideGuardActions", () => {
     assert.match(panel, /premiumContinue: true/);
   });
 });
+
+describe("fullPushAllowed — שער סיום במצב קפוא", () => {
+  const allowed = watch.fullPushAllowed;
+  const NOW = 1792400000000;
+  it("שמירה בריאה — תמיד דוחף", () => {
+    assert.equal(allowed({ txnId: "1", atMs: NOW - 3600000, approx: true }, { state: "SuspendedEV" }, NOW, true), true);
+    assert.equal(allowed({ txnId: "1", atMs: NOW - 3600000 }, { state: "SuspendedEV" }, NOW, true), true);
+  });
+  it("קפוא + חותמת טריה — דוחף; חותמת ישנה — לא", () => {
+    assert.equal(allowed({ txnId: "1", atMs: NOW - 120000 }, { state: "SuspendedEV", chargingFullTime: NOW - 120000 }, NOW, false), true);
+    assert.equal(allowed({ txnId: "1", atMs: NOW - 3600000 }, { state: "SuspendedEV", chargingFullTime: NOW - 3600000 }, NOW, false), false);
+  });
+  it("קפוא + מקורב במצב Finishing — דוחף; ב־SuspendedEV בלי חותמת — לא", () => {
+    assert.equal(allowed({ txnId: "1", atMs: NOW, approx: true }, { state: "Finishing" }, NOW, false), true);
+    assert.equal(allowed({ txnId: "1", atMs: NOW, approx: true }, { state: "SuspendedEV" }, NOW, false), false);
+  });
+  it("אין אירוע — לא דוחף", () => {
+    assert.equal(allowed(null, { state: "Charging" }, NOW, true), false);
+  });
+  it("שומר מקור: שערי שמירה־קפואה מחווטים לכל דחיפות האירועים", () => {
+    const src = readFileSync(join(root, "functions/api/wevo-watch.js"), "utf8");
+    assert.match(src, /persistenceHealthy/);
+    assert.match(src, /fullPushAllowed\(diff\.full/);
+    assert.match(src, /notifyPeakStop && persistenceHealthy/);
+    assert.match(src, /!decide\.notifyPeakStop && persistenceHealthy/);
+  });
+});

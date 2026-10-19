@@ -204,6 +204,17 @@ export function premiumArmActive(cfg) {
 // החלטות השומר הקבוע/החמוש לטיק אחד — פונקציה טהורה (נבדקת ביחידה, בלי Wevo):
 // אישור ראשון אוטומטי בחיבור (לא בשיא), אישור המשך־פרימיום רק עם חימוש פרימיום,
 // ובשיא בלי חימוש — רק התראה להחלטת עדן.
+// שער דחיפת "הטעינה הסתיימה" במצב שמירה־קפואה (persistenceHealthy=false):
+// בלי זיכרון מתמיד, כל טיק משחזר את הסיום מההפרש מול המצב הקפוא. דוחפים רק
+// עם עוגן טרי מ־Wevo: חותמת סיום בת ≤5 דקות, או מצב Finishing חולף.
+export function fullPushAllowed(full, st, nowMs, persistenceHealthy) {
+  if (!full) return false;
+  if (persistenceHealthy) return true;
+  const stamp = st && Number(st.chargingFullTime) > 0 ? Number(st.chargingFullTime) : (!full.approx ? full.atMs : 0);
+  if (stamp && nowMs - stamp <= 5 * 60 * 1000) return true;
+  return !!(full.approx && st && st.state === "Finishing");
+}
+
 export function decideGuardActions(cfg, prev, st, diff, ctx) {
   const out = { authorizeFirst: false, plugKey: null, authorizePremium: false, notifyPeakPlug: false, notifyPeakStop: false };
   if (!cfg || cfg.notifyOnly) return out;
@@ -514,13 +525,21 @@ async function handleTick(env, body) {
     cfg.lastEventKey = null;
   }
   // התראות על אירועי הטעינה (אותם אירועים שנלכדו) — גם בחימוש פרימיום וגם ב־notifyOnly
+  // בריאות השמירה: סטטוס שלא התעדכן 15+ דקות = הכתיבות חסומות והמצב השמור
+  // קפוא; אירועי הפרש מולו עלולים להיות שידורים חוזרים. במצב כזה דוחפים רק
+  // אירועים עם עוגן־זמן טרי מ־Wevo (ראו fullPushAllowed והגנות הטריות).
+  let persistenceHealthy = true;
+  try {
+    const snap = await env.EV_BACKUP.get(STATUS_KEY, { type: "json" });
+    if (snap && Number(snap.lastTickAt) && Date.now() - Number(snap.lastTickAt) > 15 * 60 * 1000) persistenceHealthy = false;
+  } catch {}
   const hhmm = (ms) => new Intl.DateTimeFormat("he-IL", {
     timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
   }).format(new Date(ms));
   const who = cfg.clientName ? `${cfg.clientName} · ` : "";
-  // הגנת טריות גם לחיבור: חיבור ש־Wevo מתארכת ללפני 10+ דקות הוא קו־בסיס של
+  // הגנת טריות גם לחיבור: חיבור ש־Wevo מתארכת ללפני 5+ דקות הוא קו־בסיס של
   // חימוש/מצב קפוא, לא אירוע חדש (אותה משפחת שידורים חוזרים כמו בניתוק).
-  const plugFresh = !st.plugInTime || Date.now() - Number(st.plugInTime) <= 10 * 60 * 1000;
+  const plugFresh = !st.plugInTime || Date.now() - Number(st.plugInTime) <= 5 * 60 * 1000;
   if (diff.plugIn && plugFresh) {
     try {
       await pushToAllSubscribers(env, decide.notifyPeakPlug ? {
@@ -534,7 +553,7 @@ async function handleTick(env, body) {
       });
     } catch {}
   }
-  if (decide.notifyPeakStop) {
+  if (decide.notifyPeakStop && persistenceHealthy) {
     try {
       await pushToAllSubscribers(env, {
         title: "⏸️ הטעינה הופסקה במעבר לשיא",
@@ -543,7 +562,7 @@ async function handleTick(env, body) {
       });
     } catch {}
   }
-  if (diff.full) {
+  if (diff.full && fullPushAllowed(diff.full, st, Date.now(), persistenceHealthy)) {
     try {
       await pushToAllSubscribers(env, {
         title: "🔋 הטעינה הסתיימה",
@@ -552,7 +571,7 @@ async function handleTick(env, body) {
       });
     } catch {}
   }
-  if (diff.chargeStop && diff.chargeStop.evsePaused && !decide.notifyPeakStop) {
+  if (diff.chargeStop && diff.chargeStop.evsePaused && !decide.notifyPeakStop && persistenceHealthy) {
     // דיכוי חזרות: היפוכי Charging↔SuspendedEVSE לא מציפים — עצירה אחת ל־15 דקות לעסקה
     const stopKey = diff.chargeStop.txnId;
     const lastStop = cfg.lastStopPushAtMs && cfg.lastStopPushKey === stopKey ? cfg.lastStopPushAtMs : 0;
