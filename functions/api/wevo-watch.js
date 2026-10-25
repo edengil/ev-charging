@@ -1,5 +1,6 @@
 import { json, optionsResponse, handleWevoRequest, cognitoLogin } from "../_shared/wevo.js";
 import { pushToAllSubscribers } from "../_shared/push.js";
+import { storeGetJson, storePutJson, storeDelete } from "../_shared/watch-store.js";
 
 // שומר צד־שרת להמשך טעינה במעבר לתעריף פרימיום.
 // המשתמש נרשם מהאפליקציה (opt-in) עם אישור מראש פעיל + premiumContinue.
@@ -105,22 +106,19 @@ function peakKey(cfg, parts, now) {
 }
 
 async function loadCfg(env) {
-  const kv = env.EV_BACKUP;
-  if (!kv) {
+  if (!env.EV_BACKUP && !env.EV_WATCH_DB) {
     const err = new Error("KV לא מוגדר בשרת");
     err.status = 503;
     throw err;
   }
-  const raw = await kv.get(CFG_KEY, { type: "json" });
-  return raw || null;
+  return storeGetJson(env, CFG_KEY);
 }
 
 async function pushLog(env, entry) {
   try {
-    const kv = env.EV_BACKUP;
-    const list = (await kv.get(LOG_KEY, { type: "json" })) || [];
+    const list = (await storeGetJson(env, LOG_KEY)) || [];
     list.unshift({ at: Date.now(), ...entry });
-    await kv.put(LOG_KEY, JSON.stringify(list.slice(0, 20)));
+    await storePutJson(env, LOG_KEY, list.slice(0, 20));
   } catch {}
 }
 
@@ -238,11 +236,10 @@ export function decideGuardActions(cfg, prev, st, diff, ctx) {
   return out;
 }
 
-// שמירת האירועים ב־KV תחת watch:events (לפי transactionId), עם גיזום ל־48 שעות / 5 עסקאות.
+// שמירת האירועים תחת watch:events (לפי transactionId), עם גיזום ל־48 שעות / 5 עסקאות.
 async function recordWatchEvents(env, cfg, diff, nowMs) {
   try {
-    const kv = env.EV_BACKUP;
-    const all = (await kv.get(EVENTS_KEY, { type: "json" })) || {};
+    const all = (await storeGetJson(env, EVENTS_KEY)) || {};
     const touch = (txnId) => {
       const e = all[txnId] || (all[txnId] = {
         txnId, clientId: cfg.clientId || null,
@@ -271,7 +268,7 @@ async function recordWatchEvents(env, cfg, diff, nowMs) {
       .filter(([, e]) => nowMs - (e.updatedAt || 0) < 48 * 3600 * 1000)
       .sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0))
       .slice(0, 5);
-    await kv.put(EVENTS_KEY, JSON.stringify(Object.fromEntries(kept)));
+    await storePutJson(env, EVENTS_KEY, Object.fromEntries(kept));
   } catch {}
 }
 
@@ -332,7 +329,11 @@ async function handleRegister(env, body) {
     err.status = 400;
     throw err;
   }
-  await env.EV_BACKUP.put(CFG_KEY, JSON.stringify(cfg));
+  if (!await storePutJson(env, CFG_KEY, cfg)) {
+    const err = new Error("שמירת השומר נכשלה");
+    err.status = 503;
+    throw err;
+  }
   await pushLog(env, { kind: "register", detail: `שומר הופעל ללקוח ${cfg.clientName || cfg.clientId || ""}` });
   return { ok: true, action: "register", armed: true };
 }
@@ -350,9 +351,9 @@ async function handleDeregister(env, body) {
       throw err;
     }
   }
-  await env.EV_BACKUP.delete(CFG_KEY);
-  await env.EV_BACKUP.delete(STATUS_KEY);
-  await env.EV_BACKUP.delete(EVENTS_KEY);
+  await storeDelete(env, CFG_KEY);
+  await storeDelete(env, STATUS_KEY);
+  await storeDelete(env, EVENTS_KEY);
   await pushLog(env, { kind: "deregister", detail: "שומר כובה והפרטים נמחקו מהשרת" });
   return { ok: true, action: "deregister", armed: false };
 }
@@ -363,9 +364,9 @@ async function handleStatus(env, body) {
   await verifyCreds(email, password);
   const cfg = await loadCfg(env);
   if (!cfg) return { ok: true, action: "status", armed: false };
-  const status = (await env.EV_BACKUP.get(STATUS_KEY, { type: "json" })) || null;
-  const log = (await env.EV_BACKUP.get(LOG_KEY, { type: "json" })) || [];
-  const events = (await env.EV_BACKUP.get(EVENTS_KEY, { type: "json" })) || {};
+  const status = (await storeGetJson(env, STATUS_KEY)) || null;
+  const log = (await storeGetJson(env, LOG_KEY)) || [];
+  const events = (await storeGetJson(env, EVENTS_KEY)) || {};
   return {
     ok: true,
     action: "status",
@@ -395,9 +396,9 @@ async function handleTick(env, body) {
   // פקיעה: רישום חולף פג כולו אחרי 24 שעות. שומר קבוע לא פג — רק חימוש
   // המשך־הפרימיום שבתוכו מתבטל אחרי 24 שעות, והשומר ממשיך כהתראות + אישור ראשון.
   if (!cfg.persistent && Date.now() - Number(cfg.armedAt || 0) > 24 * 3600 * 1000) {
-    await env.EV_BACKUP.delete(CFG_KEY);
-    await env.EV_BACKUP.delete(STATUS_KEY);
-    await env.EV_BACKUP.delete(EVENTS_KEY);
+    await storeDelete(env, CFG_KEY);
+    await storeDelete(env, STATUS_KEY);
+    await storeDelete(env, EVENTS_KEY);
     await pushLog(env, { kind: "expire", detail: "שומר כובה אוטומטית אחרי 24 שעות" });
     try {
       await pushToAllSubscribers(env, {
@@ -413,8 +414,8 @@ async function handleTick(env, body) {
     cfg.premiumContinue = false;
     cfg.premiumArmedAt = null;
     cfg.actedKey = null;
-    try { await env.EV_BACKUP.put(CFG_KEY, JSON.stringify(cfg)); cfgBefore = stableCfgJson(cfg); }
-    catch { /* כשל כתיבה לא עוצר את הטיק — הפקיעה תתמיד בטיק הבא */ }
+    // כשל כתיבה לא עוצר את הטיק — הפקיעה תתמיד בטיק הבא
+    if (await storePutJson(env, CFG_KEY, cfg)) cfgBefore = stableCfgJson(cfg);
     await pushLog(env, { kind: "premium-expire", detail: "חימוש המשך־הפרימיום פג אחרי 24 שעות — השומר הקבוע ממשיך" });
   }
   // שומר קבוע במנוחה: סריקה מדורגת (כל ~3 דקות כשאין רכב) כדי לא להציף את Wevo.
@@ -530,7 +531,7 @@ async function handleTick(env, body) {
   // אירועים עם עוגן־זמן טרי מ־Wevo (ראו fullPushAllowed והגנות הטריות).
   let persistenceHealthy = true;
   try {
-    const snap = await env.EV_BACKUP.get(STATUS_KEY, { type: "json" });
+    const snap = await storeGetJson(env, STATUS_KEY);
     if (snap && Number(snap.lastTickAt) && Date.now() - Number(snap.lastTickAt) > 15 * 60 * 1000) persistenceHealthy = false;
   } catch {}
   const hhmm = (ms) => new Intl.DateTimeFormat("he-IL", {
@@ -638,8 +639,7 @@ async function handleTick(env, body) {
   // וכשל כתיבה (למשל מכסה יומית שנוצלה) לא מפיל את הטיק — השומר ממשיך לפעול.
   let kvWriteFailed = false;
   if (stableCfgJson(cfg) !== cfgBefore) {
-    try { await env.EV_BACKUP.put(CFG_KEY, JSON.stringify(cfg)); }
-    catch { kvWriteFailed = true; }
+    if (!await storePutJson(env, CFG_KEY, cfg)) kvWriteFailed = true;
   }
 
   const status = {
@@ -652,7 +652,7 @@ async function handleTick(env, body) {
   };
   // וגם את הסטטוס כותבים רק על שינוי מהותי, או דופק־חיים כל ~10 דקות לכל היותר.
   let prevStatus = null;
-  try { prevStatus = await env.EV_BACKUP.get(STATUS_KEY, { type: "json" }); } catch {}
+  prevStatus = await storeGetJson(env, STATUS_KEY);
   const statusChanged = !prevStatus
     || prevStatus.state !== status.state
     || prevStatus.charging !== status.charging
@@ -661,8 +661,7 @@ async function handleTick(env, body) {
     || JSON.stringify(prevStatus.lastAction || null) !== JSON.stringify(status.lastAction || null)
     || Date.now() - Number(prevStatus.lastTickAt || 0) >= 10 * 60 * 1000;
   if (statusChanged) {
-    try { await env.EV_BACKUP.put(STATUS_KEY, JSON.stringify(status)); }
-    catch { kvWriteFailed = true; }
+    if (!await storePutJson(env, STATUS_KEY, status)) kvWriteFailed = true;
   }
   return { ok: true, action: "tick", armed: true, ...(kvWriteFailed ? { kvWriteFailed: true } : {}), ...status };
 }

@@ -15,12 +15,14 @@ const copyAs = (from, to) => {
   const src = readFileSync(join(root, from), "utf8")
     .replaceAll("../_shared/wevo.js", "../_shared/wevo.mjs")
     .replaceAll("../_shared/push.js", "../_shared/push.mjs")
+    .replaceAll("../_shared/watch-store.js", "../_shared/watch-store.mjs")
     .replaceAll("./wevo.js", "./wevo.mjs")
     .replaceAll("./push.js", "./push.mjs");
   writeFileSync(join(dir, to), src);
 };
 copyAs("functions/_shared/wevo.js", "_shared/wevo.mjs");
 copyAs("functions/_shared/push.js", "_shared/push.mjs");
+copyAs("functions/_shared/watch-store.js", "_shared/watch-store.mjs");
 copyAs("functions/api/wevo-watch.js", "api/wevo-watch.mjs");
 copyAs("watcher/worker.js", "worker.mjs");
 const watch = await import(pathToFileURL(join(dir, "api/wevo-watch.mjs")).href);
@@ -215,7 +217,7 @@ describe("ב3 — eventsFromStateDiff (לכידת אירועי טעינה)", () 
     const src = readFileSync(join(root, "functions/api/wevo-watch.js"), "utf8");
     assert.match(src, /EVENTS_KEY = "watch:events"/);
     assert.match(src, /events,/);
-    assert.match(src, /delete\(EVENTS_KEY\)/);
+    assert.match(src, /storeDelete\(env, EVENTS_KEY\)/);
     assert.match(src, /recordWatchEvents\(env, cfg, diff/);
   });
 
