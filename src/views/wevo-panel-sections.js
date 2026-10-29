@@ -190,3 +190,127 @@ function WatchBanner({
   }, "שומר קבוע: התראה על כל חיבור + אישור ראשון אוטומטי בתעריף רגיל (בשעות שיא — אתה מחליט), בלי פקיעת 24 שעות. שומר התראות: התראות בלבד ללקוח הנבחר.")));
 }
 
+// ── PreauthControls: בקרי אישור־מראש (באנר פעיל/נסה־עכשיו/בטל + טוגלי יקר והמשך־פרימיום + כפתור חימוש) ────
+function PreauthControls({
+  isOffPeakIntent,
+  isFullIntent,
+  isFirstAuthIntent,
+  selectedClient,
+  peakNow,
+  authAttemptsUi,
+  preAuthQueued,
+  authIntentQueued,
+  preAuthPremium,
+  premiumContinue,
+  onRetryNow,
+  onCancelIntent,
+  onArmAuthIntent,
+  onPreAuthPremiumChange,
+  onPremiumContinueChange
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginBottom: 10
+    }
+  }, isOffPeakIntent || isFullIntent ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: "1 1 200px",
+      background: isOffPeakIntent ? "#ecfdf5" : "#fff7ed",
+      border: isOffPeakIntent ? "1.5px solid #6ee7b7" : "1.5px solid #fdba74",
+      borderRadius: 12,
+      padding: "10px 12px",
+      fontWeight: 700,
+      fontSize: 13,
+      color: isOffPeakIntent ? "#047857" : "#c2410c"
+    },
+    "data-testid": isOffPeakIntent ? "wevo-preauth-active" : "wevo-fullauth-active"
+  }, isOffPeakIntent ? "✓ אישור מראש פעיל · " : "✓ מאשר עכשיו (כולל יקר) · ", selectedClient && selectedClient.name, isOffPeakIntent && (preAuthQueued || authIntentQueued || peakNow) ? " · ממתין לזול" : "", authAttemptsUi > 0 ? ` · ניסיון ${authAttemptsUi}` : ""), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...S.btnS,
+      padding: "10px 12px"
+    },
+    onClick: onRetryNow,
+    "data-testid": "wevo-auth-retry-now"
+  }, "נסה עכשיו"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...S.btnS,
+      padding: "10px 12px"
+    },
+    onClick: onCancelIntent,
+    "data-testid": "wevo-preauth-cancel"
+  }, "בטל אישור")) : /*#__PURE__*/React.createElement(React.Fragment, null, isFirstAuthIntent && /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: "1 1 100%",
+      background: "#e0f2fe",
+      border: "1.5px solid #7dd3fc",
+      borderRadius: 12,
+      padding: "10px 12px",
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#0369a1"
+    },
+    "data-testid": "wevo-firstauth-active"
+  }, "✓ מאשר חיבור אוטומטית · ", selectedClient && selectedClient.name, authAttemptsUi > 0 ? ` · ניסיון ${authAttemptsUi}` : ""), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 7,
+      padding: "10px 12px",
+      background: preAuthPremium ? "#fff7ed" : "#f8fafc",
+      border: preAuthPremium ? "1.5px solid #fdba74" : "1.5px solid #e2e8f0",
+      borderRadius: 12,
+      fontWeight: 700,
+      fontSize: 13,
+      color: preAuthPremium ? "#c2410c" : "#475569",
+      cursor: "pointer",
+      flex: "1 1 180px",
+      userSelect: "none"
+    },
+    "data-testid": "wevo-preauth-premium-toggle"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: preAuthPremium,
+    onChange: onPreAuthPremiumChange,
+    style: { width: 17, height: 17, accentColor: "#ea580c" }
+  }), `כולל תעריף יקר (₪${Number((getConfig() || {}).ratePremium || 0).toFixed(2)}/קוט״ש)`), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 7,
+      padding: "10px 12px",
+      background: premiumContinue ? "#fef3c7" : "#f8fafc",
+      border: premiumContinue ? "1.5px solid #f59e0b" : "1.5px solid #e2e8f0",
+      borderRadius: 12,
+      fontWeight: 700,
+      fontSize: 13,
+      color: premiumContinue ? "#92400e" : "#475569",
+      cursor: "pointer",
+      flex: "1 1 180px",
+      userSelect: "none"
+    },
+    "data-testid": "wevo-premium-continue-toggle",
+    title: "אם הטעינה תיעצר כשהתעריף יעבור לפרימיום — האפליקציה תאשר אוטומטית המשך בפרימיום"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: premiumContinue,
+    onChange: onPremiumContinueChange,
+    style: { width: 17, height: 17, accentColor: "#f59e0b" }
+  }), "המשך אוטומטי בפרימיום"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      ...S.btnP,
+      background: preAuthPremium ? "#ea580c" : "#059669",
+      color: "#fff",
+      padding: "11px 12px",
+      flex: "1 1 180px"
+    },
+    onClick: () => onArmAuthIntent(preAuthPremium ? "full-now" : "offpeak-preauth", null, { premiumContinue }),
+    "data-testid": "wevo-preauth-arm"
+  }, preAuthPremium ? "אשר מראש · כולל יקר" : "אשר מראש")));
+}
+
