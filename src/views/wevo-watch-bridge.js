@@ -6,7 +6,7 @@
  */
 // ── createWatchBridge: פונקציות שומר השרת של הפאנל, עם תלויות ה־closure מוזרקות כ־deps ──
 function createWatchBridge(deps) {
-  const { clientsRef, openRef, getCid, setWatchInfo } = deps;
+  const { clientsRef, openRef, getCid, setWatchInfo, onUpsertOpen } = deps;
   // שומר צד־שרת למעבר פרימיום: רישום/ביטול/סטטוס מול /api/wevo-watch.
   // הפרטים נשלחים מהדפדפן (localStorage) ונשמרים בשרת מוצפנים — רק כשהמשתמש מפעיל במפורש.
   const watchApi = async (action, extra = {}) => {
@@ -113,7 +113,9 @@ function createWatchBridge(deps) {
             if (patch) patches.push({ ...o, ...patch, updatedAt: Date.now() });
           }
           if (patches.length) {
-            dataStore.upsertOpenSessions(patches);
+            // תיקון ב3 (29.10): העדכון עובר במנגנון הרשומות של האפליקציה
+            // (onUpsertOpen) — הקריאה הישנה ל־dataStore התייחסה למזהה שלא קיים.
+            for (const p of patches) onUpsertOpen(p);
             pushWevoLog("sync", "התקבלו חותמות טעינה משומר השרת", true);
           }
         }

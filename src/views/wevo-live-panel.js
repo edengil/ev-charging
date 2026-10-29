@@ -134,7 +134,8 @@ function WevoLivePanel({
     clientsRef,
     openRef,
     getCid: () => cidRef.current,
-    setWatchInfo
+    setWatchInfo,
+    onUpsertOpen
   });
 
   const clearAuthIntent = (reason) => {

@@ -530,3 +530,77 @@ describe("fullPushAllowed — שער סיום במצב קפוא", () => {
     assert.match(src, /!decide\.notifyPeakStop && persistenceHealthy/);
   });
 });
+
+describe("גשר שומר הפאנל — תיקון ב3: מיזוג חותמות דרך onUpsertOpen", () => {
+  it("refreshWatchInfo מחיל טלאי חותמות על רשומה פתוחה ולא מאפס את watchInfo", async () => {
+    const src = readFileSync(join(root, "src/views/wevo-watch-bridge.js"), "utf8");
+    assert.ok(!src.includes("dataStore.upsertOpenSessions"), "אין עוד קריאה ל־dataStore שלא קיים במערכת");
+    const { mergeWatchEvents } = await import(pathToFileURL(join(root, "lib/ev-money.mjs")).href);
+    const factory = new Function(
+      "getWevoCreds", "ownerPeakWindow", "pushWevoLog", "mergeWatchEvents", "fetch",
+      src + "\nreturn createWatchBridge;"
+    );
+    const upserts = [];
+    const watchInfos = [];
+    const t0 = 1760000000000;
+    const openRec = {
+      id: "o1", wevoTxnId: "123", clientId: "c1",
+      plugInAt: new Date(t0).toISOString(), chargeStartedAt: null, chargeEndedAt: null
+    };
+    const statusData = {
+      ok: true, armed: true,
+      events: { "123": { plugInAt: t0, chargeStartedAt: t0 + 60000, chargingFullTime: t0 + 3600000 } }
+    };
+    const bridge = factory(
+      () => ({ email: "a@b.c", password: "x" }),
+      () => ({ startMin: 0, endMin: 0 }),
+      () => {},
+      mergeWatchEvents,
+      async () => ({ ok: true, json: async () => statusData })
+    )({
+      clientsRef: { current: [] },
+      openRef: { current: [openRec] },
+      getCid: () => "",
+      setWatchInfo: (v) => watchInfos.push(v),
+      onUpsertOpen: (p) => upserts.push(p)
+    });
+    bridge.refreshWatchInfo();
+    await new Promise(r => setTimeout(r, 30));
+    assert.equal(upserts.length, 1, "הטלאי הוחל פעם אחת דרך onUpsertOpen");
+    assert.equal(upserts[0].id, "o1");
+    assert.ok(upserts[0].chargeStartedAt, "חותמת תחילת הטעינה מולאה מאירוע השומר");
+    assert.ok(upserts[0].chargeEndedAt, "חותמת סיום הטעינה מולאה מאירוע השומר");
+    assert.ok(upserts[0].verifiedEndAt, "חותמת הסיום המאומתת מולאה");
+    assert.ok(watchInfos.length >= 1 && watchInfos[0] && watchInfos[0].armed, "watchInfo קיבל את נתוני הסטטוס");
+    assert.ok(!watchInfos.includes(null), "watchInfo לא אופס בגלל שגיאת מיזוג");
+  });
+
+  it("בלי אירועי שומר תואמים — אין upsert ו־watchInfo מוגדר כרגיל", async () => {
+    const src = readFileSync(join(root, "src/views/wevo-watch-bridge.js"), "utf8");
+    const { mergeWatchEvents } = await import(pathToFileURL(join(root, "lib/ev-money.mjs")).href);
+    const factory = new Function(
+      "getWevoCreds", "ownerPeakWindow", "pushWevoLog", "mergeWatchEvents", "fetch",
+      src + "\nreturn createWatchBridge;"
+    );
+    const upserts = [];
+    const watchInfos = [];
+    const statusData = { ok: true, armed: true, events: {} };
+    const bridge = factory(
+      () => ({ email: "a@b.c", password: "x" }),
+      () => ({ startMin: 0, endMin: 0 }),
+      () => {},
+      mergeWatchEvents,
+      async () => ({ ok: true, json: async () => statusData })
+    )({
+      clientsRef: { current: [] },
+      openRef: { current: [{ id: "o9", wevoTxnId: "999" }] },
+      getCid: () => "",
+      setWatchInfo: (v) => watchInfos.push(v),
+      onUpsertOpen: (p) => upserts.push(p)
+    });
+    bridge.refreshWatchInfo();
+    await new Promise(r => setTimeout(r, 30));
+    assert.equal(upserts.length, 0);
+    assert.ok(watchInfos[0] && watchInfos[0].armed);
+  });
+});
