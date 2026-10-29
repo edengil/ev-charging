@@ -27,6 +27,16 @@ async function listAllKeys(kv, prefix) {
   return names;
 }
 
+// כתיבה רק אם התוכן השתנה: מכסת הכתיבה היומית של KV היא המשאב הנדיר
+// (פסק 26.10 — שמירות האפליקציה כותבות ~2,000 פעמים ביום), ורוב החלקים
+// (חודשי עבר, לקוחות, תשלומים) זהים בין שמירה לשמירה. קריאות זולות בשפע.
+async function putIfChanged(kv, key, value) {
+  const cur = await kv.get(key);
+  if (cur === value) return false;
+  await kv.put(key, value);
+  return true;
+}
+
 async function writeSplit(kv, payload) {
   const groups = new Map();
   for (const s of payload.sessions || []) {
@@ -39,15 +49,15 @@ async function writeSplit(kv, payload) {
   for (const [month, arr] of groups) {
     const key = SESSIONS_PREFIX + month;
     wanted.add(key);
-    await kv.put(key, JSON.stringify(arr));
+    await putIfChanged(kv, key, JSON.stringify(arr));
   }
   for (const name of existing) {
     if (!wanted.has(name)) await kv.delete(name);
   }
-  await kv.put("data:clients", JSON.stringify(payload.clients || []));
-  await kv.put("data:payments", JSON.stringify(payload.payments || []));
-  await kv.put("data:openSess", JSON.stringify(payload.openSess || []));
-  await kv.put("data:config", JSON.stringify(payload.config != null ? payload.config : null));
+  await putIfChanged(kv, "data:clients", JSON.stringify(payload.clients || []));
+  await putIfChanged(kv, "data:payments", JSON.stringify(payload.payments || []));
+  await putIfChanged(kv, "data:openSess", JSON.stringify(payload.openSess || []));
+  await putIfChanged(kv, "data:config", JSON.stringify(payload.config != null ? payload.config : null));
 }
 
 async function readSplit(kv, meta) {

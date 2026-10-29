@@ -22,14 +22,16 @@ rmSync(dir, { recursive: true, force: true });
 
 function makeKv() {
   const m = new Map();
+  const puts = [];
   return {
     _map: m,
+    _puts: puts,
     async get(k, opts) {
       const v = m.get(k);
       if (v == null) return null;
       return opts && opts.type === "json" ? JSON.parse(v) : v;
     },
-    async put(k, v) { m.set(k, String(v)); },
+    async put(k, v) { puts.push(k); m.set(k, String(v)); },
     async delete(k) { m.delete(k); },
     async list({ prefix } = {}) {
       const keys = [...m.keys()].filter(k => !prefix || k.startsWith(prefix)).map(name => ({ name }));
@@ -147,5 +149,36 @@ describe("data-sync — ב5 אחסון מפוצל", () => {
     const legacy = JSON.parse(env.EV_BACKUP._map.get("data"));
     assert.equal(legacy.sessions.length, 3);
     assert.equal(legacy.clients.length, 1);
+  });
+
+  it("חיסכון כתיבות: save זהה לקודמו לא כותב שוב אף מפתח מפוצל", async () => {
+    const env = makeEnv();
+    const kv = env.EV_BACKUP;
+    await call(env, { action: "setup", pin: PIN, data: DATA });
+    kv._puts.length = 0;
+    const r = await call(env, { action: "save", pin: PIN, data: DATA });
+    assert.equal(r.status, 200);
+    const splitPuts = kv._puts.filter(k => k.startsWith("data:"));
+    assert.deepEqual(splitPuts, [], "אף חלק מפוצל לא נכתב מחדש כשהתוכן זהה");
+    assert.ok(kv._puts.includes("data"), "הבלוב הישן עדיין נכתב (חותמת עדכניות)");
+    assert.ok(kv._puts.includes("meta"), "המטא עדיין נכתב");
+  });
+
+  it("חיסכון כתיבות: שינוי בסשן אחד כותב רק את חודשו; ה־load מחזיר את השינוי", async () => {
+    const env = makeEnv();
+    const kv = env.EV_BACKUP;
+    await call(env, { action: "setup", pin: PIN, data: DATA });
+    kv._puts.length = 0;
+    const changed = {
+      ...DATA,
+      sessions: DATA.sessions.map(s => s.id === "s-oct" ? { ...s, amount: 55 } : s)
+    };
+    const r = await call(env, { action: "save", pin: PIN, data: changed });
+    assert.equal(r.status, 200);
+    const splitPuts = kv._puts.filter(k => k.startsWith("data:"));
+    assert.deepEqual(splitPuts, ["data:sessions:2026-10"], "נכתב רק חודש הסשן שהשתנה");
+    const load = await call(env, { action: "load", pin: PIN });
+    const oct = load.body.data.sessions.find(s => s.id === "s-oct");
+    assert.equal(oct.amount, 55, "השינוי נקרא בחזרה מהפיצול");
   });
 });
