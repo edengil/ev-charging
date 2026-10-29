@@ -600,7 +600,7 @@ describe("Wevo open session match", () => {
     // שלמות נתונים (מקרה עידן 11.10): לוגיקת ציר הזמן עברה ל־lib (שלב C) ומכוסה שם
     // בבדיקות התנהגות; כאן מוודאים שהבאנדל לא מגדיר אותה שוב ושה־lib חושף אותה.
     assert.doesNotMatch(readAppBundle(), /function resolveChargeTimeline/);
-    assert.match(readFileSync(join(root, "lib/ev-money.mjs"), "utf8"), /export function resolveChargeTimeline/);
+    assert.match(readFileSync(join(root, "lib/ev-timeline.mjs"), "utf8"), /export function resolveChargeTimeline/);
     assert.match(readAppBundle(), /Math\.max\(est\.kwh \|\| 0, Number\(existing && existing\.liveKwh\) \|\| 0\)/);
   });
 

@@ -8,11 +8,35 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
 
+/** חלקי lib/ev-money לפי סדר הבאנדל: core ראשון, ואז תחומים בסדר רשימת הפיצול. */
+const MONEY_PARTS = [
+  "lib/ev-money-core.mjs",
+  "lib/ev-payments.mjs",
+  "lib/ev-policy.mjs",
+  "lib/ev-opens.mjs",
+  "lib/ev-timeline.mjs",
+  "lib/ev-matching.mjs",
+  "lib/ev-misc.mjs"
+];
+
 function bundleMoneyLib() {
-  const raw = fs.readFileSync(path.join(root, "lib/ev-money.mjs"), "utf8");
-  const body = raw
-    .replace(/^export\s+/gm, "")
-    .replace(/\nexport\s*\{[\s\S]*?\};?\s*$/m, "\n");
+  const partNames = new Set(MONEY_PARTS.map(p => path.basename(p)));
+  const bodies = MONEY_PARTS.map(rel => {
+    const raw = fs.readFileSync(path.join(root, rel), "utf8");
+    // שורות import בין־חלקים מוסרות (בבאנדל הכול סקופ אחד); import של קובץ
+    // שאינו חלק מוכר מפיל את הבנייה — כדי שחלק חדש לא יחמוק מהרשימה בשקט.
+    const noImports = raw.replace(/^import\s+[^\n]*$/gm, line => {
+      const m = line.match(/from\s+["']([^"']+)["']/);
+      if (!m || !partNames.has(path.basename(m[1]))) {
+        throw new Error(`bundleMoneyLib: import לא מוכר ב־${rel}: ${line.trim()}`);
+      }
+      return "";
+    });
+    return noImports
+      .replace(/^export\s+/gm, "")
+      .replace(/\nexport\s*\{[\s\S]*?\};?\s*$/m, "\n");
+  });
+  const body = bodies.join("\n");
   return `/* === lib/ev-money (injected) === */
 var __EV_MONEY__ = (function () {
 ${body}
@@ -278,10 +302,12 @@ if (bundleCheck.status !== 0) {
 console.log(`bundle minified: ${rawSrc.length} -> ${minified.length} bytes`);
 const src = minified;
 
-const checkMoney = spawnSync(process.execPath, ["--check", path.join(root, "lib/ev-money.mjs")], { encoding: "utf8" });
-if (checkMoney.status !== 0) {
-  console.error(checkMoney.stderr || checkMoney.stdout);
-  process.exit(1);
+for (const rel of ["lib/ev-money.mjs", ...MONEY_PARTS]) {
+  const checkMoney = spawnSync(process.execPath, ["--check", path.join(root, rel)], { encoding: "utf8" });
+  if (checkMoney.status !== 0) {
+    console.error(checkMoney.stderr || checkMoney.stdout);
+    process.exit(1);
+  }
 }
 const checkIdle = spawnSync(process.execPath, ["--check", path.join(root, "lib/ev-idle.mjs")], { encoding: "utf8" });
 if (checkIdle.status !== 0) {
