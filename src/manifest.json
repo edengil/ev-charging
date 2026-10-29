@@ -18,6 +18,7 @@
     "src/views/cloud-gate.js",
     "src/views/wevo-live-sync.js",
     "src/views/wevo-diagnostics.js",
+    "src/views/wevo-watch-bridge.js",
     "src/views/wevo-live-panel.js",
     "src/views/wevo-sync-view.js",
     "src/views/wevo-history-view.js",

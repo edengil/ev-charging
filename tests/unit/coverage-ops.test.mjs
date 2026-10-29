@@ -240,8 +240,9 @@ describe("ב3 — חיווט הבאנדל (שומר רגרסיה)", () => {
     const inject = readFileSync(join(root, "scripts/inject-app.mjs"), "utf8");
     assert.match(inject, /mergeWatchEvents: mergeWatchEvents,/);
     assert.match(inject, /var mergeWatchEvents = __EV_MONEY__\.mergeWatchEvents;/);
-    const panel = readFileSync(join(root, "src/views/wevo-live-panel.js"), "utf8");
-    assert.match(panel, /mergeWatchEvents\(o, ev\)/);
+    // שלב 2 בפיצול הפאנל: קריאת המיזוג עברה עם גשר השומר ל־wevo-watch-bridge.js
+    const bridge = readFileSync(join(root, "src/views/wevo-watch-bridge.js"), "utf8");
+    assert.match(bridge, /mergeWatchEvents\(o, ev\)/);
   });
 });
 
