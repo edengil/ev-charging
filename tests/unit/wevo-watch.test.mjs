@@ -393,8 +393,10 @@ describe("שומר התראות — notifyOnly (גם ללקוח עצמי)", () =
   it("שומרי פאנל: חימוש שומר התראות וכפתור ההפעלה", () => {
     const panel = readFileSync(join(root, "src/views/wevo-live-panel.js"), "utf8");
     assert.match(panel, /armNotifyWatch/);
-    assert.match(panel, /wevo-watch-notify-arm/);
-    assert.match(panel, /watchInfo\.notifyOnly/);
+    // שלב 3ב בפיצול הפאנל: באנר השומר עבר ל־WatchBanner בקטעי התצוגה
+    const sections = readFileSync(join(root, "src/views/wevo-panel-sections.js"), "utf8");
+    assert.match(sections, /wevo-watch-notify-arm/);
+    assert.match(sections, /watchInfo\.notifyOnly/);
     // שלב 2 בפיצול הפאנל: מטען הרישום של armNotifyWatch עבר לגשר השומר
     const bridge = readFileSync(join(root, "src/views/wevo-watch-bridge.js"), "utf8");
     assert.match(bridge, /notifyOnly: true/);
@@ -492,7 +494,9 @@ describe("שומר קבוע — decideGuardActions", () => {
   it("שומרי פאנל: שומר קבוע + חימוש פרימיום מפורש ברישום", () => {
     const panel = readFileSync(join(root, "src/views/wevo-live-panel.js"), "utf8");
     assert.match(panel, /armGuard/);
-    assert.match(panel, /wevo-watch-guard-arm/);
+    // שלב 3ב בפיצול הפאנל: באנר השומר עבר ל־WatchBanner בקטעי התצוגה
+    const sections = readFileSync(join(root, "src/views/wevo-panel-sections.js"), "utf8");
+    assert.match(sections, /wevo-watch-guard-arm/);
     // שלב 2 בפיצול הפאנל: מטעני הרישום של armGuard/syncServerWatch עברו לגשר השומר
     const bridge = readFileSync(join(root, "src/views/wevo-watch-bridge.js"), "utf8");
     assert.match(bridge, /persistent: true/);

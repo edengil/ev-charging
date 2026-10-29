@@ -1212,67 +1212,15 @@ function WevoLivePanel({
     },
     "data-testid": "wevo-boost-try"
   }, "נסה עקיפת פרימיום"), " — או הפעל “התחל טעינת פרימיום כעת” באפליקציית Wevo."),
-  watchInfo && watchInfo.armed && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      flexWrap: "wrap",
-      alignItems: "center",
-      marginBottom: 10,
-      background: "#fef3c7",
-      border: "1.5px solid #f59e0b",
-      borderRadius: 12,
-      padding: "10px 12px"
-    },
-    "data-testid": "wevo-watch-active"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: "1 1 200px",
-      fontWeight: 700,
-      fontSize: 13,
-      color: "#92400e"
-    }
-  }, "🛰️ שומר שרת פעיל · ", watchInfo.clientName || "", watchInfo.status && watchInfo.status.lastAction ? ` · פעל לאחרונה: ${watchInfo.status.lastAction.detail}` : watchInfo.notifyOnly ? " · שומר התראות — מתריע על סיום, עצירת שיא וניתוק, גם כשהאפליקציה סגורה (בלי אישורי פרימיום)" : watchInfo.persistent ? ` · שומר קבוע — מתריע על חיבור/סיום/ניתוק ומאשר חיבורים אוטומטית (לא בפרימיום)${watchInfo.premiumContinue ? " · כולל המשך פרימיום חמוש" : ""}` : " · יאשר המשך אוטומטית במעבר לפרימיום, גם כשהאפליקציה סגורה"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: {
-      ...S.btnS,
-      padding: "8px 10px"
-    },
-    onClick: () => syncServerWatch(null),
-    "data-testid": "wevo-watch-off"
-  }, "כבה שומר")),
-  !watchInfo && hasCreds && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      flexWrap: "wrap",
-      alignItems: "center",
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: {
-      ...S.btnS,
-      padding: "8px 12px"
-    },
-    onClick: armGuard,
-    "data-testid": "wevo-watch-guard-arm"
-  }, "🛰️ הפעל שומר קבוע"), cid && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: {
-      ...S.btnS,
-      padding: "8px 12px"
-    },
-    onClick: armNotifyWatch,
-    "data-testid": "wevo-watch-notify-arm"
-  }, "🔔 שומר התראות ללקוח זה"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "#64748b",
-      lineHeight: 1.4,
-      flex: "1 1 200px"
-    }
-  }, "שומר קבוע: התראה על כל חיבור + אישור ראשון אוטומטי בתעריף רגיל (בשעות שיא — אתה מחליט), בלי פקיעת 24 שעות. שומר התראות: התראות בלבד ללקוח הנבחר.")),
+  // באנר שומר שרת
+  /*#__PURE__*/React.createElement(WatchBanner, {
+    watchInfo: watchInfo,
+    hasCreds: hasCreds,
+    cid: cid,
+    onWatchOff: () => syncServerWatch(null),
+    onArmGuard: armGuard,
+    onArmNotifyWatch: armNotifyWatch
+  }),
   !isSelfSelected && cid && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
