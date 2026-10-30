@@ -22,15 +22,15 @@ const MONTH_SHORT = ["ינו'", "פבר'", "מרץ", "אפר'", "מאי", "יו�
 
 function ownerPremRatio(s) {
   // Wevo "פרימיום" = חלק האנרגיה בחלון הפיק החי של Wevo (לא בסופ״ש)
+  // M1 (ביקורת 30.10): החפיפה נספרת רק על ימי חול (ownerPeakOverlapMinutes),
+  // בדיוק כמו עלות הבעלים ב־calcSession — לא לפי יום ההתחלה בלבד.
   const start = new Date(s.date);
   if (isNaN(start)) return 0;
   const durMin = Number(s.durMin) > 0 ? Number(s.durMin) : 60;
   const end = new Date(start.getTime() + durMin * 60000);
-  const day = start.getDay();
-  if (day === 5 || day === 6) return 0;
   const w = ownerPeakWindow();
   const totalOwnerMin = Math.max((end - start) / 60000, 1);
-  const peakOwnerMin = peakOverlapMinutes(start, end, w.startMin, w.endMin);
+  const peakOwnerMin = ownerPeakOverlapMinutes(start, end, w.startMin, w.endMin);
   return Math.max(0, Math.min(1, peakOwnerMin / totalOwnerMin));
 }
 

@@ -24,9 +24,8 @@ const DEFAULT_CONFIG = {
 // הגבייה (16:00) — לא לאחד ביניהם.
 const PREM_S = typeof BILLING_PREMIUM_START_H !== "undefined" ? BILLING_PREMIUM_START_H : 16,
   PREM_E = typeof BILLING_PREMIUM_END_H !== "undefined" ? BILLING_PREMIUM_END_H : 23;
-// M25: חלון הבעלים נגזר מ־DEFAULT_CONFIG — מקור אחד.
-const OWNER_PS = DEFAULT_CONFIG.ownerPeakStartMin / 60,
-  OWNER_PE = DEFAULT_CONFIG.ownerPeakEndMin / 60;
+// M25: חלון הבעלים נגזר מ־DEFAULT_CONFIG — מקור אחד. (ברירות המחדל של
+// החלון עצמו חיות ב־lib/ev-pricing.mjs מאז H12.)
 let _configCache = { ...DEFAULT_CONFIG };
 let _configListeners = [];
 function getConfig() {
@@ -62,100 +61,23 @@ async function loadConfigFromStorage() {
  * חלון הפיק של עלות הבעלים (דקות מיום) — Wevo היא הקובעת: החלון נשמר
  * מהלוח החי בכל סנכרון, וברירת המחדל 17:00–23:00 משמשת רק עד המשיכה הראשונה.
  * endMin יכול לעבור 1440 כשהחלון חוצה חצות.
+ * H12 (ביקורת 30.10): המימוש הטהור חי ב־lib/ev-pricing.mjs
+ * (ownerPeakWindowFor); כאן רק ברירת־המחדל של התצורה הנוכחית.
  */
 function ownerPeakWindow(cfg = getConfig()) {
-  const s = Number(cfg && cfg.ownerPeakStartMin);
-  const e = Number(cfg && cfg.ownerPeakEndMin);
-  if (Number.isFinite(s) && Number.isFinite(e) && s >= 0 && s < 1440 && e > s && e <= 2880) {
-    return { startMin: s, endMin: e };
-  }
-  return { startMin: OWNER_PS * 60, endMin: OWNER_PE * 60 };
+  return ownerPeakWindowFor(cfg);
 }
 
-/** דקות החפיפה בין [start, end] לבין חלון הפיק היומי (עובד גם מעבר לחצות). */
-function peakOverlapMinutes(start, end, startMin, endMin) {
-  if (!(end > start)) return 0;
-  let total = 0;
-  const days = Math.min(8, Math.ceil((end - start) / 86400000) + 1);
-  for (let i = 0; i < days; i++) {
-    const mid = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
-    const ps = mid.getTime() + startMin * 60000;
-    const pe = mid.getTime() + endMin * 60000;
-    const o = Math.min(end.getTime(), pe) - Math.max(start.getTime(), ps);
-    if (o > 0) total += o / 60000;
-  }
-  return total;
-}
+/* peakOverlapMinutes עבר ל־lib/ev-pricing.mjs (H12) — נחשף כגלובל מהבאנדל. */
+
+/**
+ * H12 (ביקורת 30.10): חישוב הטעינה חי ב־lib/ev-pricing.mjs
+ * (calcSessionWithConfig) עם בדיקות יחידה ישירות — כולל תיקון M1 (עלות
+ * בעלים לפי כל יום בנפרד, לא לפי יום ההתחלה בלבד). כאן רק מתאם שמזריק
+ * את תצורת התמחור הנוכחית; כל הקריאות הקיימות לא השתנו.
+ */
 function calcSession(kwhRaw, startDt, endDt = null, forceReg = false, forcePrem = false, customRate = null) {
-  const cfg = getConfig();
-  const start = startDt instanceof Date ? startDt : new Date(startDt);
-  const end = endDt ? endDt instanceof Date ? endDt : new Date(endDt) : start;
-  const kwhInflated = Math.round(kwhRaw * getInflation());
-  let rate,
-    premiumRatio = 0,
-    isMixed = false;
-  if (customRate && customRate > 0) {
-    rate = customRate;
-  } else if (forceReg) {
-    rate = cfg.rateRegular;
-  } else if (forcePrem) {
-    rate = cfg.ratePremium;
-    premiumRatio = 1;
-  } else {
-    const totalMin = Math.max((end - start) / 60000, 1);
-    // H3 (ביקורת 30.10): חפיפת פרימיום אמיתית על פני כל הימים — כמו צד עלות
-    // הבעלים. הלוגיקה הקודמת עבדה על שעות־יום בלבד ומחקה את שעות הפיק של
-    // היום הראשון בכל טעינה שחצתה חצות והסתיימה בשעה מאוחרת מההתחלה.
-    const premMin = peakOverlapMinutes(start, end, PREM_S * 60, PREM_E * 60);
-    premiumRatio = Math.min(1, premMin / totalMin);
-    if (premiumRatio > 0 && premiumRatio < 1) {
-      isMixed = true;
-      rate = Math.round((cfg.ratePremium * premiumRatio + cfg.rateRegular * (1 - premiumRatio)) * 1000) / 1000;
-    } else if (premiumRatio >= 1) {
-      rate = cfg.ratePremium;
-    } else if (end > start) {
-      rate = cfg.rateRegular;
-    } else {
-      // משך אפס/שלילי — סיווג לפי שעת ההתחלה (ההתנהגות ההיסטורית למקרה הקצה)
-      const h = start.getHours();
-      if (h >= PREM_S && h < PREM_E) {
-        rate = cfg.ratePremium;
-        premiumRatio = 1;
-      } else {
-        rate = cfg.rateRegular;
-      }
-    }
-  }
-  const amountBilled = Math.ceil(kwhInflated * rate);
-
-  // Owner cost: Friday/Saturday flat, else weighted by the Wevo peak window
-  const day = start.getDay();
-  const isWeekend = day === 5 || day === 6;
-  const totalOwnerMin = Math.max((end - start) / 60000, 1);
-  let ownerRate;
-  if (isWeekend) {
-    ownerRate = cfg.ownerOff;
-  } else {
-    const w = ownerPeakWindow(cfg);
-    const peakOwnerMin = peakOverlapMinutes(start, end, w.startMin, w.endMin);
-    const peakRatio = Math.min(1, peakOwnerMin / totalOwnerMin);
-    ownerRate = cfg.ownerPeak * peakRatio + cfg.ownerOff * (1 - peakRatio);
-  }
-  const costToOwner = Math.round(kwhRaw * ownerRate * 100) / 100;
-  const profit = Math.round((amountBilled - costToOwner) * 100) / 100;
-  const rateLabel = customRate ? "מותאם" : isMixed ? `משולב (${Math.round(premiumRatio * 100)}% פרימיום)` : premiumRatio >= 1 ? "פרימיום" : "רגיל";
-  return {
-    kwhRaw,
-    kwhInflated,
-    premiumRatio: Math.round(premiumRatio * 100) / 100,
-    isMixed,
-    rate,
-    amountBilled,
-    costToOwner,
-    profit,
-    rateLabel,
-    ownerRate: Math.round(ownerRate * 1000) / 1000
-  };
+  return calcSessionWithConfig(getConfig(), kwhRaw, startDt, endDt, forceReg, forcePrem, customRate);
 }
 
 /** שעות פיק Wevo (עלות בעלים) — החלון מלוח Wevo החי, ימי חול בלבד */

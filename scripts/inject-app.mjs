@@ -13,6 +13,7 @@ const MONEY_PARTS = [
   "lib/ev-money-core.mjs",
   "lib/ev-payments.mjs",
   "lib/ev-policy.mjs",
+  "lib/ev-pricing.mjs",
   "lib/ev-opens.mjs",
   "lib/ev-timeline.mjs",
   "lib/ev-matching.mjs",
@@ -62,6 +63,13 @@ ${body}
     isDangerousEmptyCloudSnap: isDangerousEmptyCloudSnap,
     buildCloudSnapFromParts: buildCloudSnapFromParts,
     isBillingPremiumAt: isBillingPremiumAt,
+    peakOverlapMinutes: peakOverlapMinutes,
+    ownerPeakOverlapMinutes: ownerPeakOverlapMinutes,
+    ownerPeakWindowFor: ownerPeakWindowFor,
+    calcSessionWithConfig: calcSessionWithConfig,
+    timelinePoints: timelinePoints,
+    pointAt: pointAt,
+    pickMaxBillWindowWithConfig: pickMaxBillWindowWithConfig,
     isChargeTimelineRelevant: isChargeTimelineRelevant,
     BILLING_PREMIUM_START_H: BILLING_PREMIUM_START_H,
     BILLING_PREMIUM_END_H: BILLING_PREMIUM_END_H,
@@ -145,6 +153,13 @@ var buildClientLedger = __EV_MONEY__.buildClientLedger;
 var isDangerousEmptyCloudSnap = __EV_MONEY__.isDangerousEmptyCloudSnap;
 var buildCloudSnapFromParts = __EV_MONEY__.buildCloudSnapFromParts;
 var isBillingPremiumAt = __EV_MONEY__.isBillingPremiumAt;
+var peakOverlapMinutes = __EV_MONEY__.peakOverlapMinutes;
+var ownerPeakOverlapMinutes = __EV_MONEY__.ownerPeakOverlapMinutes;
+var ownerPeakWindowFor = __EV_MONEY__.ownerPeakWindowFor;
+var calcSessionWithConfig = __EV_MONEY__.calcSessionWithConfig;
+var timelinePoints = __EV_MONEY__.timelinePoints;
+var pointAt = __EV_MONEY__.pointAt;
+var pickMaxBillWindowWithConfig = __EV_MONEY__.pickMaxBillWindowWithConfig;
 var isChargeTimelineRelevant = __EV_MONEY__.isChargeTimelineRelevant;
 var authorizeShouldConfirmPremium = __EV_MONEY__.authorizeShouldConfirmPremium;
 var isOffPeakPreauthQueuedOk = __EV_MONEY__.isOffPeakPreauthQueuedOk;

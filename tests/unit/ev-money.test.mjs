@@ -73,8 +73,11 @@ function readAppBundle() {
   );
   return manifest.order
     .map(rel => {
-      const lines = readFileSync(join(root, rel), "utf8").split("\n");
-      return lines.slice(6, -1).join("\n");
+      const txt = readFileSync(join(root, rel), "utf8");
+      // M37 (ביקורת 30.10): חיתוך לפי בלוק ההערה הפותח, לא slice(6,-1) —
+      // ההנחה של 6 שורות כותרת אחידות כבר נשברה (74-push-client עם 5,
+      // 05-icons עם 8), והחיתוך הישן מחק שורת קוד חיה / השאיר שאריות הערה.
+      return txt.replace(/^\/\*[\s\S]*?\*\/\n?/, "").replace(/\n$/, "");
     })
     .join("\n");
 }
@@ -700,7 +703,10 @@ describe("Wevo open session match", () => {
     assert.equal(clientBalance({ id: "c1", name: "שכן" }, [{ clientId: "c1", amountBilled: 18.99 }], []), 18.99);
     const src = readAppBundle();
     assert.match(src, /ownCar[\s\S]{0,400}fictionalBilledDisplay/);
-    assert.match(src, /Math\.ceil\(kwhInflated \* rate\)/);
+    // H12 (ביקורת 30.10): נוסחת החיוב עברה ל־lib/ev-pricing.mjs — השמירה על
+    // צורת הנוסחה נאכפת מול מקור המימוש החדש.
+    const pricingSrc = readFileSync(join(root, "lib/ev-pricing.mjs"), "utf8");
+    assert.match(pricingSrc, /Math\.ceil\(kwhInflated \* rate\)/);
   });
 
   it("dedupeSessionsByTxn שומר חיוב וויבו וחיוב ללקוח בנפרד", () => {

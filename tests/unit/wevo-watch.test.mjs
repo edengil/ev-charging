@@ -623,3 +623,119 @@ describe("גשר שומר הפאנל — תיקון ב3: מיזוג חותמות
     assert.ok(watchInfos[0] && watchInfos[0].armed);
   });
 });
+
+describe("M36: טיק עם ביצוע authorize חיובי מקצה לקצה", () => {
+  // M36 (ביקורת 30.10): עד היום שני ה־harness־ים דימו fetch שזורק על כל URL
+  // שאינו Cognito — טיק שהיה אמור לאשר מעולם לא הגיע לפקודת Wevo. כאן
+  // fetch מתוסרט מלא (Cognito + REST + WebSocket מדומה) וטיק שלם מבצע
+  // אישור ראשון אמיתי, עם אסרטים על ה־payload, ה־actedKey, היומן והאירועים.
+  class FakeWS {
+    static instances = [];
+    constructor(script) {
+      this.sent = [];
+      this.listeners = {};
+      this.script = script;
+      this.closed = false;
+      FakeWS.instances.push(this);
+    }
+    accept() {}
+    addEventListener(type, fn) {
+      (this.listeners[type] ||= []).push(fn);
+    }
+    send(data) {
+      if (this.closed) return;
+      const payload = JSON.parse(data);
+      this.sent.push(payload);
+      const reply = this.script ? this.script(payload) : null;
+      if (reply) {
+        queueMicrotask(() => {
+          if (!this.closed) (this.listeners.message || []).forEach(fn => fn({ data: JSON.stringify(reply) }));
+        });
+      }
+    }
+    close() {
+      this.closed = true;
+    }
+  }
+
+  it("חיבור רכב מחוץ לפרימיום → השומר שולח authorize נקי ורושם actedKey + יומן + אירוע", async () => {
+    const CHARGER = "TACW2242722G1263";
+    const nowSec = Math.floor(Date.now() / 1000);
+    const stateMsg = state => ({
+      chargerIdentifier: CHARGER,
+      state,
+      transactionData: { transactionId: 777, plugInTime: nowSec - 120, totalEnergyKwh: 3 }
+    });
+    let authorized = false;
+    FakeWS.instances = [];
+    globalThis.fetch = async url => {
+      const u = String(url);
+      if (u.includes("cognito-idp")) {
+        return new Response(JSON.stringify({ AuthenticationResult: { AccessToken: "tok-1" } }), {
+          status: 200, headers: { "Content-Type": "application/json" }
+        });
+      }
+      if (u.includes("/rest/user/details")) {
+        return new Response(JSON.stringify({ email: CREDS.email, chargerIdentifier: CHARGER, connector: 1 }), {
+          status: 200, headers: { "Content-Type": "application/json" }
+        });
+      }
+      if (u.includes("/rest/transactions")) {
+        return new Response(JSON.stringify([
+          { transactionId: 777, isOngoing: true, plugInTime: nowSec - 120, totalEnergyKwh: 3 }
+        ]), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (u.endsWith("/ws")) {
+        return {
+          status: 101,
+          webSocket: new FakeWS(payload => {
+            if (payload.command === "authorize") {
+              authorized = true;
+              return stateMsg("Charging");
+            }
+            if (payload.command === "getState") return stateMsg(authorized ? "Charging" : "Preparing");
+            return null;
+          })
+        };
+      }
+      throw new Error("fetch לא צפוי בבדיקת M36: " + u);
+    };
+
+    // חלון פיק שלא מכיל את השעה הנוכחית בירושלים — כדי שהטיק יהיה מחוץ לפרימיום
+    // בכל שעה ויום שבהם הבדיקה רצה (בסופ״ש אין פיק ממילא).
+    const p = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+    }).formatToParts(new Date());
+    const nowMin = (Number(p.find(x => x.type === "hour").value) % 24) * 60 + Number(p.find(x => x.type === "minute").value);
+    const [ps, pe] = [[0, 60], [300, 360], [720, 780], [1200, 1260]].find(([s, e]) => nowMin < s || nowMin >= e);
+
+    const env = makeEnv();
+    const reg = await call(env, {
+      action: "register", ...CREDS, clientId: "c1", clientName: "שכן בדיקה",
+      peakStartMin: ps, peakEndMin: pe, autoApprove: true
+    });
+    assert.equal(reg.status, 200);
+
+    const tick = await call(env, { action: "tick", secret: "tick-secret-1" });
+    assert.equal(tick.status, 200);
+    assert.equal(tick.body.ok, true);
+
+    // פקודת authorize אחת בדיוק, נקייה (בלי שדות נוספים כמו boost)
+    const authPayloads = FakeWS.instances.flatMap(ws => ws.sent).filter(x => x.command === "authorize");
+    assert.equal(authPayloads.length, 1);
+    assert.deepEqual(Object.keys(authPayloads[0]).sort(), ["chargerIdentifier", "command", "connector"]);
+    assert.equal(authPayloads[0].chargerIdentifier, CHARGER);
+
+    // actedKey נשמר בתצורת השומר — הטיק הבא לא יאשר שוב לאותו חיבור
+    const cfg = JSON.parse(env.EV_BACKUP._map.get("watch:cfg"));
+    assert.match(cfg.plugActedKey, /^plug:777:/);
+
+    // אירוע החיבור נרשם תחת מזהה העסקה
+    const events = JSON.parse(env.EV_BACKUP._map.get("watch:events"));
+    assert.ok(events["777"] && typeof events["777"].plugInAt === "number");
+
+    // ופעולת האישור נרשמה ביומן השומר
+    const log = JSON.parse(env.EV_BACKUP._map.get("watch:log"));
+    assert.ok(log.some(e => e.kind === "authorize-first"));
+  });
+});

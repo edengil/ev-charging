@@ -178,80 +178,17 @@ function toMs(v) {
 
 /* resolveChargeTimeline עבר ל־lib/ev-money.mjs (שלב C) — נחשף כגלובל מהבאנדל */
 
-const TIMELINE_LABELS = {
-  plugIn: "חיבור כבל",
-  chargeStart: "התחלת טעינה בפועל",
-  chargeEnd: "סיום טעינה בפועל",
-  plugOut: "הוצאת כבל"
-};
-
-function timelinePoints(tl) {
-  if (!tl) return [];
-  return [
-    { key: "plugIn", label: TIMELINE_LABELS.plugIn, at: tl.plugInAt },
-    { key: "chargeStart", label: TIMELINE_LABELS.chargeStart, at: tl.chargeStartAt },
-    { key: "chargeEnd", label: TIMELINE_LABELS.chargeEnd, at: tl.chargeEndAt },
-    { key: "plugOut", label: TIMELINE_LABELS.plugOut, at: tl.plugOutAt }
-  ].filter(p => !!p.at);
-}
-
-function pointAt(tl, key) {
-  if (!tl || !key) return null;
-  switch (key) {
-    case "plugIn":
-      return tl.plugInAt;
-    case "chargeStart":
-      return tl.chargeStartAt;
-    case "chargeEnd":
-      return tl.chargeEndAt;
-    case "plugOut":
-      return tl.plugOutAt;
-    default: {
-      const _exhaustive = key;
-      void _exhaustive;
-      return null;
-    }
-  }
-}
+/* timelinePoints / pointAt / TIMELINE_LABELS עברו ל־lib/ev-pricing.mjs
+ * (H12, ביקורת 30.10) — נחשפים כגלובלים מהבאנדל דרך inject-app.mjs. */
 
 /**
  * בוחר צירוף התחלה/סיום עם הסכום הגבוה ביותר (פרימיום וכו').
- * H2 (ביקורת 30.10): ברירת המחדל היא ארבעת חלונות החיוב הקנוניים בלבד —
- * התחלה ∈ {plugIn, chargeStart} × סיום ∈ {chargeEnd, plugOut} — אותם חלונות
- * שמוצגים למשתמש מתומחרים באשף. startKeys / endKeys אופציונליים לחריגה מפורשת.
+ * H12: המימוש חי ב־lib/ev-pricing.mjs (pickMaxBillWindowWithConfig) עם
+ * בדיקות יחידה ישירות; כאן רק מתאם שמזריק את תצורת התמחור הנוכחית.
+ * ברירת המחדל נשארת ארבעת חלונות החיוב הקנוניים בלבד (H2).
  */
 function pickMaxBillWindow(kwh, tl, opts = {}) {
-  const points = timelinePoints(tl);
-  if (!points.length || !(kwh > 0)) return null;
-  const startKeys = opts.startKeys || ["plugIn", "chargeStart"];
-  const endKeys = opts.endKeys || ["chargeEnd", "plugOut"];
-  const forceReg = !!opts.forceReg;
-  const forcePrem = !!opts.forcePrem;
-  const customRate = opts.customRate || null;
-  let best = null;
-  for (const sk of startKeys) {
-    const start = pointAt(tl, sk);
-    if (!start) continue;
-    for (const ek of endKeys) {
-      const end = pointAt(tl, ek);
-      if (!end) continue;
-      const sm = toMs(start);
-      const em = toMs(end);
-      if (sm == null || em == null || em <= sm) continue;
-      const calc = calcSession(kwh, new Date(sm), new Date(em), forceReg, forcePrem, customRate);
-      if (!best || calc.amountBilled > best.calc.amountBilled) {
-        best = {
-          startKey: sk,
-          endKey: ek,
-          start,
-          end,
-          calc,
-          mins: Math.max(1, Math.round((em - sm) / 60000))
-        };
-      }
-    }
-  }
-  return best;
+  return pickMaxBillWindowWithConfig(getConfig(), kwh, tl, opts);
 }
 
 function formatTimelineClock(at) {

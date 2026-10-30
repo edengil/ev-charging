@@ -70,3 +70,21 @@ test("כל export של lib שנקרא מ־src חשוף כגלובל בבאנדל
   }
   assert.deepEqual(missing, []);
 });
+
+test("M37: כל קובץ במניפסט נפתח בבלוק הערה תקין שהחיתוך מסיר במלואו", () => {
+  const manifest = JSON.parse(read("src/manifest.json"));
+  const bad = [];
+  for (const rel of manifest.order) {
+    const txt = read(rel);
+    if (!txt.startsWith("/**")) {
+      bad.push(`${rel}: לא נפתח בבלוק הערה`);
+      continue;
+    }
+    const stripped = txt.replace(/^\/\*[\s\S]*?\*\/\n?/, "");
+    const firstLine = stripped.split("\n").find(l => l.trim() !== "") || "";
+    if (firstLine.trim().startsWith("*") || firstLine.includes("*/")) {
+      bad.push(`${rel}: שארית הערה אחרי החיתוך`);
+    }
+  }
+  assert.deepEqual(bad, []);
+});
