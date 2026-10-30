@@ -202,7 +202,7 @@ export function wsCommand(token, payload, { matchCharger, timeoutMs = 10000 } = 
  * אחרי שהראשונה עובדה, ורק בשעות הפרימיום. לכן לא יורים את כל הלחיצות ברצף —
  * מחכים בין השלבים ובודקים מצב. אותו WS נשאר פתוח בין השלבים.
  */
-export function wsAuthorizePremium(token, charger, connector, { gapMs = 4000, timeoutMs = 22000, boost = false } = {}) {
+export function wsAuthorizePremium(token, charger, connector, { gapMs = 4000, timeoutMs = 22000 } = {}) {
   return new Promise(async (resolve, reject) => {
     let settled = false;
     let lastMsg = null;
@@ -564,7 +564,6 @@ export async function handleWevoRequest(body) {
 
   if (action === "authorize") {
     const confirmPremium = body.confirmPremium !== false;
-    const boost = body.boost === true;
     const readState = async () => {
       const [rawState, list] = await Promise.all([
         wsCommand(token, { command: "getState", chargerIdentifier: charger, connector }, { matchCharger: charger }),
@@ -578,8 +577,7 @@ export async function handleWevoRequest(body) {
     if (confirmPremium) {
       result = await wsAuthorizePremium(token, charger, connector, {
         gapMs: 4000,
-        timeoutMs: 22000,
-        boost
+        timeoutMs: 22000
       });
     } else {
       result = await wsCommand(
@@ -609,13 +607,12 @@ export async function handleWevoRequest(body) {
         try {
           result = await wsAuthorizePremium(token, charger, connector, {
             gapMs: 3500,
-            timeoutMs: 16000,
-            boost
+            timeoutMs: 16000
           });
           state = await readState();
         } catch {}
       }
-      // confirmPremium=false: אחרי אישור בודד בשיא — מצב ממתין הוא רצוי (המתנה לזול), בלי לחיצות תעריף יקר
+      // confirmPremium=false: אחרי אישור בודד בפרימיום — מצב ממתין הוא רצוי (המתנה לרגיל), בלי לחיצות פרימיום
     }
 
     return {
@@ -625,7 +622,6 @@ export async function handleWevoRequest(body) {
       authorize: result,
       state,
       premiumConfirmed: confirmPremium,
-      boostRequested: boost,
       waitingAuthorize: !!(state && state.waitingAuthorize)
     };
   }
@@ -696,7 +692,7 @@ export async function handleWevoRequest(body) {
     return { ok: true, action, user, probeResults: results };
   }
 
-  const err = new Error("action לא מוכר (sync|state|authorize|inspect|tariff|probe-commands|probe-tariff-write)");
+  const err = new Error("פעולה לא מוכרת (sync|state|authorize|inspect|tariff|probe-commands|probe-tariff-write)");
   err.status = 400;
   throw err;
 }

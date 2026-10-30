@@ -282,7 +282,7 @@ async function handleDataSync(env, body) {
     return { ok: true, saved: true, updatedAt: now };
   }
 
-  const err = new Error("action לא מוכר (status|setup|load|save)");
+  const err = new Error("פעולה לא מוכרת (status|setup|load|save)");
   err.status = 400;
   throw err;
 }

@@ -109,7 +109,7 @@ test.describe("wevo-mock", () => {
     await page.getByTestId("wevo-client-select").selectOption(CLIENT_A.id);
     // מדליקים את אופציית הפרימיום ואז לוחצים אשר מראש
     await page.getByTestId("wevo-preauth-premium-toggle").locator("input").check();
-    await expect(page.getByTestId("wevo-preauth-arm")).toContainText(/כולל יקר/);
+    await expect(page.getByTestId("wevo-preauth-arm")).toContainText(/כולל פרימיום/);
     await page.getByTestId("wevo-preauth-arm").click();
     await expect(page.getByTestId("wevo-fullauth-active")).toBeVisible();
 
@@ -124,7 +124,7 @@ test.describe("wevo-mock", () => {
     expect(mock.authorizeCalls.some(c => c.confirmPremium === true)).toBe(true);
   });
 
-  test("מטען מתוזמן מחוץ לחלון — באנר תזמון, בלי ניסיונות אוטומטיים, 'נסה עקיפה' שולח boost", async ({ page }) => {
+  test("מטען מתוזמן מחוץ לחלון — באנר תזמון, בלי ניסיונות אוטומטיים, 'נסה עקיפה' שולח ניסיון פרימיום ידני", async ({ page }) => {
     await resetWevoMock(page, "scheduled");
     await openApp(page, {
       clients: [CLIENT_A, CLIENT_SELF],
@@ -142,19 +142,21 @@ test.describe("wevo-mock", () => {
     await expect(banner).toBeVisible({ timeout: 15000 });
     await expect(banner).toContainText(/22:00/);
 
-    // ה-arm עושה לכל היותר ניסיון בודד (עם boost) — אין סופת ניסיונות אוטומטית.
+    // ה-arm עושה לכל היותר ניסיון בודד — אין סופת ניסיונות אוטומטית.
     // (אישור ראשון אוטומטי בלי יקר כן עלול להישלח בבחירת לקוח — זה לא נחשב.
     //  ייתכן 0 אם המצב המתוזמן נטען אחרי ה-kick הראשוני — זה תקין, ההשהיה היא העיקר.)
     await page.waitForTimeout(8000);
     let mock = await readWevoMock(page);
     let premiumCalls = mock.authorizeCalls.filter(c => c.confirmPremium === true);
     expect(premiumCalls.length).toBeLessThanOrEqual(1);
-    expect(premiumCalls.every(c => c.boost === true)).toBe(true);
+    // M34 (ביקורת 30.10): שדה boost הוסר מהצנרת — הוא לא הגיע ל־Wevo מעולם
+    // (השרת התעלם ממנו מאז 09.10). האישור נשלח נקי, בלי השדה.
+    expect(premiumCalls.every(c => c.boost === undefined)).toBe(true);
     const callsBefore = premiumCalls.length;
     // עדיין מתוזמן — הבאנר לא נעלם
     await expect(banner).toBeVisible();
 
-    // "נסה עקיפת פרימיום" — ניסיון ידני אחד נוסף עם דגל boost
+    // "נסה עקיפת פרימיום" — ניסיון ידני אחד נוסף (אישור פרימיום רגיל, בלי שדה boost)
     await page.getByTestId("wevo-boost-try").click();
     await expect
       .poll(async () => {
@@ -166,7 +168,7 @@ test.describe("wevo-mock", () => {
     mock = await readWevoMock(page);
     premiumCalls = mock.authorizeCalls.filter(c => c.confirmPremium === true);
     expect(premiumCalls.length).toBe(callsBefore + 1);
-    expect(premiumCalls[premiumCalls.length - 1].boost).toBe(true);
+    expect(premiumCalls[premiumCalls.length - 1].boost).toBe(undefined);
   });
 
   test("חיבור מחדש אחרי ניתוק — הטעינה הישנה נאטמת עם plugOutAt ולא מקבלת תזכורת idle", async ({ page }) => {

@@ -68,7 +68,7 @@ function createWatchBridge(deps) {
           peakEndMin: w.endMin,
           notifyOnly: true
         });
-        pushWevoLog("preauth", "שומר התראות הופעל — התראות על סיום, עצירת שיא וניתוק כבל גם כשהאפליקציה סגורה", true);
+        pushWevoLog("preauth", "שומר התראות הופעל — התראות על סיום, עצירת פרימיום וניתוק כבל גם כשהאפליקציה סגורה", true);
         refreshWatchInfo();
       } catch (e) {
         pushWevoLog("preauth", `שומר התראות לא הופעל: ${e && e.message || "שגיאה"}`, false);
@@ -77,7 +77,7 @@ function createWatchBridge(deps) {
   };
 
   // שומר קבוע: רישום persistent בשרת — התראות על חיבור/סיום/ניתוק + אישור
-  // ראשון אוטומטי בחיבור (לעולם לא בשעות שיא; שם נדרשת החלטת עדן באפליקציה).
+  // ראשון אוטומטי בחיבור (לעולם לא בשעות פרימיום; שם נדרשת החלטת עדן באפליקציה).
   const armGuard = () => {
     (async () => {
       try {

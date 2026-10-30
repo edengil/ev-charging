@@ -413,7 +413,7 @@ function CompleteSession({
   }, /*#__PURE__*/React.createElement(Icon, {
     n: "check",
     s: 16
-  }), timelineRelevant ? "הנתונים מולאו מ-Wevo — בחר נקודות לחיוב מתוך חלון הזמנים (מעבר בין יקרות לרגיל)." : "הנתונים מולאו מ-Wevo — אין מעבר בין שעות יקרות/רגילות, חיוב לפי חיבור→סיום.") : filledOk ? /*#__PURE__*/React.createElement("span", {
+  }), timelineRelevant ? "הנתונים מולאו מ-Wevo — בחר נקודות לחיוב מתוך חלון הזמנים (מעבר בין פרימיום לרגיל)." : "הנתונים מולאו מ-Wevo — אין מעבר בין שעות פרימיום/רגילות, חיוב לפי חיבור→סיום.") : filledOk ? /*#__PURE__*/React.createElement("span", {
     style: {
       display: "inline-flex",
       alignItems: "center",
@@ -817,11 +817,11 @@ function CompleteSession({
     }
   }, !isSelf && (prev.isMixed ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: S.pill(C.warnSoft, C.warnInk)
-  }, (Number(prev.kwhInflated) * Number(prev.premiumRatio || 0)).toFixed(1), " קוט״ש שיא"), /*#__PURE__*/React.createElement("span", {
+  }, (Number(prev.kwhInflated) * Number(prev.premiumRatio || 0)).toFixed(1), " קוט״ש פרימיום"), /*#__PURE__*/React.createElement("span", {
     style: S.pill(C.primarySoft, C.primaryInk)
   }, (Number(prev.kwhInflated) * (1 - Number(prev.premiumRatio || 0))).toFixed(1), " קוט״ש רגיל")) : /*#__PURE__*/React.createElement("span", {
     style: S.pill(Number(prev.premiumRatio) >= 1 ? C.warnSoft : C.primarySoft, Number(prev.premiumRatio) >= 1 ? C.warnInk : C.primaryInk)
-  }, Number(prev.premiumRatio) >= 1 ? "תעריף שיא" : "תעריף רגיל")), prev.durMin > 0 && /*#__PURE__*/React.createElement("span", {
+  }, Number(prev.premiumRatio) >= 1 ? "תעריף פרימיום" : "תעריף רגיל")), prev.durMin > 0 && /*#__PURE__*/React.createElement("span", {
     style: S.pill(C.bg, C.meta)
   }, "משך: ", formatDurMins(prev.durMin))))), /*#__PURE__*/React.createElement("div", {
     style: S.acts

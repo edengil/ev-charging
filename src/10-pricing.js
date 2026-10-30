@@ -100,7 +100,7 @@ function calcSession(kwhRaw, startDt, endDt = null, forceReg = false, forcePrem 
   } else {
     const totalMin = Math.max((end - start) / 60000, 1);
     // H3 (ביקורת 30.10): חפיפת פרימיום אמיתית על פני כל הימים — כמו צד עלות
-    // הבעלים. הלוגיקה הקודמת עבדה על שעות־יום בלבד ומחקה את שעות השיא של
+    // הבעלים. הלוגיקה הקודמת עבדה על שעות־יום בלבד ומחקה את שעות הפיק של
     // היום הראשון בכל טעינה שחצתה חצות והסתיימה בשעה מאוחרת מההתחלה.
     const premMin = peakOverlapMinutes(start, end, PREM_S * 60, PREM_E * 60);
     premiumRatio = Math.min(1, premMin / totalMin);
@@ -154,7 +154,7 @@ function calcSession(kwhRaw, startDt, endDt = null, forceReg = false, forcePrem 
   };
 }
 
-/** שעות יקרות Wevo (עלות בעלים) — החלון מלוח Wevo החי, ימי חול בלבד */
+/** שעות פיק Wevo (עלות בעלים) — החלון מלוח Wevo החי, ימי חול בלבד */
 function isOwnerPeakNow(d = new Date()) {
   const day = d.getDay();
   if (day === 5 || day === 6) return false;

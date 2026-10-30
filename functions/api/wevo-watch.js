@@ -182,7 +182,7 @@ export function eventsFromStateDiff(prev, st, nowMs) {
   if (key && connected && !out.full && st && st.didCompleteFull && p.fullNotifiedKey == null) {
     out.full = { txnId: key, atMs: fullMs || nowMs, approx: !fullMs };
   }
-  // עצירת עמדה (SuspendedEVSE) אחרי זרם פעיל — מועמד להתראת שיא (רק כשאין סיום באותה דגימה)
+  // עצירת עמדה (SuspendedEVSE) אחרי זרם פעיל — מועמד להתראת פרימיום (רק כשאין סיום באותה דגימה)
   if (prevWasFlowing(p, false) && !active && connected && key && !out.full && st.state === "SuspendedEVSE") {
     out.chargeStop = { txnId: key, atMs: nowMs, evsePaused: true };
   }
@@ -200,8 +200,8 @@ export function premiumArmActive(cfg) {
 }
 
 // החלטות השומר הקבוע/החמוש לטיק אחד — פונקציה טהורה (נבדקת ביחידה, בלי Wevo):
-// אישור ראשון אוטומטי בחיבור (לא בשיא), אישור המשך־פרימיום רק עם חימוש פרימיום,
-// ובשיא בלי חימוש — רק התראה להחלטת עדן.
+// אישור ראשון אוטומטי בחיבור (לא בפרימיום), אישור המשך־פרימיום רק עם חימוש פרימיום,
+// ובפרימיום בלי חימוש — רק התראה להחלטת עדן.
 // שער דחיפת "הטעינה הסתיימה" במצב שמירה־קפואה (persistenceHealthy=false):
 // בלי זיכרון מתמיד, כל טיק משחזר את הסיום מההפרש מול המצב הקפוא. דוחפים רק
 // עם עוגן טרי מ־Wevo: חותמת סיום בת ≤5 דקות, או מצב Finishing חולף.
@@ -342,7 +342,7 @@ async function handleRegister(env, body) {
     // notifyOnly: חימוש להתראות בלבד (גם ללקוח עצמי) — בלי אישורי פרימיום אוטומטיים בטיק
     notifyOnly: body.notifyOnly === true,
     // persistent: שומר קבוע (התראות + אישור ראשון) בלי פקיעת 24 שעות;
-    // autoApprove: אישור ראשון אוטומטי בחיבור (לא בשעות שיא);
+    // autoApprove: אישור ראשון אוטומטי בחיבור (לא בשעות פרימיום);
     // premiumContinue: חימוש המשך־פרימיום ל־24 שעות (premiumArmedAt).
     persistent,
     autoApprove: persistent ? true : body.autoApprove === true,
@@ -467,7 +467,7 @@ async function handleTick(env, body) {
     await pushLog(env, { kind: "expire", detail: "שומר כובה אוטומטית אחרי 24 שעות" });
     try {
       await pushAndLog({
-        title: "🛰️ שומר הפרימיום כובה",
+        title: "🛰️ שומר השרת כובה",
         body: "השומר כובה אוטומטית אחרי 24 שעות. להפעלה מחדש — סמן שוב «המשך אוטומטי בפרימיום» באפליקציה.",
         tag: "ev-watch-expired"
       });
@@ -569,7 +569,7 @@ async function handleTick(env, body) {
     try {
       await pushAndLog({
         title: "⚡ טעינה אושרה אוטומטית",
-        body: `רכב חובר לעמדה והשומר אישר טעינה בתעריף רגיל${cfg.clientName ? ` (${cfg.clientName})` : ""}. לאישור המשך גם בפרימיום — הפעל «אישור מראש כולל פרימיום» באפליקציה.`,
+        body: `רכב חובר לעמדה והשומר אישר טעינה בתעריף רגיל${cfg.clientName ? ` (${cfg.clientName})` : ""}. לאישור המשך גם בפרימיום — הפעילו «המשך אוטומטי בפרימיום» באפליקציה.`,
         tag: "ev-watch-firstauth"
       });
     } catch {}
@@ -591,7 +591,7 @@ async function handleTick(env, body) {
   }
   // חימוש־מחדש של שער הסיום: קטע זרם חדש ויציב (3+ דקות Charging רצוף) שזורם
   // 10+ דקות אחרי הסיום הקודם מאפשר דיווח סיום נוסף באותו חיבור (חידוש אחרי
-  // שיא). היפוכי מצב מאפסים את מונה היציבות — ולכן לא מחמשים מחדש לעולם.
+  // פרימיום). היפוכי מצב מאפסים את מונה היציבות — ולכן לא מחמשים מחדש לעולם.
   if (!connected) {
     cfg.fullNotifiedKey = null;
     cfg.lastEventKey = null;
@@ -615,8 +615,8 @@ async function handleTick(env, body) {
   if (diff.plugIn && plugFresh) {
     try {
       await pushAndLog(decide.notifyPeakPlug ? {
-        title: "🔌 רכב חובר בשעות שיא",
-        body: `${who}רכב חובר לעמדה בשעות תעריף שיא — השומר לא אישר אוטומטית. לאישור, פתחו את האפליקציה.`,
+        title: "🔌 רכב חובר בשעות פרימיום",
+        body: `${who}רכב חובר לעמדה בשעות פרימיום — השומר לא אישר אוטומטית. לאישור, פתחו את האפליקציה.`,
         tag: "ev-watch-peakplug"
       } : {
         title: "🔌 רכב חובר לעמדה",
@@ -628,8 +628,8 @@ async function handleTick(env, body) {
   if (decide.notifyPeakStop && persistenceHealthy) {
     try {
       await pushAndLog({
-        title: "⏸️ הטעינה הופסקה במעבר לשיא",
-        body: `${who}הטעינה הופסקה במעבר לתעריף שיא והשומר הקבוע לא מאשר פרימיום אוטומטית. לאישור המשך — הפעילו «אישור מראש כולל פרימיום» באפליקציה.`,
+        title: "⏸️ הטעינה הופסקה במעבר לפרימיום",
+        body: `${who}הטעינה הופסקה במעבר לפרימיום והשומר הקבוע לא מאשר פרימיום אוטומטית. לאישור המשך — פתחו את האפליקציה והפעילו «אשר מראש · כולל פרימיום».`,
         tag: "ev-watch-peakstop"
       });
     } catch {}
@@ -652,8 +652,8 @@ async function handleTick(env, body) {
       cfg.lastStopPushAtMs = Date.now();
       try {
         await pushAndLog({
-          title: "⏸️ הטעינה הופסקה",
-          body: `${who}הטעינה הופסקה מצד העמדה — ככל הנראה מעבר לתעריף שיא`,
+          title: "⏸️ הטעינה מושהית",
+          body: `${who}הטעינה מושהית מצד העמדה — ככל הנראה מעבר לפרימיום`,
           tag: "ev-watch-stop"
         });
       } catch {}

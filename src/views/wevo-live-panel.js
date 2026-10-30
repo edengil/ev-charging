@@ -26,7 +26,7 @@ function WevoLivePanel({
     const i = getWevoAuthIntent();
     return i && i.attempts || 0;
   });
-  // טוגל ״כולל תעריף יקר״ ליד כפתור האישור מראש — כבוי כברירת מחדל, פרימיום רק בהחלטה מפורשת
+  // טוגל ״כולל פרימיום״ ליד כפתור האישור מראש — כבוי כברירת מחדל, פרימיום רק בהחלטה מפורשת
   const [preAuthPremium, setPreAuthPremium] = useState(false);
   const [premiumContinue, setPremiumContinue] = useState(false);
   const [watchInfo, setWatchInfo] = useState(null);
@@ -170,18 +170,18 @@ function WevoLivePanel({
     syncServerWatch(next);
     const name = (picked && picked.name) || targetId;
     const label = mode === "offpeak-preauth"
-      ? `אישור מראש לזול · ${name}`
+      ? `אישור מראש לרגיל · ${name}`
       : mode === "first-auth"
         ? `אישור ראשון (חיבור) · ${name}`
-        : `אשר עכשיו כולל יקר · ${name}`;
+        : `אשר עכשיו כולל פרימיום · ${name}`;
     pushWevoLog("preauth", label, true);
     if (!silent) {
       appAlert(
         mode === "offpeak-preauth"
-          ? "אישור מראש פעיל — יאושר בלי תעריף יקר, יתחיל כשהזול מתחיל"
+          ? "אישור מראש פעיל — יאושר בלי פרימיום, יתחיל כשהרגיל מתחיל"
           : mode === "first-auth"
-            ? "מאשר חיבור אוטומטית — בלי תעריף יקר"
-            : "מאשר עכשיו כולל תעריף יקר — ממשיך לנסות עד שהטעינה רצה",
+            ? "מאשר חיבור אוטומטית — בלי פרימיום"
+            : "מאשר עכשיו כולל פרימיום — ממשיך לנסות עד שהטעינה רצה",
         "ok",
         5200
       );
@@ -409,11 +409,10 @@ function WevoLivePanel({
     const noPremium = !authorizeShouldConfirmPremium(mode);
     const confirmPremium = !noPremium;
     try {
-      // boost: ניסיון עקיפת תזמון — מקביל ל"התחל טעינת פרימיום כעת" באפליקציית Wevo.
-      // אם Wevo מתעלמת מהשדה, אין שינוי בהתנהגות.
+      // M34 (ביקורת 30.10): שדה boost לא נשלח יותר — מאז 09.10 הוא לא מגיע
+      // ל־Wevo כלל (ה־payload נקי), והשרת רק קיבל והתעלם ממנו.
       const data = await wevoApi("authorize", {
-        confirmPremium,
-        boost: confirmPremium
+        confirmPremium
       });
       const st = data.state || null;
       if (st) setState(st);
@@ -428,15 +427,15 @@ function WevoLivePanel({
         if (intentActive || offPeakMode || firstAuthMode || mode === "full-now") {
           clearAuthIntent("טעינה התחילה · אישור הושלם");
         }
-        pushWevoLog("authorize", confirmPremium ? "אישור Wevo הצליח (כולל פרימיום)" : "אישור Wevo הצליח (בלי תעריף יקר)", true);
+        pushWevoLog("authorize", confirmPremium ? "אישור Wevo הצליח (כולל פרימיום)" : "אישור Wevo הצליח (בלי פרימיום)", true);
         return true;
       }
-      // אישור ראשון בשיא: חיבור אושר, עדיין ממתין — מסיימים את האוטומטי הראשון; יקר / המתנה לזול בלחיצה
+      // אישור ראשון בפרימיום: חיבור אושר, עדיין ממתין — מסיימים את האוטומטי הראשון; פרימיום / המתנה לרגיל בלחיצה
       if (firstAuthMode && isOffPeakPreauthQueuedOk(finalState, isOwnerPeakNow())) {
-        clearAuthIntent("אישור ראשון הושלם · ממתין להוראה ליקר או לזול");
+        clearAuthIntent("אישור ראשון הושלם · ממתין להוראה לפרימיום או לרגיל");
         setErr("");
-        pushWevoLog("authorize", "אישור ראשון (חיבור) הושלם — בלי תעריף יקר", true);
-        appAlert("חיבור אושר — לאישור תעריף יקר או המתנה לזול לחץ על הכפתור", "ok", 6000);
+        pushWevoLog("authorize", "אישור ראשון (חיבור) הושלם — בלי פרימיום", true);
+        appAlert("חיבור אושר — לאישור פרימיום או המתנה לרגיל לחץ על הכפתור", "ok", 6000);
         return "first-done";
       }
       if (offPeakMode && isOffPeakPreauthQueuedOk(finalState, isOwnerPeakNow())) {
@@ -451,14 +450,14 @@ function WevoLivePanel({
           });
         }
         setErr("");
-        pushWevoLog("authorize", "אושר מראש — ממתין לסיום תעריף יקר", true);
-        appAlert("אושר לתור זול — יתחיל כשהתעריף היקר ייגמר", "ok", 5500);
+        pushWevoLog("authorize", "אושר מראש — ממתין לסיום הפרימיום", true);
+        appAlert("אושר לתור רגיל — יתחיל כשהפרימיום ייגמר", "ok", 5500);
         return "queued";
       }
       if (finalState && isWaitingForAuthorize(finalState)) {
         if ((offPeakMode || firstAuthMode) && !isOwnerPeakNow()) {
-          setErr(firstAuthMode ? "ממתין שהמטען יתחיל — מנסה שוב…" : "ממתין שהמטען יתחיל בזול — מנסה שוב…");
-          pushWevoLog("authorize", firstAuthMode ? "ממתין להתחלת טעינה אחרי אישור ראשון" : "ממתין להתחלת טעינה בזול", false);
+          setErr(firstAuthMode ? "ממתין שהמטען יתחיל — מנסה שוב…" : "ממתין שהמטען יתחיל ברגיל — מנסה שוב…");
+          pushWevoLog("authorize", firstAuthMode ? "ממתין להתחלת טעינה אחרי אישור ראשון" : "ממתין להתחלת טעינה ברגיל", false);
           return false;
         }
         if (!noPremium) {
@@ -511,7 +510,7 @@ function WevoLivePanel({
       const existing = findActiveWevoOpen(openRef.current, state);
       onUpsertOpen(buildOpenPayload(state, id, existing));
     }
-    // רכב מחובר / ממתין — אישור ראשון אוטומטי (בלי תעריף יקר); כפתורי יקר/זול נשארים
+    // רכב מחובר / ממתין — אישור ראשון אוטומטי (בלי פרימיום); כפתורי פרימיום/רגיל נשארים
     if (picked && !isSelfClient(picked) && state && isWaitingForAuthorize(state)) {
       const cur = authIntentRef.current;
       const keepStrong = cur && cur.clientId === id && (cur.mode === "full-now" || cur.mode === "offpeak-preauth");
@@ -580,12 +579,12 @@ function WevoLivePanel({
 
       const peakNowLive = isOwnerPeakNow();
       if (intent.mode === "offpeak-preauth" && (intent.queued || preAuthQueuedRef.current) && peakNowLive) {
-        // כבר בתור לזול — לא לוחצים שוב על תעריף יקר
+        // כבר בתור לרגיל — לא לוחצים שוב על פרימיום
         schedule(12000);
         return;
       }
 
-      // המטען בתזמון Wevo מחוץ לחלון הזול — authorize לא יתחיל טעינה.
+      // המטען בתזמון Wevo מחוץ לחלון הרגיל — authorize לא יתחיל טעינה.
       // לא מנסים עיוורת כל 4 שניות; מחכים להחלטת המשתמש (באנר) או לחלון.
       // ניסיון ידני ("נסה עקיפה") כן מבצע ניסיון אחד עם דגל boost.
       if (intent.mode === "full-now" && isScheduleBlocked(st) && !forceAttemptRef.current) {
@@ -673,7 +672,7 @@ function WevoLivePanel({
     };
   }, [hasCreds, intentActive, cid, authIntent && authIntent.mode]);
 
-  // מעבר שיא → זול: לאישור מראש — ניסיון מיידי
+  // מעבר פרימיום → רגיל: לאישור מראש — ניסיון מיידי
   useEffect(() => {
     const peak = isOwnerPeakNow();
     const was = peakWasRef.current;
@@ -835,7 +834,7 @@ function WevoLivePanel({
   const chargingNow = isActuallyCharging(st);
   const waitingAuth = isWaitingForAuthorize(st);
   const vehicleNow = chargerReportsVehicle(st, sessions);
-  // מטען חסום ע"י תזמון Wevo מחוץ לחלון הזול — authorize לא יתחיל טעינה
+  // מטען חסום ע"י תזמון Wevo מחוץ לחלון הרגיל — authorize לא יתחיל טעינה
   const scheduleBlocked = isScheduleBlocked(st);
   const scheduleBlockedFullIntent = !!(isFullIntent && scheduleBlocked && !st.isBoost);
   // טעינות שסיימו אבל הרכב עדיין מחובר — באנר תזכורת (רק לחיבור הנוכחי, לא לטעינה ישנה)
@@ -922,7 +921,7 @@ function WevoLivePanel({
       background: C.ok,
       flexShrink: 0
     }
-  }), vehicleNow ? "מטען — " + wevoStateLabel(st.state) + (peakNow ? " · שיא" : "") : "אין רכב בעמדה"), /*#__PURE__*/React.createElement("button", {
+  }), vehicleNow ? "מטען — " + wevoStateLabel(st.state) + (peakNow ? " · פרימיום" : "") : "אין רכב בעמדה"), /*#__PURE__*/React.createElement("button", {
     onClick: refresh,
     disabled: busy,
     "data-testid": "wevo-refresh",
@@ -1188,7 +1187,7 @@ function WevoLivePanel({
       marginTop: 8,
       lineHeight: 1.4
     }
-  }, isOffPeakIntent ? "אישור מראש פעיל — ממשיך לנסות בלי תעריף יקר; הטעינה תתחיל כשהזול נכנס." : isFullIntent ? "מאשר עכשיו כולל תעריף יקר — ממשיך לנסות עד שהטעינה רצה." : isFirstAuthIntent ? "מאשר חיבור אוטומטית (אישור ראשון, בלי יקר). לאישור מראש (עם אופציה לתעריף יקר) — הכפתור למטה." : isSelfSelected ? "עדן — אשר טעינה רק כשיש רכב בעמדה." : cid && !isSelfSelected ? (vehicleNow ? "רכב בעמדה — אישור ראשון אוטומטי. לאישור מראש (עם אופציה לתעריף יקר) — הכפתור למטה." : "הלקוח נבחר. אישור ראשון יקרה רק כשיהיה רכב בעמדה.") : "בחר לקוח. רכב בעמדה יופיע למעלה לפני אישור.")),
+  }, isOffPeakIntent ? "אישור מראש פעיל — ממשיך לנסות בלי פרימיום; הטעינה תתחיל כשהרגיל נכנס." : isFullIntent ? "מאשר עכשיו כולל פרימיום — ממשיך לנסות עד שהטעינה רצה." : isFirstAuthIntent ? "מאשר חיבור אוטומטית (אישור ראשון, בלי פרימיום). לאישור מראש (עם אופציה לפרימיום) — הכפתור למטה." : isSelfSelected ? "עדן — אשר טעינה רק כשיש רכב בעמדה." : cid && !isSelfSelected ? (vehicleNow ? "רכב בעמדה — אישור ראשון אוטומטי. לאישור מראש (עם אופציה לפרימיום) — הכפתור למטה." : "הלקוח נבחר. אישור ראשון יקרה רק כשיהיה רכב בעמדה.") : "בחר לקוח. רכב בעמדה יופיע למעלה לפני אישור.")),
   scheduleBlockedFullIntent && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#fffbeb",
@@ -1201,7 +1200,7 @@ function WevoLivePanel({
       lineHeight: 1.6
     },
     "data-testid": "wevo-schedule-blocked"
-  }, "⏸ המטען בתזמון Wevo — הטעינה תתחיל ב־", offPeakWindowLabel(st) || "חלון הזול", ". פקודת האישור לא עוקפת תזמון, לכן הניסיונות האוטומטיים מושהים. ", /*#__PURE__*/React.createElement("button", {
+  }, "⏸ המטען בתזמון Wevo — הטעינה תתחיל ב־", offPeakWindowLabel(st) || "חלון הרגיל", ". פקודת האישור לא עוקפת תזמון, לכן הניסיונות האוטומטיים מושהים. ", /*#__PURE__*/React.createElement("button", {
     type: "button",
     style: {
       ...S.btnS,
@@ -1281,14 +1280,14 @@ function WevoLivePanel({
     },
     "data-testid": "wevo-auto-auth-status"
   }, authBusy
-    ? noPremiumIntent ? "מאשר חיבור (בלי תעריף יקר)..." : peakNow ? "לוחץ אישור פרימיום ב-Wevo..." : "מאשר ב-Wevo..."
+    ? noPremiumIntent ? "מאשר חיבור (בלי פרימיום)..." : peakNow ? "לוחץ אישור פרימיום ב-Wevo..." : "מאשר ב-Wevo..."
     : isFirstAuthIntent
       ? `מאשר חיבור אוטומטית${authAttemptsUi ? ` · ${authAttemptsUi}` : ""}`
       : isOffPeakIntent
         ? (authIntent && authIntent.queued || preAuthQueuedRef.current) && peakNow
-          ? "🌙 ממתין לזול — אושר בלי תעריף יקר"
-          : `ממשיך לנסות לזול${authAttemptsUi ? ` · ${authAttemptsUi}` : ""}`
-        : `ממשיך לנסות כולל יקר${authAttemptsUi ? ` · ${authAttemptsUi}` : ""}`) : isSelfSelected || !cid ? /*#__PURE__*/React.createElement("button", {
+          ? "🌙 ממתין לרגיל — אושר בלי פרימיום"
+          : `ממשיך לנסות לרגיל${authAttemptsUi ? ` · ${authAttemptsUi}` : ""}`
+        : `ממשיך לנסות כולל פרימיום${authAttemptsUi ? ` · ${authAttemptsUi}` : ""}`) : isSelfSelected || !cid ? /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnP,
       background: authBusy ? "#93c5fd" : peakNow ? "#ea580c" : "#0ea5c6",
@@ -1315,7 +1314,7 @@ function WevoLivePanel({
       textAlign: "center"
     },
     "data-testid": "wevo-auth-awaiting-click"
-  }, waitingAuth ? "ממתין ללחיצה על כפתור אישור למעלה" : "לחץ ׳אשר מראש׳ למעלה (עם אופציה לתעריף יקר)"), /*#__PURE__*/React.createElement("button", {
+  }, waitingAuth ? "ממתין ללחיצה על כפתור אישור למעלה" : "לחץ ׳אשר מראש׳ למעלה (עם אופציה לפרימיום)"), /*#__PURE__*/React.createElement("button", {
     style: {
       ...S.btnP,
       background: "#f59e0b",

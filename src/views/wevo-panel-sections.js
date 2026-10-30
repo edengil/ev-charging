@@ -147,7 +147,7 @@ function WatchBanner({
       fontSize: 13,
       color: "#92400e"
     }
-  }, "🛰️ שומר שרת פעיל · ", watchInfo.clientName || "", watchInfo.status && watchInfo.status.lastAction ? ` · פעל לאחרונה: ${watchInfo.status.lastAction.detail}` : watchInfo.notifyOnly ? " · שומר התראות — מתריע על סיום, עצירת שיא וניתוק, גם כשהאפליקציה סגורה (בלי אישורי פרימיום)" : watchInfo.persistent ? ` · שומר קבוע — מתריע על חיבור/סיום/ניתוק ומאשר חיבורים אוטומטית (לא בפרימיום)${watchInfo.premiumContinue ? " · כולל המשך פרימיום חמוש" : ""}` : " · יאשר המשך אוטומטית במעבר לפרימיום, גם כשהאפליקציה סגורה"), /*#__PURE__*/React.createElement("button", {
+  }, "🛰️ שומר שרת פעיל · ", watchInfo.clientName || "", watchInfo.status && watchInfo.status.lastAction ? ` · פעל לאחרונה: ${watchInfo.status.lastAction.detail}` : watchInfo.notifyOnly ? " · שומר התראות — מתריע על סיום, עצירת פרימיום וניתוק, גם כשהאפליקציה סגורה (בלי אישורי פרימיום)" : watchInfo.persistent ? ` · שומר קבוע — מתריע על חיבור/סיום/ניתוק ומאשר חיבורים אוטומטית (לא בפרימיום)${watchInfo.premiumContinue ? " · כולל המשך פרימיום חמוש" : ""}` : " · יאשר המשך אוטומטית במעבר לפרימיום, גם כשהאפליקציה סגורה"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     style: {
       ...S.btnS,
@@ -187,10 +187,10 @@ function WatchBanner({
       lineHeight: 1.4,
       flex: "1 1 200px"
     }
-  }, "שומר קבוע: התראה על כל חיבור + אישור ראשון אוטומטי בתעריף רגיל (בשעות שיא — אתה מחליט), בלי פקיעת 24 שעות. שומר התראות: התראות בלבד ללקוח הנבחר.")));
+  }, "שומר קבוע: התראה על כל חיבור + אישור ראשון אוטומטי בתעריף רגיל (בשעות פרימיום — אתה מחליט), בלי פקיעת 24 שעות. שומר התראות: התראות בלבד ללקוח הנבחר.")));
 }
 
-// ── PreauthControls: בקרי אישור־מראש (באנר פעיל/נסה־עכשיו/בטל + טוגלי יקר והמשך־פרימיום + כפתור חימוש) ────
+// ── PreauthControls: בקרי אישור־מראש (באנר פעיל/נסה־עכשיו/בטל + טוגלי פרימיום והמשך־פרימיום + כפתור חימוש) ────
 function PreauthControls({
   isOffPeakIntent,
   isFullIntent,
@@ -227,7 +227,7 @@ function PreauthControls({
       color: isOffPeakIntent ? "#047857" : "#c2410c"
     },
     "data-testid": isOffPeakIntent ? "wevo-preauth-active" : "wevo-fullauth-active"
-  }, isOffPeakIntent ? "✓ אישור מראש פעיל · " : "✓ מאשר עכשיו (כולל יקר) · ", selectedClient && selectedClient.name, isOffPeakIntent && (preAuthQueued || authIntentQueued || peakNow) ? " · ממתין לזול" : "", authAttemptsUi > 0 ? ` · ניסיון ${authAttemptsUi}` : ""), /*#__PURE__*/React.createElement("button", {
+  }, isOffPeakIntent ? "✓ אישור מראש פעיל · " : "✓ מאשר עכשיו (כולל פרימיום) · ", selectedClient && selectedClient.name, isOffPeakIntent && (preAuthQueued || authIntentQueued || peakNow) ? " · ממתין לרגיל" : "", authAttemptsUi > 0 ? ` · ניסיון ${authAttemptsUi}` : ""), /*#__PURE__*/React.createElement("button", {
     type: "button",
     style: {
       ...S.btnS,
@@ -277,7 +277,7 @@ function PreauthControls({
     checked: preAuthPremium,
     onChange: onPreAuthPremiumChange,
     style: { width: 17, height: 17, accentColor: "#ea580c" }
-  }), `כולל תעריף יקר (₪${Number((getConfig() || {}).ratePremium || 0).toFixed(2)}/קוט״ש)`), /*#__PURE__*/React.createElement("label", {
+  }), `כולל פרימיום (₪${Number((getConfig() || {}).ratePremium || 0).toFixed(2)}/קוט״ש)`), /*#__PURE__*/React.createElement("label", {
     style: {
       display: "inline-flex",
       alignItems: "center",
@@ -311,6 +311,6 @@ function PreauthControls({
     },
     onClick: () => onArmAuthIntent(preAuthPremium ? "full-now" : "offpeak-preauth", null, { premiumContinue }),
     "data-testid": "wevo-preauth-arm"
-  }, preAuthPremium ? "אשר מראש · כולל יקר" : "אשר מראש")));
+  }, preAuthPremium ? "אשר מראש · כולל פרימיום" : "אשר מראש")));
 }
 
