@@ -1,16 +1,30 @@
-import { json, optionsResponse, handleWevoRequest, cognitoLogin, requestOrigin } from "../_shared/wevo.js";
+import { json, optionsResponse, handleWevoRequest, cognitoLogin, requestOrigin, verifyCreds } from "../_shared/wevo.js";
 import { pushToAllSubscribers } from "../_shared/push.js";
 import { storeGetJson, storePutJson, storeDelete } from "../_shared/watch-store.js";
 
-// שומר צד־שרת להמשך טעינה במעבר לתעריף פרימיום.
-// המשתמש נרשם מהאפליקציה (opt-in) עם אישור מראש פעיל + premiumContinue.
-// פרטי ההתחברות נשמרים ב־KV מוצפנים ב־AES-GCM (מפתח ב־env.EV_WATCH_KEY).
+// שומר צד־שרת (watch): שלושה מצבים — שומר קבוע (אישור ראשון אוטומטי +
+// התראות), שומר התראות בלבד, וחימוש המשך־פרימיום במעבר לתעריף פרימיום.
+// המשתמש נרשם מהאפליקציה (opt-in) מהפאנל החי.
+// פרטי ההתחברות נשמרים מוצפנים ב־AES-GCM (מפתח ב־env.EV_WATCH_KEY) במאגר
+// השומר (watch-store: ‏D1 אם כרוך, אחרת KV).
 // טריגר חיצוני (קרון) קורא action=tick עם env.EV_WATCH_TICK_SECRET כל דקה.
 
 const CFG_KEY = "watch:cfg";
 const STATUS_KEY = "watch:status";
 const LOG_KEY = "watch:log";
 const EVENTS_KEY = "watch:events";
+
+// M27 (ביקורת 30.10): ספי הבטיחות של השומר — בלוק אחד. שינוי מדיניות עובר
+// כאן בלבד; בעבר כל סף היה ליטרל גולמי בכמה מקומות ופספוס של מופע אחד
+// היה שובר את הגנת השחזור בחלק מהמסלולים.
+const FRESH_MS = 5 * 60 * 1000; // טריות חותמת סיום / חיבור / שידור חוזר
+const STALE_SNAPSHOT_MS = 15 * 60 * 1000; // snapshot ישן מזה = ההתמדה לא בריאה
+const STOP_REPUSH_MS = 15 * 60 * 1000; // חלון דה־דופ להתראת עצירה חוזרת
+const POLL_FRESH_MS = 3 * 60 * 1000; // טריות סקירת האפליקציה (דילוג טיק)
+const FLOW_STABLE_MS = 3 * 60 * 1000; // זרם יציב לחימוש־מחדש (כמו FLOW_STABLE_MS ב־lib/ev-timeline)
+const HEARTBEAT_MS = 10 * 60 * 1000; // דופק סטטוס / גיל מינימלי לחימוש־מחדש של שער הסיום
+const EXPIRY_MS = 24 * 3600 * 1000; // פקיעת חימוש (רגיל ופרימיום)
+const EVENTS_KEEP_MS = 48 * 3600 * 1000; // שמירת יומן אירועים במאגר
 
 // תיקון מכסת KV (19.10.2026): השוואת cfg בלי שדות הזמן התנודתיים (lastTickAt/lastPollAt),
 // כדי לזהות אם טיק שינה משהו מהותי. בעבר כל טיק כתב cfg+status מחדש (2 כתיבות לטיק,
@@ -209,7 +223,7 @@ export function fullPushAllowed(full, st, nowMs, persistenceHealthy) {
   if (!full) return false;
   if (persistenceHealthy) return true;
   const stamp = st && Number(st.chargingFullTime) > 0 ? Number(st.chargingFullTime) : (!full.approx ? full.atMs : 0);
-  if (stamp && nowMs - stamp <= 5 * 60 * 1000) return true;
+  if (stamp && nowMs - stamp <= FRESH_MS) return true;
   return !!(full.approx && st && st.state === "Finishing");
 }
 
@@ -291,7 +305,7 @@ async function recordWatchEvents(env, cfg, diff, nowMs) {
       }
     }
     const kept = Object.entries(all)
-      .filter(([, e]) => nowMs - (e.updatedAt || 0) < 48 * 3600 * 1000)
+      .filter(([, e]) => nowMs - (e.updatedAt || 0) < EVENTS_KEEP_MS)
       .sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0))
       .slice(0, 5);
     await storePutJson(env, EVENTS_KEY, Object.fromEntries(kept));
@@ -301,15 +315,6 @@ async function recordWatchEvents(env, cfg, diff, nowMs) {
       await pushLog(env, { kind: "events-error", detail: `שמירת אירועי שומר נכשלה: ${e && e.message || "שגיאה"}` });
     } catch {}
   }
-}
-
-async function verifyCreds(email, password) {
-  if (!email || !password) {
-    const err = new Error("חסרים אימייל או סיסמה");
-    err.status = 400;
-    throw err;
-  }
-  await cognitoLogin(email, password);
 }
 
 async function handleRegister(env, body) {
@@ -331,7 +336,7 @@ async function handleRegister(env, body) {
   let premiumContinue = body.premiumContinue === true;
   let premiumArmedAt = premiumContinue ? now : null;
   if (!premiumContinue && persistent && existing && existing.premiumContinue
-      && now - Number(existing.premiumArmedAt || 0) < 24 * 3600 * 1000) {
+      && now - Number(existing.premiumArmedAt || 0) < EXPIRY_MS) {
     premiumContinue = true;
     premiumArmedAt = existing.premiumArmedAt;
   }
@@ -460,7 +465,7 @@ async function handleTick(env, body) {
   };
   // פקיעה: רישום חולף פג כולו אחרי 24 שעות. שומר קבוע לא פג — רק חימוש
   // המשך־הפרימיום שבתוכו מתבטל אחרי 24 שעות, והשומר ממשיך כהתראות + אישור ראשון.
-  if (!cfg.persistent && Date.now() - Number(cfg.armedAt || 0) > 24 * 3600 * 1000) {
+  if (!cfg.persistent && Date.now() - Number(cfg.armedAt || 0) > EXPIRY_MS) {
     await storeDelete(env, CFG_KEY);
     await storeDelete(env, STATUS_KEY);
     await storeDelete(env, EVENTS_KEY);
@@ -475,7 +480,7 @@ async function handleTick(env, body) {
     return { ok: true, action: "tick", armed: false, expired: true };
   }
   if (cfg.persistent && cfg.premiumContinue
-      && Date.now() - Number(cfg.premiumArmedAt || cfg.armedAt || 0) > 24 * 3600 * 1000) {
+      && Date.now() - Number(cfg.premiumArmedAt || cfg.armedAt || 0) > EXPIRY_MS) {
     cfg.premiumContinue = false;
     cfg.premiumArmedAt = null;
     cfg.actedKey = null;
@@ -486,7 +491,7 @@ async function handleTick(env, body) {
   // שומר קבוע במנוחה: סריקה מדורגת (כל ~3 דקות כשאין רכב) כדי לא להציף את Wevo.
   // תיקון מכסת KV (19.10.2026): נוסף שער דקת־שעון — סריקה מלאה רק בדקות שמתחלקות
   // ב־3, כך שהמצערת לא תלויה בשמירת lastPollAt בכל טיק (מה שאילץ כתיבת cfg בכל סריקה).
-  const lastPollFresh = cfg.lastPollAt && Date.now() - Number(cfg.lastPollAt) < 3 * 60 * 1000;
+  const lastPollFresh = cfg.lastPollAt && Date.now() - Number(cfg.lastPollAt) < POLL_FRESH_MS;
   if (cfg.persistent && !cfg.wasConnected
       && (lastPollFresh || Math.floor(Date.now() / 60000) % 3 !== 0)) {
     return { ok: true, action: "tick", armed: true, throttled: true };
@@ -603,7 +608,7 @@ async function handleTick(env, body) {
   let persistenceHealthy = true;
   try {
     const snap = await storeGetJson(env, STATUS_KEY);
-    if (snap && Number(snap.lastTickAt) && Date.now() - Number(snap.lastTickAt) > 15 * 60 * 1000) persistenceHealthy = false;
+    if (snap && Number(snap.lastTickAt) && Date.now() - Number(snap.lastTickAt) > STALE_SNAPSHOT_MS) persistenceHealthy = false;
   } catch {}
   const hhmm = (ms) => new Intl.DateTimeFormat("he-IL", {
     timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
@@ -611,7 +616,7 @@ async function handleTick(env, body) {
   const who = cfg.clientName ? `${cfg.clientName} · ` : "";
   // הגנת טריות גם לחיבור: חיבור ש־Wevo מתארכת ללפני 5+ דקות הוא קו־בסיס של
   // חימוש/מצב קפוא, לא אירוע חדש (אותה משפחת שידורים חוזרים כמו בניתוק).
-  const plugFresh = !st.plugInTime || Date.now() - Number(st.plugInTime) <= 5 * 60 * 1000;
+  const plugFresh = !st.plugInTime || Date.now() - Number(st.plugInTime) <= FRESH_MS;
   if (diff.plugIn && plugFresh) {
     try {
       await pushAndLog(decide.notifyPeakPlug ? {
@@ -647,7 +652,7 @@ async function handleTick(env, body) {
     // דיכוי חזרות: היפוכי Charging↔SuspendedEVSE לא מציפים — עצירה אחת ל־15 דקות לעסקה
     const stopKey = diff.chargeStop.txnId;
     const lastStop = cfg.lastStopPushAtMs && cfg.lastStopPushKey === stopKey ? cfg.lastStopPushAtMs : 0;
-    if (Date.now() - lastStop >= 900000) {
+    if (Date.now() - lastStop >= STOP_REPUSH_MS) {
       cfg.lastStopPushKey = stopKey;
       cfg.lastStopPushAtMs = Date.now();
       try {
@@ -670,7 +675,7 @@ async function handleTick(env, body) {
       const withOut = txs.filter(t => Number(t.plugOutTime) > 0)
         .sort((a, b) => Number(b.plugOutTime) - Number(a.plugOutTime));
       const outMs = withOut.length ? Number(withOut[0].plugOutTime) : 0;
-      if (outMs && Date.now() - outMs > 5 * 60 * 1000) staleReplay = true;
+      if (outMs && Date.now() - outMs > FRESH_MS) staleReplay = true;
     } catch {}
     if (!staleReplay) {
       try {
@@ -690,8 +695,8 @@ async function handleTick(env, body) {
   } else {
     cfg.flowSinceMs = null;
   }
-  if (cfg.fullNotifiedKey != null && cfg.lastFullAtMs && Date.now() - cfg.lastFullAtMs >= 600000 &&
-      cfg.flowSinceMs && Date.now() - cfg.flowSinceMs >= 180000) {
+  if (cfg.fullNotifiedKey != null && cfg.lastFullAtMs && Date.now() - cfg.lastFullAtMs >= HEARTBEAT_MS &&
+      cfg.flowSinceMs && Date.now() - cfg.flowSinceMs >= FLOW_STABLE_MS) {
     cfg.fullNotifiedKey = null;
   }
   const evKey = watchEventKey(st);
@@ -734,7 +739,7 @@ async function handleTick(env, body) {
     || prevStatus.connected !== status.connected
     || prevStatus.peak !== status.peak
     || JSON.stringify(prevStatus.lastAction || null) !== JSON.stringify(status.lastAction || null)
-    || Date.now() - Number(prevStatus.lastTickAt || 0) >= 10 * 60 * 1000;
+    || Date.now() - Number(prevStatus.lastTickAt || 0) >= HEARTBEAT_MS;
   if (statusChanged) {
     if (!await storePutJson(env, STATUS_KEY, status)) kvWriteFailed = true;
   }

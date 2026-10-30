@@ -87,6 +87,7 @@ ${body}
     findChargeStillOnStation: findChargeStillOnStation,
     pickFinishedWevoTx: pickFinishedWevoTx,
     stationStillCharging: stationStillCharging,
+    isWaitingForAuthorize: isWaitingForAuthorize,
     pickLiveChargeEndMs: pickLiveChargeEndMs,
     mergeWatchEvents: mergeWatchEvents,
     preferLiveStamps: preferLiveStamps,
@@ -128,6 +129,9 @@ var DUPLICATE_SAVE_WINDOW_MS = __EV_MONEY__.DUPLICATE_SAVE_WINDOW_MS;
 var DUPLICATE_DEDUP_WINDOW_MS = __EV_MONEY__.DUPLICATE_DEDUP_WINDOW_MS;
 var hasDebt = __EV_MONEY__.hasDebt;
 var hasCredit = __EV_MONEY__.hasCredit;
+var isSelfClient = __EV_MONEY__.isSelfClient;
+var BILLING_PREMIUM_START_H = __EV_MONEY__.BILLING_PREMIUM_START_H;
+var BILLING_PREMIUM_END_H = __EV_MONEY__.BILLING_PREMIUM_END_H;
 var knownCarPatchForName = __EV_MONEY__.knownCarPatchForName;
 var mergeByIdPreferNewer = __EV_MONEY__.mergeByIdPreferNewer;
 var normalizePayments = __EV_MONEY__.normalizePayments;
@@ -164,6 +168,7 @@ var openFollowsLiveCharge = __EV_MONEY__.openFollowsLiveCharge;
 var findChargeStillOnStation = __EV_MONEY__.findChargeStillOnStation;
 var pickFinishedWevoTx = __EV_MONEY__.pickFinishedWevoTx;
 var stationStillCharging = __EV_MONEY__.stationStillCharging;
+var isWaitingForAuthorize = __EV_MONEY__.isWaitingForAuthorize;
 var pickLiveChargeEndMs = __EV_MONEY__.pickLiveChargeEndMs;
 var mergeWatchEvents = __EV_MONEY__.mergeWatchEvents;
 var preferLiveStamps = __EV_MONEY__.preferLiveStamps;

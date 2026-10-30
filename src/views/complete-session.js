@@ -207,7 +207,7 @@ function CompleteSession({
           avgRateKW: fields.avgRateKW,
           maxRateKW: fields.maxRateKW,
           stopReason: fields.stopReason,
-          wevoOrigin: fields.origin,
+          wevoOrigin: fields.wevoOrigin,
           didCompleteFull: fields.didCompleteFull,
           wevoFlags: {
             ...(openSession.wevoFlags || {}),

@@ -111,7 +111,7 @@ function App() {
               await DB.set("ev_open", mergedOpen);
               if (r.data.config) {
                 try {
-                  localStorage.setItem("ev_config", JSON.stringify(r.data.config));
+                  localStorage.setItem(CONFIG_KEY, JSON.stringify(r.data.config));
                   await loadConfigFromStorage();
                 } catch {}
               }
@@ -172,6 +172,8 @@ function App() {
   paymentsRef.current = payments;
   const openSessRef = useRef(openSess);
   openSessRef.current = openSess;
+  const archivedUncatRef = useRef(archivedUncat);
+  archivedUncatRef.current = archivedUncat;
   const [cloudNeedSetup, setCloudNeedSetup] = useState(false);
   const [cloudNeedLogin, setCloudNeedLogin] = useState(false);
   const [cloudBusy, setCloudBusy] = useState(false);
@@ -182,6 +184,7 @@ function App() {
       sessions: sessionsRef.current,
       payments: paymentsRef.current,
       openSess: openSessRef.current,
+      archivedUncat: archivedUncatRef.current,
       config: typeof _configCache !== "undefined" ? _configCache : null
     });
     _cloudStatusHook = st => setCloudStatusUi(st || getCloudStatus());
@@ -205,23 +208,34 @@ function App() {
     const repaired = repairSelfSessions(carFix.clients, mergedSessions);
     const cloudSessions = dedupeSessionsByTxn(repaired.sessions);
     const mergedOpen = dropOpensAlreadySaved(mergeByIdPreferNewer(_cloudDataCache.openSess || openSessRef.current || [], data.openSess || []).map(item => repairWevoOpenRecord(item, Date.now(), readLiveStation())), cloudSessions);
+    // M14: איחוד לפי key — פריט שנארכב בכל מכשיר נשאר מאורכב (בלי איבוד נתונים).
+    const mergedArchivedUncat = (() => {
+      const byKey = new Map();
+      for (const e of [...(_cloudDataCache.archivedUncat || archivedUncatRef.current || []), ...(data.archivedUncat || [])]) {
+        if (e && e.key) byKey.set(e.key, e);
+      }
+      return [...byKey.values()];
+    })();
     setClients(carFix.clients);
     setSessions(cloudSessions);
     setPayments(mergedPayments);
     setOpenSess(mergedOpen);
+    setArchivedUncat(mergedArchivedUncat);
     rememberCloudCache({
       clients: carFix.clients,
       sessions: cloudSessions,
       payments: mergedPayments,
-      openSess: mergedOpen
+      openSess: mergedOpen,
+      archivedUncat: mergedArchivedUncat
     });
     await DB.set("ev_clients", carFix.clients);
     await DB.set("ev_sessions", cloudSessions);
     await DB.set("ev_payments", mergedPayments);
     await DB.set("ev_open", mergedOpen);
+    await DB.set("ev_archived_uncat", mergedArchivedUncat);
     if (data.config) {
       try {
-        localStorage.setItem("ev_config", JSON.stringify(data.config));
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(data.config));
         await loadConfigFromStorage();
       } catch {}
     }
@@ -780,23 +794,29 @@ function App() {
     try {
       const d = JSON.parse(json);
       let nextSessions = sessionsRef.current || [];
+      let importedClients = null;
       if (d.clients) {
         const carFix = applyKnownClientCars(d.clients);
+        importedClients = carFix.clients;
         setClients(carFix.clients);
         DB.set("ev_clients", carFix.clients);
         rememberCloudCache({ clients: carFix.clients });
       }
       if (d.sessions) {
-        nextSessions = dedupeSessionsByTxn(d.sessions);
+        // M4 (ביקורת 30.10): הייבוא עובר את אותו נרמול כמו נתוני ענן — בעבר
+        // נכנס גולמי, בלי תיקון עצמי ובלי נרמול תשלומים.
+        const clientsForRepair = importedClients || clientsRef.current || [];
+        nextSessions = dedupeSessionsByTxn(repairSelfSessions(clientsForRepair, d.sessions).sessions);
         sessionsRef.current = nextSessions;
         setSessions(nextSessions);
         DB.set("ev_sessions", nextSessions);
         rememberCloudCache({ sessions: nextSessions });
       }
       if (d.payments) {
-        setPayments(d.payments);
-        DB.set("ev_payments", d.payments);
-        rememberCloudCache({ payments: d.payments });
+        const normPayments = dedupeDuplicatePayments(normalizePayments(d.payments).payments).payments;
+        setPayments(normPayments);
+        DB.set("ev_payments", normPayments);
+        rememberCloudCache({ payments: normPayments });
       }
       if (d.openSess) {
         const opens = dropOpensAlreadySaved((d.openSess || []).map(item => repairWevoOpenRecord(item, Date.now(), readLiveStation())), nextSessions);
@@ -824,10 +844,10 @@ function App() {
         const d = new Date(s.date);
         return d.getMonth() === mo && d.getFullYear() === yr;
       });
-      const monthP = monthSs.reduce((a, s) => a + s.profit, 0);
+      const monthP = monthSs.reduce((a, s) => a + (Number(s.profit) || 0), 0);
       const monthCost = monthSs.reduce((a, s) => a + (Number(s.costToOwner) || 0), 0);
-      const totalP = ss.reduce((a, s) => a + s.profit, 0);
-      const totalCost = ss.reduce((a, s) => a + s.costToOwner, 0);
+      const totalP = ss.reduce((a, s) => a + (Number(s.profit) || 0), 0);
+      const totalCost = ss.reduce((a, s) => a + (Number(s.costToOwner) || 0), 0);
       const last = [...ss].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
       const lastActivityMs = clientLastActivityMs(c.id, sessions, openSess);
       const archived = isClientArchived(c);

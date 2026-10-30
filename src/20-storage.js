@@ -9,6 +9,10 @@ const CLOUD_PIN_KEY = "ev_cloud_pin";
 const CLOUD_UPDATED_KEY = "ev_cloud_updated";
 const CLOUD_STATUS_KEY = "ev_cloud_status";
 const WEVO_LOG_KEY = "ev_wevo_action_log";
+// B2 (ביקורת 30.10): מפתחות localStorage נוספים — קבוע אחד לכל מפתח.
+const CONFIG_KEY = "ev_config";
+const WEVO_CREDS_KEY = "ev_wevo_creds";
+const UNCAT_COUNT_KEY = "ev_uncat_count";
 let _cloudSaveTimer = null;
 let _cloudSaveHook = null; // () => snapshot | null — נקבע מ-App
 let _cloudStatusHook = null; // (status) => void — רענון UI
@@ -19,6 +23,7 @@ let _cloudDataCache = {
   sessions: null,
   payments: null,
   openSess: null,
+  archivedUncat: null,
   config: undefined
 };
 let _lastUploadedCounts = null;
@@ -41,6 +46,7 @@ function rememberCloudCache(partial = {}) {
   if (partial.sessions != null) _cloudDataCache.sessions = partial.sessions;
   if (partial.payments != null) _cloudDataCache.payments = partial.payments;
   if (partial.openSess != null) _cloudDataCache.openSess = partial.openSess;
+  if (partial.archivedUncat != null) _cloudDataCache.archivedUncat = partial.archivedUncat;
   if (partial.config !== undefined) _cloudDataCache.config = partial.config;
 }
 
@@ -138,6 +144,9 @@ function installAppServiceWorker() {
   } catch {}
 }
 
+// B2 (ביקורת 30.10): שני מפתחות URL דומים — לא לבלבל ביניהם:
+// ev_data_sync_url = גיבוי הענן (data-sync, קובץ זה);
+// ev_wevo_sync_url = גשר Wevo (wevo-sync, ב־40-wevo-sync.js).
 function dataSyncUrl() {
   try {
     const custom = localStorage.getItem("ev_data_sync_url");
@@ -358,6 +367,7 @@ const DB = {
     else if (k === "ev_sessions") rememberCloudCache({ sessions: v });
     else if (k === "ev_payments") rememberCloudCache({ payments: v });
     else if (k === "ev_open") rememberCloudCache({ openSess: v });
+    else if (k === "ev_archived_uncat") rememberCloudCache({ archivedUncat: v });
     scheduleCloudSave();
   }
 };

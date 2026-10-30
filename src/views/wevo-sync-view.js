@@ -14,7 +14,7 @@ function WevoSyncView({
 }) {
   const saved = (() => {
     try {
-      return JSON.parse(localStorage.getItem("ev_wevo_creds") || "{}");
+      return JSON.parse(localStorage.getItem(WEVO_CREDS_KEY) || "{}");
     } catch {
       return {};
     }
@@ -53,12 +53,12 @@ function WevoSyncView({
       }
       try {
         if (remember) {
-          localStorage.setItem("ev_wevo_creds", JSON.stringify({
+          localStorage.setItem(WEVO_CREDS_KEY, JSON.stringify({
             email: email.trim(),
             password
           }));
         } else {
-          localStorage.setItem("ev_wevo_creds", JSON.stringify({
+          localStorage.setItem(WEVO_CREDS_KEY, JSON.stringify({
             email: email.trim()
           }));
         }
@@ -90,7 +90,7 @@ function WevoSyncView({
     setBusy(true);
     try {
       try {
-        localStorage.setItem("ev_wevo_creds", JSON.stringify({
+        localStorage.setItem(WEVO_CREDS_KEY, JSON.stringify({
           email: email.trim(),
           password
         }));

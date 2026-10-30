@@ -1,12 +1,12 @@
-import { json, optionsResponse, cognitoLogin, requestOrigin } from "../_shared/wevo.js";
-import { loadVapidJwk, vapidPublicKey } from "../_shared/push.js";
+import { json, optionsResponse, cognitoLogin, requestOrigin, verifyCreds } from "../_shared/wevo.js";
+import { loadVapidJwk, vapidPublicKey, PUSH_SUBS_KEY } from "../_shared/push.js";
 
 // מנויי Web Push — התראות כשהאפליקציה סגורה.
 // GET: מחזיר את מפתח ה־VAPID הציבורי (נגזר מהפרטי ב־env). בלי מפתח מוגדר → 503.
 // POST subscribe/unsubscribe: מאומתים בהתחברות Cognito אמיתית (כמו שומר הפרימיום).
 // המנויים נשמרים ב־KV ‏(EV_BACKUP, מפתח push:subs) — endpoint + מפתחות הצפנה של הדפדפן בלבד.
 
-const SUBS_KEY = "push:subs";
+const SUBS_KEY = PUSH_SUBS_KEY;
 
 export async function onRequestGet(context) {
   const jwk = loadVapidJwk(context.env);
@@ -18,15 +18,6 @@ export async function onRequestGet(context) {
 
 export function onRequestOptions(context) {
   return optionsResponse(requestOrigin(context));
-}
-
-async function verifyCreds(email, password) {
-  if (!email || !password) {
-    const err = new Error("חסרים אימייל או סיסמה");
-    err.status = 400;
-    throw err;
-  }
-  await cognitoLogin(email, password);
 }
 
 function validSubscription(sub) {

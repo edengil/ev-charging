@@ -7,12 +7,12 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 
-const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
-const fnPath = path.resolve(root, "netlify/functions/wevo-sync.js");
+// M38 (ביקורת 30.10): שרת ה־e2e טוען את פונקציית הייצור (Pages), לא את
+// כפיל ה־Netlify הישן — עץ netlify/ נמחק.
+const fnPath = path.resolve(root, "functions/api/wevo-sync.js");
 const PORT = Number(process.env.E2E_PORT || 8787);
 const MOCK = process.env.E2E_MOCK === "1" || process.env.E2E_MOCK === "true";
 
@@ -184,7 +184,9 @@ function handleMockWevo(body) {
     const call = {
       confirmPremium,
       rawConfirmPremium: body.confirmPremium,
-      boost: body.boost === true,
+      // M34: שומרים את הערך הגולמי מהתיל — שדה שלא נשלח נשאר undefined, כדי
+      // שהבדיקה תוכל לאמת שהלקוח באמת לא שלח boost (נרמול לבוליאני שבר זאת).
+      boost: body.boost,
       at: Date.now()
     };
     wevoMock.lastAuthorize = call;
@@ -279,9 +281,23 @@ function handleMockDataSync(body) {
   return { error: `unknown action ${action}` };
 }
 
-function loadHandler() {
-  delete require.cache[fnPath];
-  return require(fnPath).handler;
+async function loadHandler() {
+  // פונקציית הייצור היא ESM בסגנון Pages (onRequestPost עם context) —
+  // מתאימים אותה לצורת ה־handler שהשרת מצפה לה ({statusCode, body, headers}).
+  const mod = await import(`file://${fnPath}?t=${Date.now()}`);
+  return async ({ httpMethod, headers, body }) => {
+    const request = new Request("http://127.0.0.1/api/wevo-sync", {
+      method: httpMethod || "POST",
+      headers: headers || {},
+      body: httpMethod === "POST" ? body : undefined
+    });
+    const resp = await mod.onRequestPost({ request, env: {} });
+    const hdrs = {};
+    resp.headers.forEach((v, k) => {
+      hdrs[k] = v;
+    });
+    return { statusCode: resp.status, body: await resp.text(), headers: hdrs };
+  };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -306,7 +322,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     try {
-      const handler = loadHandler();
+      const handler = await loadHandler();
       const out = await handler({
         httpMethod: req.method,
         headers: req.headers,

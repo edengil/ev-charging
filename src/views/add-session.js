@@ -271,6 +271,10 @@ function AddSession({
       id: uid(),
       clientId: cid,
       date: dt,
+      // M5 (ביקורת 30.10): גם שמירה ידנית נושאת endDate/durMin כמו האשף —
+      // בעבר חסרו, ומסנני טווח וסטטיסטיקות משך פספסו את הרשומות האלה.
+      endDate: edt || null,
+      durMin: durMins > 0 ? durMins : null,
       ...prev,
       source: "manual",
       notes

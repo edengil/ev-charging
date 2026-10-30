@@ -19,10 +19,14 @@ const DEFAULT_CONFIG = {
   ownerPeakEndMin: 23 * 60,
   inflation: 1.21 // ניפוח קוט״ש לגבייה (1.21 = +21%)
 };
-const PREM_S = 16,
-  PREM_E = 23;
-const OWNER_PS = 17,
-  OWNER_PE = 23;
+// M24 (ביקורת 30.10): חלון הגבייה נגזר מקבועי ה־lib — מקור אחד ל"מה מחויב"
+// ול"מתי החלונות רלוונטיים". חלון פיק הבעלים שונה במכוון (17:00) מחלון
+// הגבייה (16:00) — לא לאחד ביניהם.
+const PREM_S = typeof BILLING_PREMIUM_START_H !== "undefined" ? BILLING_PREMIUM_START_H : 16,
+  PREM_E = typeof BILLING_PREMIUM_END_H !== "undefined" ? BILLING_PREMIUM_END_H : 23;
+// M25: חלון הבעלים נגזר מ־DEFAULT_CONFIG — מקור אחד.
+const OWNER_PS = DEFAULT_CONFIG.ownerPeakStartMin / 60,
+  OWNER_PE = DEFAULT_CONFIG.ownerPeakEndMin / 60;
 let _configCache = { ...DEFAULT_CONFIG };
 let _configListeners = [];
 function getConfig() {
@@ -38,7 +42,7 @@ function inflationPctLabel() {
 function persistConfig(cfg) {
   _configCache = { ..._configCache, ...cfg };
   _configListeners.forEach(fn => fn(_configCache));
-  try { localStorage.setItem("ev_config", JSON.stringify(_configCache)); } catch {}
+  try { localStorage.setItem(CONFIG_KEY, JSON.stringify(_configCache)); } catch {}
   // M12+M13 (ביקורת 30.10): שינוי תעריפים מגובה לענן כמו כל שינוי נתונים,
   // ומטמון הענן מתעדכן לאותו ערך — שלא ישמור config ישן על חדש.
   if (typeof rememberCloudCache === "function") rememberCloudCache({ config: _configCache });
@@ -46,7 +50,7 @@ function persistConfig(cfg) {
 }
 async function loadConfigFromStorage() {
   try {
-    const v = localStorage.getItem("ev_config");
+    const v = localStorage.getItem(CONFIG_KEY);
     if (v) {
       _configCache = { ...DEFAULT_CONFIG, ...JSON.parse(v) };
       _configListeners.forEach(fn => fn(_configCache));
@@ -155,19 +159,36 @@ function calcSession(kwhRaw, startDt, endDt = null, forceReg = false, forcePrem 
 }
 
 /** שעות פיק Wevo (עלות בעלים) — החלון מלוח Wevo החי, ימי חול בלבד */
+/** M31 (ביקורת 30.10): חלקי־זמן בשעון ישראל — חלונות המטען חיים ב־Asia/Jerusalem
+ * (כמו השומר בשרת), גם כשהטלפון בחו״ל; בעבר הפאנל השתמש בשעון המכשיר
+ * והחלונות זזו בנסיעות. */
+function jerusalemParts(d = new Date()) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Jerusalem",
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(d);
+    const get = t => (parts.find(p => p.type === t) || {}).value;
+    const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    return {
+      day: dayMap[get("weekday")],
+      minutes: (Number(get("hour")) % 24) * 60 + Number(get("minute"))
+    };
+  } catch {
+    return { day: d.getDay(), minutes: d.getHours() * 60 + d.getMinutes() };
+  }
+}
+
 function isOwnerPeakNow(d = new Date()) {
-  const day = d.getDay();
-  if (day === 5 || day === 6) return false;
-  const m = d.getHours() * 60 + d.getMinutes();
+  const jp = jerusalemParts(d);
+  if (jp.day === 5 || jp.day === 6) return false;
+  const m = jp.minutes;
   const w = ownerPeakWindow();
   if (m >= w.startMin && m < Math.min(w.endMin, 1440)) return true;
   return w.endMin > 1440 && m < w.endMin - 1440;
-}
-
-/** שעות פרימיום לגבייה מלקוחות — 16:00–23:00 */
-function isBillingPeakNow(d = new Date()) {
-  const h = d.getHours() + d.getMinutes() / 60;
-  return h >= PREM_S && h < PREM_E;
 }
 
 function timelineHintsFromOpenOrSession(o = {}) {

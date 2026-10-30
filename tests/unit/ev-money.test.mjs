@@ -41,6 +41,7 @@ import {
   shouldCloseStaleWevoOpen,
   openChargeStatus,
   stationStillCharging,
+  isWaitingForAuthorize,
   pickLiveChargeEndMs,
   monthlyCollection,
   resolveChargeTimeline,
@@ -257,6 +258,40 @@ describe("cloud merge + wipe guard", () => {
     );
     assert.equal(snap.payments.length, 1);
     assert.equal(snap.clients.length, 1);
+  });
+
+  it("M14: סנאפשוט נושא archivedUncat — מהמטמון, ואחריו מה־hook", () => {
+    const fromCache = buildCloudSnapFromParts(
+      { archivedUncat: [{ key: "k1" }] },
+      { archivedUncat: [{ key: "k2" }] },
+      null
+    );
+    assert.deepEqual(fromCache.archivedUncat, [{ key: "k1" }]);
+    const fromHook = buildCloudSnapFromParts({}, { archivedUncat: [{ key: "k2" }] }, null);
+    assert.deepEqual(fromHook.archivedUncat, [{ key: "k2" }]);
+    const empty = buildCloudSnapFromParts({}, null, null);
+    assert.deepEqual(empty.archivedUncat, []);
+  });
+});
+
+describe("מסווגי תחנה — מקור אחד ב־lib (M15)", () => {
+  it("stationStillCharging: רק שלושת מצבי הזרימה", () => {
+    assert.equal(stationStillCharging({ state: "Charging" }), true);
+    assert.equal(stationStillCharging({ state: "SuspendedEV" }), true);
+    assert.equal(stationStillCharging({ state: "SuspendedEVSE" }), true);
+    assert.equal(stationStillCharging({ state: "Finishing" }), false);
+    assert.equal(stationStillCharging({ state: "Preparing" }), false);
+    assert.equal(stationStillCharging(null), false);
+  });
+
+  it("isWaitingForAuthorize: רכב ממתין, לא טוען, לא מסיים", () => {
+    assert.equal(isWaitingForAuthorize({ state: "Preparing" }, []), true);
+    assert.equal(isWaitingForAuthorize({ state: "Occupied", waitingAuthorize: false }, []), true);
+    assert.equal(isWaitingForAuthorize({ state: "Charging", rateKw: 7.2 }, []), false);
+    assert.equal(isWaitingForAuthorize({ state: "SuspendedEVSE" }, []), false);
+    assert.equal(isWaitingForAuthorize({ state: "Finishing", waitingAuthorize: true }, []), false);
+    assert.equal(isWaitingForAuthorize({ state: "Available" }, []), false);
+    assert.equal(isWaitingForAuthorize(null, []), false);
   });
 });
 
@@ -830,7 +865,9 @@ describe("app-source drift guards", () => {
   it("בונה payload חי אחד משותף למנוע הסנכרון ולפאנל (שלב A)", () => {
     const src = readAppBundle();
     assert.match(src, /function buildLiveOpenPayload/);
-    assert.equal((src.match(/delayCharge: !!\(st/g) || []).length, 1);
+    // טביעת האצבע של הבונה: שורת wevoFlags היחידה (B10, ביקורת 30.10: הצטמצמה
+    // ל־isBoost בלבד — בעבר הטביעה הייתה delayCharge).
+    assert.equal((src.match(/isBoost: !!\(st && st\.isBoost\)/g) || []).length, 1);
     assert.equal((src.match(/buildLiveOpenPayload\(st, clientId, existing, clientsRef/g) || []).length, 2);
   });
 

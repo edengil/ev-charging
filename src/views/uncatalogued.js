@@ -77,7 +77,7 @@ function UncataloguedView({
   }, [txs, sessions, opens, archivedSet]);
   useEffect(() => {
     try {
-      localStorage.setItem("ev_uncat_count", String(list.length));
+      localStorage.setItem(UNCAT_COUNT_KEY, String(list.length));
       localStorage.setItem("ev_uncat_ts", String(Date.now()));
     } catch (e) {}
   }, [list]);

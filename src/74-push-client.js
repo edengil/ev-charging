@@ -21,7 +21,7 @@ async function ensurePushSubscription() {
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     let creds = {};
     try {
-      creds = JSON.parse(localStorage.getItem("ev_wevo_creds") || "{}");
+      creds = JSON.parse(localStorage.getItem(WEVO_CREDS_KEY) || "{}");
     } catch {}
     if (!creds.email || !creds["pass" + "word"]) return;
     const reg = await navigator.serviceWorker.ready;

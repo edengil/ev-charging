@@ -5,6 +5,7 @@
  * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
  */
 // ── Wevo sync helpers ──────────────────────────────────────────────────────
+// B2: ev_wevo_sync_url = גשר Wevo; ev_data_sync_url (ב־20-storage.js) = גיבוי ענן.
 function wevoSyncUrl() {
   try {
     const custom = localStorage.getItem("ev_wevo_sync_url");
@@ -15,7 +16,7 @@ function wevoSyncUrl() {
 
 function getWevoCreds() {
   try {
-    return JSON.parse(localStorage.getItem("ev_wevo_creds") || "{}");
+    return JSON.parse(localStorage.getItem(WEVO_CREDS_KEY) || "{}");
   } catch {
     return {};
   }
@@ -201,23 +202,12 @@ function buildLiveOpenPayload(st, clientId, existing, clients) {
     updatedAt: new Date().toISOString(),
     avgRateKW: st && st.avgRateKW != null ? Number(st.avgRateKW) : existing && existing.avgRateKW,
     maxRateKW: st && st.maxRateKW != null ? Number(st.maxRateKW) : existing && existing.maxRateKW,
+    // B10 (ביקורת 30.10): רק isBoost נקרא מהאובייקט הזה (באשף) — שאר הדגלים
+    // נקראים מהמצב החי (st) ישירות, לא מהרשומה הפתוחה.
     wevoFlags: {
-      delayCharge: !!(st && st.delayCharge),
-      manageCharge: !!(st && st.manageCharge),
-      isWaitingAllocation: !!(st && st.isWaitingAllocation),
-      isBoost: !!(st && st.isBoost),
-      inWindow: st && st.inWindow,
-      solarChargingType: st && st.solarChargingType || null
+      isBoost: !!(st && st.isBoost)
     }
   }, st);
-}
-
-/** אותה עסקה, גם אם סומנה בטעות כמוכנה לאישור בזמן שהעמדה עדיין טוענת. */
-function findLiveTxnOpen(opens, st) {
-  const txn = st && st.transactionId != null && String(st.transactionId) !== "" ? String(st.transactionId) : null;
-  if (!txn) return findActiveWevoOpen(opens, st);
-  const list = (opens || []).filter(o => wevoOpenTxnId(o) === txn);
-  return list.find(o => !o.readyToComplete && !o.wevoEnded) || list[0] || null;
 }
 
 /** מי מטעין: אותה עסקה, גם אם סומנה בטעות כמוכנה, או הטעינה הפעילה היחידה. */
@@ -391,10 +381,11 @@ function txToEndFields(tx, fallback = {}) {
     // ב2 (18.10): האם הסיום נגזר מקירוב — אין אף מקור סיום פיזי (לא חותמת
     // full, לא סיום מאומת, לא סיום שמור). רשומה כזו מסומנת בתגית אזהרה.
     endApprox: !(fallback.verifiedEndAt || fallback.chargeEndedAt || fallback.chargingFullTime || (tx && tx.chargingFullTime)),
-    origin: tx && (tx.originStr || tx.origin) || fallback.origin || null,
+    // B10 (ביקורת 30.10): שם אחד למקור — wevoOrigin, כמו ברשומות. בעבר נקרא
+    // כאן origin וה־fallback.origin מעולם לא נכתב בשום מקום (תמיד undefined).
+    wevoOrigin: tx && (tx.originStr || tx.origin) || fallback.wevoOrigin || null,
     didCompleteFull: !!(tx && tx.didCompleteFull),
-    isBoost: !!(tx && tx.isBoost),
-    chargingCost: tx && tx.chargingCost != null ? Math.round(Number(tx.chargingCost) * 100) / 100 : null
+    isBoost: !!(tx && tx.isBoost)
   };
 }
 
@@ -439,12 +430,10 @@ async function fetchWevoFinalForOpen(open, opts = {}) {
   return lastFields;
 }
 
-function isSelfClient(c) {
-  if (!c) return false;
-  if (c.self === true) return true;
-  return /עדן/.test(c.name) && (/עצמי/.test(c.name) || /🔒/.test(c.name));
-}
-
+// M29 (ביקורת 30.10): המימוש של isSelfClient חי רק ב־lib/ev-payments.mjs —
+// העותק שהיה כאן נמחק; הבאנדל חושף אותו כגלובל דרך scripts/inject-app.mjs
+// (var isSelfClient = __EV_MONEY__.isSelfClient). בלי שורת החשיפה הזו כל
+// קריאה חשופה קורסת ב־ReferenceError והאפליקציה לא עולה (נתפס ב־e2e של גל 5).
 function selfClientIds(clients) {
   return new Set((clients || []).filter(isSelfClient).map(c => c.id));
 }
@@ -706,7 +695,8 @@ function mergeWevoTransactions(clients, sessions, transactions, openSess = []) {
 
   const linked = new Set();
   const wevoIds = new Set();
-  const sameChargeWindowMs = 36 * 60 * 60 * 1000;
+  // M26: חלון "אותה טעינה" — הקבוע הקנוני SAME_CHARGE_WINDOW_MS מ־lib/ev-money-core.
+  const sameChargeWindowMs = SAME_CHARGE_WINDOW_MS;
   sessions.forEach(s => {
     const id = chargeTxnId(s);
     if (!id) return;
@@ -775,8 +765,7 @@ function mergeWevoTransactions(clients, sessions, transactions, openSess = []) {
       stopReason: tx.stopReason || null,
       wevoOrigin: tx.originStr || tx.origin || null,
       didCompleteFull: !!tx.didCompleteFull,
-      isBoost: !!tx.isBoost,
-      chargingCost: tx.chargingCost != null ? Math.round(Number(tx.chargingCost) * 100) / 100 : null
+      isBoost: !!tx.isBoost
     });
     wevoIds.add(tid);
     added++;

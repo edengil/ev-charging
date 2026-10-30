@@ -30,7 +30,7 @@ function WevoLivePanel({
   const [preAuthPremium, setPreAuthPremium] = useState(false);
   const [premiumContinue, setPremiumContinue] = useState(false);
   const [watchInfo, setWatchInfo] = useState(null);
-  // אבחון זמני: גילוי פקודת הפרימיום האמיתית של Wevo
+  // אבחון: גילוי פקודת הפרימיום האמיתית של Wevo
   const [probeResults, setProbeResults] = useState(null);
   const [probeBusy, setProbeBusy] = useState(false);
   const runProbe = async () => {
@@ -85,7 +85,8 @@ function WevoLivePanel({
   const authIntentRef = useRef(authIntent);
   authIntentRef.current = authIntent;
   const autoAttemptsRef = useRef((authIntent && authIntent.attempts) || 0);
-  const preAuthQueuedRef = useRef(!!(authIntent && authIntent.queued));
+  // M16 (ביקורת 30.10): אין יותר preAuthQueuedRef — "בתור לרגיל" נגזר רק
+  // מ־authIntent.queued (מקור אמת אחד; בעבר ref־מראה סונכרן ידנית ב־5 נקודות והתפצל).
   const peakWasRef = useRef(isOwnerPeakNow());
   const wasChargingRef = useRef(false);
   const tryAuthKickRef = useRef(null);
@@ -119,11 +120,9 @@ function WevoLivePanel({
     authIntentRef.current = norm;
     if (norm) {
       autoAttemptsRef.current = norm.attempts || 0;
-      preAuthQueuedRef.current = !!norm.queued;
       setAuthAttemptsUi(norm.attempts || 0);
     } else {
       autoAttemptsRef.current = 0;
-      preAuthQueuedRef.current = false;
       setAuthAttemptsUi(0);
     }
     return norm;
@@ -191,20 +190,11 @@ function WevoLivePanel({
 
   const buildOpenPayload = (st, clientId, existing) => buildLiveOpenPayload(st, clientId, existing, clientsRef.current || []);
 
-  const isActuallyCharging = st => {
-    if (!st) return false;
-    const s = String(st.state || "");
-    // רק מצב מטען אמיתי — לא דגל charging ישן / עסקה פתוחה לפני אישור
-    return s === "Charging" || s === "SuspendedEV" || s === "SuspendedEVSE";
-  };
-
-  const isWaitingForAuthorize = st => {
-    if (!st || isActuallyCharging(st)) return false;
-    if (!chargerReportsVehicle(st, sessions)) return false;
-    const s = String(st.state || "");
-    if (s === "Finishing") return false;
-    return s === "Preparing" || s === "Occupied" || s === "Reserved" || !!st.waitingAuthorize;
-  };
+  // M15 (ביקורת 30.10): המסווגים חיים ב־lib בלבד (stationStillCharging
+  // ב־ev-opens, isWaitingForAuthorize ב־ev-misc). כאן רק כריכת ה־sessions של
+  // הקומפוננטה — בעבר היו כאן עותקי לוגיקה זהים שהיו עלולים להתפצל.
+  const isActuallyCharging = st => stationStillCharging(st);
+  const isWaitingForAuthorize = st => globalThis.isWaitingForAuthorize(st, sessions);
 
   const refresh = async () => {
     if (!hasCreds) return;
@@ -415,8 +405,12 @@ function WevoLivePanel({
         confirmPremium
       });
       const st = data.state || null;
-      if (st) setState(st);
-      else await refresh();
+      // M19 (ביקורת 30.10): כל דגימת תחנה מעדכנת גם את הסנאפשוט המודולרי —
+      // בעבר ה־authorize עדכן רק state מקומי ושער הסגירה החליט על מצב ישן.
+      if (st) {
+        rememberLiveStation(st);
+        setState(st);
+      } else await refresh();
       const finalState = st || stateRef.current;
       const clientId = cidRef.current;
       if (clientId && chargerReportsVehicle(finalState, sessions)) {
@@ -439,7 +433,6 @@ function WevoLivePanel({
         return "first-done";
       }
       if (offPeakMode && isOffPeakPreauthQueuedOk(finalState, isOwnerPeakNow())) {
-        preAuthQueuedRef.current = true;
         const cur = authIntentRef.current;
         if (cur && cur.mode === "offpeak-preauth") {
           persistIntent({
@@ -506,7 +499,9 @@ function WevoLivePanel({
     if (!id) return;
     const picked = (clientsRef.current || []).find(c => c.id === id);
     // שיוך מיידי כשיש רכב/עסקה
-    if (state && (state.connected || state.charging || state.waitingAuthorize || state.transactionId || isWaitingForAuthorize(state) || isActuallyCharging(state))) {
+    // M17 (ביקורת 30.10): החלטות "חי/טוען/יש רכב" רק דרך המסווגים — לא דרך
+    // הדגלים הגולמיים (charging/connected יכולים להיות תקועים ולא מסונכרנים למצב).
+    if (state && (state.transactionId || chargerReportsVehicle(state, sessions) || isWaitingForAuthorize(state) || isActuallyCharging(state))) {
       const existing = findActiveWevoOpen(openRef.current, state);
       onUpsertOpen(buildOpenPayload(state, id, existing));
     }
@@ -534,8 +529,12 @@ function WevoLivePanel({
   }, [linkedOpen && linkedOpen.id, linkedOpen && linkedOpen.clientId]);
 
   useEffect(() => {
-    if (state && !isWaitingForAuthorize(state) && !isActuallyCharging(state) && !state.connected) {
-      autoAttemptsRef.current = 0;
+    if (state && !isWaitingForAuthorize(state) && !isActuallyCharging(state) && !chargerReportsVehicle(state, sessions)) {
+      // M18: איפוס המונה עובר דרך persistIntent כשיש כוונה עם ניסיונות —
+      // בעבר רק ה־ref אופס וה־UI/האחסון נשארו עם המונה הישן.
+      const cur = authIntentRef.current;
+      if (cur && (cur.attempts || 0) > 0) persistIntent({ ...cur, attempts: 0 });
+      else autoAttemptsRef.current = 0;
     }
   }, [state && state.state, state && state.connected, state && state.charging]);
 
@@ -578,7 +577,7 @@ function WevoLivePanel({
       }
 
       const peakNowLive = isOwnerPeakNow();
-      if (intent.mode === "offpeak-preauth" && (intent.queued || preAuthQueuedRef.current) && peakNowLive) {
+      if (intent.mode === "offpeak-preauth" && intent.queued && peakNowLive) {
         // כבר בתור לרגיל — לא לוחצים שוב על פרימיום
         schedule(12000);
         return;
@@ -586,7 +585,7 @@ function WevoLivePanel({
 
       // המטען בתזמון Wevo מחוץ לחלון הרגיל — authorize לא יתחיל טעינה.
       // לא מנסים עיוורת כל 4 שניות; מחכים להחלטת המשתמש (באנר) או לחלון.
-      // ניסיון ידני ("נסה עקיפה") כן מבצע ניסיון אחד עם דגל boost.
+      // ניסיון ידני ("נסה עקיפה") כן מבצע ניסיון authorize אחד נקי.
       if (intent.mode === "full-now" && isScheduleBlocked(st) && !forceAttemptRef.current) {
         setErr("");
         schedule(15000);
@@ -594,9 +593,8 @@ function WevoLivePanel({
       }
       forceAttemptRef.current = false;
 
-      autoAttemptsRef.current += 1;
-      const attempt = autoAttemptsRef.current;
-      setAuthAttemptsUi(attempt);
+      // M18: persistIntent הוא הכותב היחיד — הוא מסנכרן ref + UI מהערך הנשמר.
+      const attempt = (autoAttemptsRef.current || 0) + 1;
       persistIntent({
         ...intent,
         attempts: attempt,
@@ -613,12 +611,10 @@ function WevoLivePanel({
         return;
       }
       if (ok === "queued") {
-        preAuthQueuedRef.current = true;
         schedule(12000);
         return;
       }
       if (ok && stateRef.current && isActuallyCharging(stateRef.current)) {
-        autoAttemptsRef.current = 0;
         clearAuthIntent("טעינה התחילה");
         return;
       }
@@ -645,14 +641,15 @@ function WevoLivePanel({
     };
 
     tryAuthKickRef.current = () => {
-      autoAttemptsRef.current = Math.max(0, autoAttemptsRef.current - 1);
+      // M18: החזר ניסיון עובר דרך persistIntent — לא כתיבת ref ישירה.
+      const cur = authIntentRef.current;
+      if (cur && (cur.attempts || 0) > 0) persistIntent({ ...cur, attempts: cur.attempts - 1 });
       forceAttemptRef.current = true;
       schedule(120);
     };
 
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
-      autoAttemptsRef.current = Math.max(0, autoAttemptsRef.current);
       schedule(200);
       refresh();
     };
@@ -677,8 +674,7 @@ function WevoLivePanel({
     const peak = isOwnerPeakNow();
     const was = peakWasRef.current;
     peakWasRef.current = peak;
-    if (was && !peak && isOffPeakIntent && (preAuthQueuedRef.current || authIntent && authIntent.queued)) {
-      preAuthQueuedRef.current = false;
+    if (was && !peak && isOffPeakIntent && authIntent && authIntent.queued) {
       const cur = authIntentRef.current;
       if (cur) {
         persistIntent({
@@ -708,7 +704,7 @@ function WevoLivePanel({
 
   // המסך נשאר דלוק בזמן חיבור או אישור מראש, כדי שהסנכרון ימשיך
   useEffect(() => {
-    const live = !!(state && (state.connected || state.charging || state.waitingAuthorize || isWaitingForAuthorize(state) || isActuallyCharging(state)));
+    const live = !!(state && (state.transactionId || chargerReportsVehicle(state, sessions) || isWaitingForAuthorize(state) || isActuallyCharging(state)));
     if (!intentArmed && !live) {
       if (wakeLockRef.current) {
         wakeLockRef.current.release().catch(() => {});
@@ -752,11 +748,11 @@ function WevoLivePanel({
     const onIntent = ev => {
       if (selfIntentEventRef.current) return; // אקו של persistIntent עצמי — לא בועטים
       const next = ev && ev.detail !== undefined ? normalizeWevoAuthIntent(ev.detail) : getWevoAuthIntent();
-      setAuthIntentUi(next);
-      authIntentRef.current = next;
+      // M18: גם כוונה חיצונית (דשבורד) עוברת דרך persistIntent — כותב יחיד
+      // ל־state+ref+מראות; בעבר האפקט איפס רק את מונה ה־ref וה־UI נשאר תקוע.
+      persistIntent(next ? { ...next, attempts: 0 } : null);
       if (next && next.clientId) {
         setCid(next.clientId);
-        autoAttemptsRef.current = 0;
         if (tryAuthKickRef.current) tryAuthKickRef.current();
       }
     };
@@ -1228,7 +1224,7 @@ function WevoLivePanel({
     selectedClient: selectedClient,
     peakNow: peakNow,
     authAttemptsUi: authAttemptsUi,
-    preAuthQueued: preAuthQueuedRef.current,
+    preAuthQueued: !!(authIntent && authIntent.queued),
     authIntentQueued: authIntent && authIntent.queued,
     preAuthPremium: preAuthPremium,
     premiumContinue: premiumContinue,
@@ -1284,7 +1280,7 @@ function WevoLivePanel({
     : isFirstAuthIntent
       ? `מאשר חיבור אוטומטית${authAttemptsUi ? ` · ${authAttemptsUi}` : ""}`
       : isOffPeakIntent
-        ? (authIntent && authIntent.queued || preAuthQueuedRef.current) && peakNow
+        ? (authIntent && authIntent.queued) && peakNow
           ? "🌙 ממתין לרגיל — אושר בלי פרימיום"
           : `ממשיך לנסות לרגיל${authAttemptsUi ? ` · ${authAttemptsUi}` : ""}`
         : `ממשיך לנסות כולל פרימיום${authAttemptsUi ? ` · ${authAttemptsUi}` : ""}`) : isSelfSelected || !cid ? /*#__PURE__*/React.createElement("button", {
@@ -1320,9 +1316,9 @@ function WevoLivePanel({
       background: "#f59e0b",
       padding: "11px 12px",
       flex: "1 1 140px",
-      opacity: st.connected || st.charging || st.transactionId ? 1 : 0.5
+      opacity: chargerReportsVehicle(st, sessions) || isActuallyCharging(st) || st.transactionId ? 1 : 0.5
     },
-    disabled: !(st.connected || st.charging || st.transactionId) || !cid,
+    disabled: !(chargerReportsVehicle(st, sessions) || isActuallyCharging(st) || st.transactionId) || !cid,
     onClick: () => assignOpen()
   }, linkedOpen ? "עדכן שיוך" : "פתח טעינה פתוחה"), lastAt && /*#__PURE__*/React.createElement("div", {
     style: {

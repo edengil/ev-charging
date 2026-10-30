@@ -10,7 +10,7 @@ const src = readFileSync(join(root, "functions/_shared/wevo.js"), "utf8");
 const dir = mkdtempSync(join(tmpdir(), "ev-wevo-"));
 const dest = join(dir, "wevo.mjs");
 writeFileSync(dest, src);
-const { normalizeState, pickLiveOngoing } = await import(pathToFileURL(dest).href);
+const { normalizeState, pickLiveOngoing, toMsTime } = await import(pathToFileURL(dest).href);
 rmSync(dir, { recursive: true, force: true });
 
 describe("getState sample", () => {
@@ -104,6 +104,32 @@ describe("normalizeState", () => {
     assert.equal(st.stopReason, "Remote");
     assert.equal(st.netDuration, 1200);
     assert.equal(st.charging, true);
+  });
+});
+
+describe("toMsTime — נרמול יחידות plugInTime (M32)", () => {
+  it("שניות מוכפלות ב־1000, מילישניות עוברות כמו שהן", () => {
+    assert.equal(toMsTime(1761624000), 1761624000000);
+    assert.equal(toMsTime(1761624000000), 1761624000000);
+    assert.equal(toMsTime("1761624000"), 1761624000000);
+  });
+
+  it("ערכים פסולים מחזירים null", () => {
+    assert.equal(toMsTime(null), null);
+    assert.equal(toMsTime(undefined), null);
+    assert.equal(toMsTime(0), null);
+    assert.equal(toMsTime("abc"), null);
+  });
+
+  it("normalizeState מנרמל plugInTime משניות למילישניות (גם ב־ongoing)", () => {
+    const st = normalizeState(
+      { state: "Charging", transactionData: { transactionId: 7, plugInTime: 1761624000 } },
+      { transactionId: 7, plugInTime: 1761624000, totalEnergyKwh: 3 },
+      "CHG1",
+      1
+    );
+    assert.equal(st.plugInTime, 1761624000000);
+    assert.equal(st.ongoing.plugInTime, 1761624000000);
   });
 });
 

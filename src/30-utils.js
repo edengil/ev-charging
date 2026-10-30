@@ -178,23 +178,6 @@ function toMs(v) {
 
 /* resolveChargeTimeline עבר ל־lib/ev-money.mjs (שלב C) — נחשף כגלובל מהבאנדל */
 
-/** תאימות לאחור — חלון ברירת מחדל: חיבור → סיום טעינה */
-function resolveBillingWindow(tx = {}, hints = {}) {
-  const t = resolveChargeTimeline(tx, hints);
-  return {
-    plugInAt: t.plugInAt,
-    chargeEndAt: t.chargeEndAt,
-    plugOutAt: t.plugOutAt,
-    billMins: t.billMins,
-    netMins: t.netMins,
-    plugInMs: t.plugInMs,
-    chargeEndMs: t.chargeEndMs,
-    plugOutMs: t.plugOutMs,
-    chargeStartAt: t.chargeStartAt,
-    chargeStartMs: t.chargeStartMs
-  };
-}
-
 const TIMELINE_LABELS = {
   plugIn: "חיבור כבל",
   chargeStart: "התחלת טעינה בפועל",
@@ -294,16 +277,6 @@ function waLink(phone, text) {
   if (p) q.set("phone", p);
   q.set("text", text || "");
   return `https://api.whatsapp.com/send?${q.toString()}`;
-}
-
-function isStandalonePwa() {
-  try {
-    if (typeof navigator !== "undefined" && navigator.standalone === true) return true;
-    if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) {
-      return true;
-    }
-  } catch {}
-  return false;
 }
 
 let _setWaDraft = null;

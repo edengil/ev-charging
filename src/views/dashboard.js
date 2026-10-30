@@ -102,7 +102,7 @@ function Dashboard({
   const debtCount = stats.filter(c => !c.isSelf && !c.hidden && hasDebt(c.balance)).length;
   const uncatCount = (() => {
     try {
-      return Number(localStorage.getItem("ev_uncat_count")) || 0;
+      return Number(localStorage.getItem(UNCAT_COUNT_KEY)) || 0;
     } catch (e) {
       return 0;
     }

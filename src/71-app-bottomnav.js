@@ -7,7 +7,7 @@
 function BottomNav({ view, go }) {
   const uncatCount = (() => {
     try {
-      return Number(window.localStorage.getItem("ev_uncat_count")) || 0;
+      return Number(window.localStorage.getItem(UNCAT_COUNT_KEY)) || 0;
     } catch {
       return 0;
     }

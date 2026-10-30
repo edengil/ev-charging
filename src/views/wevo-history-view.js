@@ -480,15 +480,20 @@ function WevoHistoryView({
     }
   }, label));
 
+  // M25 (ביקורת 30.10): כל ברירות המחדל נגזרות מ־DEFAULT_CONFIG ומהחלונות
+  // הקנוניים — בעבר היו כאן ליטרלים כפולים שהיו מתפצלים בעדכון מחיר הבא.
   const rateRows = (() => {
     if (isBilling) {
-      const off = Number(cfg.rateRegular) || 1.47;
-      const peak = Number(cfg.ratePremium) || 2.98;
-      return [["עכשיו - 16:00", off], ["16:00 - 23:00", peak], ["23:00 - 16:00 (+1)", off]];
+      const off = Number(cfg.rateRegular) || DEFAULT_CONFIG.rateRegular;
+      const peak = Number(cfg.ratePremium) || DEFAULT_CONFIG.ratePremium;
+      const s = `${PREM_S}:00`, e = `${PREM_E}:00`;
+      return [[`עכשיו - ${s}`, off], [`${s} - ${e}`, peak], [`${e} - ${s} (+1)`, off]];
     }
-    const off = Number(cfg.ownerOff) || 0.87;
-    const peak = Number(cfg.ownerPeak) || 2.08;
-    return [["עכשיו - 17:00", off], ["17:00 - 23:00", peak], ["23:00 - 17:00 (+1)", off]];
+    const off = Number(cfg.ownerOff) || DEFAULT_CONFIG.ownerOff;
+    const peak = Number(cfg.ownerPeak) || DEFAULT_CONFIG.ownerPeak;
+    const s = mhMin(cfg.ownerPeakStartMin != null ? cfg.ownerPeakStartMin : DEFAULT_CONFIG.ownerPeakStartMin);
+    const e = mhMin(cfg.ownerPeakEndMin != null ? cfg.ownerPeakEndMin : DEFAULT_CONFIG.ownerPeakEndMin);
+    return [[`עכשיו - ${s}`, off], [`${s} - ${e}`, peak], [`${e} - ${s} (+1)`, off]];
   })();
   const pageTitle = isBilling ? "היסטוריית חיוב" : "היסטוריית טעינה";
   const totalLabel = isBilling ? "Total billed · all time" : "Total charged · all time";

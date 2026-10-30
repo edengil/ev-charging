@@ -20,18 +20,9 @@ function WevoOpenLiveSync({
   const prevStateRef = useRef(null);
   const alertedReadyRef = useRef(new Set());
 
-  const isActuallyCharging = st => {
-    if (!st) return false;
-    const s = String(st.state || "");
-    return s === "Charging" || s === "SuspendedEV" || s === "SuspendedEVSE";
-  };
-  const isWaitingForAuthorize = st => {
-    if (!st || isActuallyCharging(st)) return false;
-    if (!chargerReportsVehicle(st, sessionsRefLive.current)) return false;
-    const s = String(st.state || "");
-    if (s === "Finishing") return false;
-    return s === "Preparing" || s === "Occupied" || s === "Reserved" || !!st.waitingAuthorize;
-  };
+  // M15: המסווגים חיים ב־lib בלבד — כאן רק כריכת sessionsRefLive.
+  const isActuallyCharging = st => stationStillCharging(st);
+  const isWaitingForAuthorize = st => globalThis.isWaitingForAuthorize(st, sessionsRefLive.current);
 
   const notifyReady = (existing, kwh) => {
     if (!existing || !existing.id) return;

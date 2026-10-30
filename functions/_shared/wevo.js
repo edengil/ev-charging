@@ -75,6 +75,17 @@ export async function cognitoLogin(email, password) {
   throw err;
 }
 
+/** אימות פרטי Wevo בלי פעולה נוספת — שער הכניסה לרישום שומר/מנויי push.
+ * M28 (ביקורת 30.10): מקור אחד — בעבר היו שני עותקים זהים ב־push.js וב־wevo-watch.js. */
+export async function verifyCreds(email, password) {
+  if (!email || !password) {
+    const err = new Error("חסרים אימייל או סיסמה");
+    err.status = 400;
+    throw err;
+  }
+  await cognitoLogin(email, password);
+}
+
 function authHeaders(token) {
   return { Authorization: `Bearer ${token}`, Accept: "application/json" };
 }
@@ -275,6 +286,15 @@ export function wsAuthorizePremium(token, charger, connector, { gapMs = 4000, ti
   });
 }
 
+/** M32 (ביקורת 30.10): נרמול חותמת זמן לגבול השרת — Wevo מחזירה plugInTime
+ * לפעמים בשניות ולפעמים במילישניות; הלקוח מצפה תמיד למילישניות. ערך מתחת
+ * ל־1e11 הוא שניות (1e11 מ״ש = 1973; 1e11 שניות = שנת 5138). */
+export function toMsTime(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n < 1e11 ? n * 1000 : n;
+}
+
 export function summarizeUser(userRaw) {
   if (!userRaw) return null;
   return {
@@ -291,6 +311,10 @@ export function summarizeUser(userRaw) {
  * עסקה פתוחה לשימוש רק אם היא העסקה של המצב החי.
  * הראשונה ברשימה עלולה להיות טעינה ישנה שעדיין מסומנת isOngoing.
  */
+// M26 (ביקורת 30.10): חלון "אותה טעינה" — אותו ערך כמו SAME_CHARGE_WINDOW_MS
+// ב־lib/ev-money-core.mjs (סביבת ה־functions לא יכולה לייבא את lib של הלקוח).
+const SAME_CHARGE_WINDOW_MS = 36 * 60 * 60 * 1000;
+
 export function pickLiveOngoing(list, raw) {
   const ongoing = (list || []).filter(t => t && t.isOngoing);
   if (!ongoing.length) return null;
@@ -311,9 +335,9 @@ export function pickLiveOngoing(list, raw) {
     if (!Number.isFinite(plug) || plug <= 0) return false;
     const ms = plug > 1e12 ? plug : plug * 1000;
     const age = now - ms;
-    return age >= -5 * 60 * 1000 && age <= 36 * 60 * 60 * 1000;
+    return age >= -5 * 60 * 1000 && age <= SAME_CHARGE_WINDOW_MS;
   });
-  fresh.sort((a, b) => (Number(b.plugInTime) || 0) - (Number(a.plugInTime) || 0));
+  fresh.sort((a, b) => (toMsTime(b.plugInTime) || 0) - (toMsTime(a.plugInTime) || 0));
   return fresh[0] || null;
 }
 
@@ -338,7 +362,7 @@ export function normalizeState(raw, ongoingTx, charger, connector) {
       : liveOngoing && liveOngoing.avgRateKW != null
         ? Number(liveOngoing.avgRateKW)
         : null;
-  const plugInTime = tx.plugInTime || (liveOngoing && liveOngoing.plugInTime) || null;
+  const plugInTime = toMsTime(tx.plugInTime) || toMsTime(liveOngoing && liveOngoing.plugInTime);
   const transactionId = vehiclePresent
     ? tx.transactionId || (liveOngoing && liveOngoing.transactionId) || null
     : null;
@@ -392,7 +416,7 @@ export function normalizeState(raw, ongoingTx, charger, connector) {
     ongoing: liveOngoing
       ? {
           transactionId: liveOngoing.transactionId,
-          plugInTime: liveOngoing.plugInTime,
+          plugInTime: toMsTime(liveOngoing.plugInTime),
           totalEnergyKwh: liveOngoing.totalEnergyKwh,
           totalCost: liveOngoing.totalCost,
           electricityCost: liveOngoing.electricityCost,
@@ -656,10 +680,10 @@ export async function handleWevoRequest(body) {
   }
 
   if (action === "probe-commands") {
-    // כלי אבחון זמני: מנסה לגלות את פקודת הפרימיום האמיתית של Wevo.
+    // כלי אבחון: מנסה לגלות את פקודת הפרימיום האמיתית של Wevo.
     // שולח פקודות WebSocket מועמדות אחת־אחת, עם timeout קצר, ומחזיר את התגובה הגולמית.
     // בטיחות: לא מבצע retry, לא שולח פקודות הרסניות (stop/reset), וכל פקודה נשלחת פעם אחת בלבד.
-    // מצומצם ל־6 המועמדות הסבירות ביותר עם timeout קצר כדי לא לחרוג ממגבלת השרת.
+    // מצומצם ל־7 המועמדות הסבירות ביותר עם timeout קצר כדי לא לחרוג ממגבלת השרת.
     const candidates = [
       "authorize",
       "startCharge",

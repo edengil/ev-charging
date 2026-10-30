@@ -98,6 +98,8 @@ async function writeSplit(kv, payload) {
   await putIfChanged(kv, "data:clients", JSON.stringify(payload.clients || []));
   await putIfChanged(kv, "data:payments", JSON.stringify(payload.payments || []));
   await putIfChanged(kv, "data:openSess", JSON.stringify(payload.openSess || []));
+  // M14 (ביקורת 30.10): גם פריטי הייבוא הארכיוניים מסונכרנים — בעבר חיו רק על מכשיר אחד.
+  await putIfChanged(kv, "data:archivedUncat", JSON.stringify(payload.archivedUncat || []));
   await putIfChanged(kv, "data:config", JSON.stringify(payload.config != null ? payload.config : null));
 }
 
@@ -112,6 +114,7 @@ async function readSplit(kv, meta) {
   const clients = await kv.get("data:clients", { type: "json" });
   const payments = await kv.get("data:payments", { type: "json" });
   const openSess = await kv.get("data:openSess", { type: "json" });
+  const archivedUncat = await kv.get("data:archivedUncat", { type: "json" });
   const config = await kv.get("data:config", { type: "json" });
   if (!Array.isArray(clients) || !Array.isArray(payments) || !Array.isArray(openSess)) {
     throw new Error("אחסון מפוצל פגום: אוספים חסרים");
@@ -121,6 +124,8 @@ async function readSplit(kv, meta) {
     sessions,
     payments,
     openSess,
+    // M14: מפתח חסר (גיבויים מלפני השדה) = רשימה ריקה, לא שגיאה.
+    archivedUncat: Array.isArray(archivedUncat) ? archivedUncat : [],
     config: config != null ? config : null,
     updatedAt: (meta && meta.updatedAt) || null
   };

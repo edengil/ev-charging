@@ -32,10 +32,10 @@ function StatsView({
       return d.getFullYear() === y && d.getMonth() === m;
     });
     const ssBiz = ssAll.filter(s => isNeighborSession(s, selfIds));
-    const income = ssBiz.reduce((a, s) => a + s.amountBilled, 0);
-    const expense = ssBiz.reduce((a, s) => a + s.costToOwner, 0);
-    const profit = ssBiz.reduce((a, s) => a + s.profit, 0);
-    const kwh = ssBiz.reduce((a, s) => a + s.kwhInflated, 0);
+    const income = ssBiz.reduce((a, s) => a + (Number(s.amountBilled) || 0), 0);
+    const expense = ssBiz.reduce((a, s) => a + (Number(s.costToOwner) || 0), 0);
+    const profit = ssBiz.reduce((a, s) => a + (Number(s.profit) || 0), 0);
+    const kwh = ssBiz.reduce((a, s) => a + (Number(s.kwhInflated) || 0), 0);
     return {
       income,
       expense,
@@ -57,9 +57,9 @@ function StatsView({
   const profitPrevMTD = profitMonthToDay(sessions, clients, prevPaceDate.getFullYear(), prevPaceDate.getMonth(), paceDay);
 
   const bizAll = sessions.filter(s => isNeighborSession(s, selfIds));
-  const allIncome = bizAll.reduce((a, s) => a + s.amountBilled, 0);
-  const allExpense = bizAll.reduce((a, s) => a + s.costToOwner, 0);
-  const allProfit = bizAll.reduce((a, s) => a + s.profit, 0);
+  const allIncome = bizAll.reduce((a, s) => a + (Number(s.amountBilled) || 0), 0);
+  const allExpense = bizAll.reduce((a, s) => a + (Number(s.costToOwner) || 0), 0);
+  const allProfit = bizAll.reduce((a, s) => a + (Number(s.profit) || 0), 0);
 
   const graphMonths = useMemo(() => {
     const ms = [...monthKeys].sort((a, b) => a.y !== b.y ? a.y - b.y : a.m - b.m).slice(-8);
@@ -79,8 +79,8 @@ function StatsView({
     const map = {};
     cur.sessions.forEach(s => {
       if (!map[s.clientId]) map[s.clientId] = { billed: 0, profit: 0, count: 0 };
-      map[s.clientId].billed += s.amountBilled;
-      map[s.clientId].profit += s.profit;
+      map[s.clientId].billed += Number(s.amountBilled) || 0;
+      map[s.clientId].profit += Number(s.profit) || 0;
       map[s.clientId].count += 1;
     });
     return Object.entries(map).map(([id, v]) => {
@@ -201,4 +201,3 @@ function StatsView({
     )
   );
 }
-

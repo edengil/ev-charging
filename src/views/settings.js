@@ -5,10 +5,8 @@
  * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
  */
 // ── SettingsView: עדכון תעריפים ─────────────────────────────────────────────
-function tariffMh(min) {
-  const m = ((Math.round(min) % 1440) + 1440) % 1440;
-  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-}
+// M30 (ביקורת 30.10): המרת דקות→"HH:MM" היא mhMin מ־40-wevo-sync — העותק
+// המקומי (tariffMh) נמחק.
 
 // שורת גרסה קטנה בתחתית מסך ההגדרות — מזהה מה פרוס בפועל באתר החי.
 function appVersionLabel() {
@@ -60,7 +58,7 @@ function SettingsView({
   useEffect(() => {
     if (getWevoCreds().email) void pullTariff(false);
   }, []);
-  const [inf, setInf] = useState(String(cfg.inflation != null ? cfg.inflation : 1.21));
+  const [inf, setInf] = useState(String(cfg.inflation != null ? cfg.inflation : DEFAULT_CONFIG.inflation));
   const valid = [rp, rr, op, oo, inf].every(v => v !== "" && !isNaN(parseFloat(v)) && parseFloat(v) > 0);
   return /*#__PURE__*/React.createElement("main", {
     style: S.main
@@ -162,7 +160,7 @@ function SettingsView({
       color: C.warnInk
     }
   }, "עלות בעלים (מה שאתה משלם)")), /*#__PURE__*/React.createElement(FG, {
-    lbl: `עלות פיק (${tariffMh(cfg.ownerPeakStartMin != null ? cfg.ownerPeakStartMin : 17 * 60)}–${tariffMh(cfg.ownerPeakEndMin != null ? cfg.ownerPeakEndMin : 23 * 60)}, ימי חול) ₪/קוט״ש`
+    lbl: `עלות פיק (${mhMin(cfg.ownerPeakStartMin != null ? cfg.ownerPeakStartMin : DEFAULT_CONFIG.ownerPeakStartMin)}–${mhMin(cfg.ownerPeakEndMin != null ? cfg.ownerPeakEndMin : DEFAULT_CONFIG.ownerPeakEndMin)}, ימי חול) ₪/קוט״ש`
   }, /*#__PURE__*/React.createElement("input", {
     style: S.inp,
     type: "number",
@@ -223,7 +221,7 @@ function SettingsView({
     style: {
       fontWeight: 700
     }
-  }, `${tariffMh(r.startMin)}–${r.endMin != null ? tariffMh(r.endMin) : "…"}`), /*#__PURE__*/React.createElement("span", null, `₪${r.rate.toFixed(2)}/קוט״ש`)))), live && /*#__PURE__*/React.createElement("div", {
+  }, `${mhMin(r.startMin)}–${r.endMin != null ? mhMin(r.endMin) : "…"}`), /*#__PURE__*/React.createElement("span", null, `₪${r.rate.toFixed(2)}/קוט״ש`)))), live && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12.5,
       fontWeight: 700,

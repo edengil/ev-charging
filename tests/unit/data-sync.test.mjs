@@ -91,6 +91,21 @@ describe("data-sync — ב5 אחסון מפוצל", () => {
     assert.deepEqual(load.body.data.config, DATA.config);
   });
 
+  it("M14: archivedUncat נכתב בפיצול וחוזר ב־load; גיבוי ישן בלי המפתח נטען עם []", async () => {
+    const env = makeEnv();
+    const data = { ...DATA, archivedUncat: [{ key: "tx-1" }, { key: "tx-2", assignedTo: "c1" }] };
+    const r = await call(env, { action: "setup", pin: PIN, data });
+    assert.equal(r.status, 200);
+    assert.ok(env.EV_BACKUP._map.has("data:archivedUncat"), "המפתח המפוצל נכתב");
+    const load = await call(env, { action: "load", pin: PIN });
+    assert.deepEqual(load.body.data.archivedUncat, data.archivedUncat);
+    // גיבוי מלפני M14: אין מפתח — load לא קורס ומחזיר רשימה ריקה
+    env.EV_BACKUP._map.delete("data:archivedUncat");
+    const legacy = await call(env, { action: "load", pin: PIN });
+    assert.equal(legacy.status, 200);
+    assert.deepEqual(legacy.body.data.archivedUncat, []);
+  });
+
   it("PIN שגוי נדחה ב־401 גם אחרי setup", async () => {
     const env = makeEnv();
     await call(env, { action: "setup", pin: PIN, data: DATA });
