@@ -250,7 +250,14 @@ async function recordWatchEvents(env, cfg, diff, nowMs) {
       return e;
     };
     if (diff.plugIn) { const e = touch(diff.plugIn.txnId); if (e.plugInAt == null) e.plugInAt = diff.plugIn.atMs; }
-    if (diff.chargeStart) { const e = touch(diff.chargeStart.txnId); if (e.chargeStartedAt == null) e.chargeStartedAt = diff.chargeStart.atMs; }
+    if (diff.chargeStart) {
+      const e = touch(diff.chargeStart.txnId);
+      if (e.chargeStartedAt == null) {
+        e.chargeStartedAt = diff.chargeStart.atMs;
+        // חותמת ההתחלה היא זמן־צפייה של הטיק, לא חותמת Wevo — מסומן כמקורב (B9)
+        e.chargeStartApprox = true;
+      }
+    }
     if (diff.full) {
       const e = touch(diff.full.txnId);
       if (diff.full.approx) {
@@ -264,12 +271,36 @@ async function recordWatchEvents(env, cfg, diff, nowMs) {
     }
     if (diff.chargeStop) { const e = touch(diff.chargeStop.txnId); if (e.chargeStoppedAt == null) e.chargeStoppedAt = diff.chargeStop.atMs; }
     if (diff.plugOut) { const e = touch(diff.plugOut.txnId); if (e.plugOutAt == null) e.plugOutAt = diff.plugOut.atMs; }
+    // M7 (ביקורת 30.10): מעבר זהות — העמדה החזירה קודם "0"/ריק (מפתח plug-… או
+    // watch-…) ואחר כך מזהה עסקה אמיתי: מאחדים את הרשומה הישנה לתוך החדשה,
+    // שלא יישארו שתי רשומות לאותה טעינה (הפאנל ממזג רק אחת מהן).
+    const oldKey = cfg && cfg.lastEventKey;
+    const diffKeys = [diff.plugIn, diff.chargeStart, diff.full, diff.chargeStop, diff.plugOut]
+      .filter(Boolean).map(d => d.txnId);
+    if (oldKey && (String(oldKey).startsWith("plug-") || String(oldKey).startsWith("watch-")) && all[oldKey]) {
+      const target = diffKeys.find(k => k && k !== oldKey && !String(k).startsWith("plug-") && !String(k).startsWith("watch-"));
+      if (target) {
+        const from = all[oldKey];
+        const to = touch(target);
+        for (const f of ["plugInAt", "chargeStartedAt", "chargingFullTime", "chargeEndedAt", "chargeStoppedAt", "plugOutAt"]) {
+          if (to[f] == null && from[f] != null) to[f] = from[f];
+        }
+        if (from.endApprox && to.endApprox == null) to.endApprox = true;
+        if (from.chargeStartApprox && to.chargeStartApprox == null) to.chargeStartApprox = true;
+        delete all[oldKey];
+      }
+    }
     const kept = Object.entries(all)
       .filter(([, e]) => nowMs - (e.updatedAt || 0) < 48 * 3600 * 1000)
       .sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0))
       .slice(0, 5);
     await storePutJson(env, EVENTS_KEY, Object.fromEntries(kept));
-  } catch {}
+  } catch (e) {
+    // M9 (ביקורת 30.10): בעבר ה־catch בלע הכול — כשלי שמירת אירועים היו בלתי נראים
+    try {
+      await pushLog(env, { kind: "events-error", detail: `שמירת אירועי שומר נכשלה: ${e && e.message || "שגיאה"}` });
+    } catch {}
+  }
 }
 
 async function verifyCreds(email, password) {
@@ -288,9 +319,15 @@ async function handleRegister(env, body) {
   const credsBlob = await encryptJson(env, { email, password });
   const existing = await loadCfg(env);
   const now = Date.now();
-  // שומר קבוע: persistent שורד חימושי פרימיום — חימוש פרימיום מתמזג לתוכו ולא דורס אותו.
-  const mergeIntoGuard = !!(existing && existing.persistent && body.premiumContinue === true);
-  const persistent = body.persistent === true || mergeIntoGuard;
+  // שומר קבוע: persistent שורד כל חימוש־על. H6+M6 (ביקורת 30.10): בעבר רק
+  // חימוש פרימיום התמזג לתוך השומר הקבוע; חימוש notifyOnly (או כל רישום אחר)
+  // דרס אותו בשקט — מחק את ה־persistent ואיפס את שערי הדה־דופ (fullNotifiedKey
+  // וחבריו), עם סיכון להתראות סיום כפולות. כעת: persistent נשמר תמיד מעל שומר
+  // קבוע קיים, ומצב המעקב נשמר בכל רישום מעל רישום קיים (רישום חדש באמת
+  // קורה רק אחרי deregister/פקיעה, כש־existing ריק).
+  const keepPersistent = !!(existing && existing.persistent);
+  const mergeIntoGuard = !!existing;
+  const persistent = body.persistent === true || keepPersistent;
   let premiumContinue = body.premiumContinue === true;
   let premiumArmedAt = premiumContinue ? now : null;
   if (!premiumContinue && persistent && existing && existing.premiumContinue
@@ -313,13 +350,23 @@ async function handleRegister(env, body) {
     premiumArmedAt,
     peakStartMin: Number(body.peakStartMin),
     peakEndMin: Number(body.peakEndMin),
-    armedAt: mergeIntoGuard ? Number(existing.armedAt || now) : now,
+    armedAt: keepPersistent ? Number(existing.armedAt || now) : now,
     credsBlob,
     wasCharging: mergeIntoGuard ? existing.wasCharging : null,
     wasPeak: mergeIntoGuard ? existing.wasPeak : null,
     wasConnected: mergeIntoGuard ? existing.wasConnected : null,
+    // שדות מצב ודה־דופ — נשמרים במיזוג, בלי לאפס שערי "כבר הותרע" (H6)
+    wasState: mergeIntoGuard ? (existing.wasState ?? null) : null,
+    wasFull: mergeIntoGuard ? (existing.wasFull ?? null) : null,
     lastTxnId: mergeIntoGuard ? existing.lastTxnId : null,
+    lastEventKey: mergeIntoGuard ? (existing.lastEventKey ?? null) : null,
     lastFullMs: mergeIntoGuard ? existing.lastFullMs : null,
+    lastFullSeenMs: mergeIntoGuard ? (existing.lastFullSeenMs ?? null) : null,
+    lastFullAtMs: mergeIntoGuard ? (existing.lastFullAtMs ?? null) : null,
+    fullNotifiedKey: mergeIntoGuard ? (existing.fullNotifiedKey ?? null) : null,
+    flowSinceMs: mergeIntoGuard ? (existing.flowSinceMs ?? null) : null,
+    lastStopPushKey: mergeIntoGuard ? (existing.lastStopPushKey ?? null) : null,
+    lastStopPushAtMs: mergeIntoGuard ? (existing.lastStopPushAtMs ?? null) : null,
     actedKey: mergeIntoGuard ? existing.actedKey : null,
     plugActedKey: mergeIntoGuard ? existing.plugActedKey : null,
     lastPollAt: mergeIntoGuard ? existing.lastPollAt : null
@@ -393,6 +440,24 @@ async function handleTick(env, body) {
   const cfg = await loadCfg(env);
   if (!cfg || !cfg.armed) return { ok: true, action: "tick", armed: false };
   let cfgBefore = stableCfgJson(cfg);
+  // M8 (ביקורת 30.10): pushToAllSubscribers לא זורק ומחזיר סטטוס — בעבר איש לא
+  // קרא אותו, וכשל התראות טוטאלי (למשל VAPID חסר) היה שקט לגמרי. כעת כשל
+  // נרשם ליומן השומר, פעם אחת לטיק.
+  let pushProblemLogged = false;
+  const pushAndLog = async (payload) => {
+    const r = await pushToAllSubscribers(env, payload);
+    const problem = r && (r.skipped || (r.subs > 0 && r.sent === 0));
+    if (problem && !pushProblemLogged) {
+      pushProblemLogged = true;
+      await pushLog(env, {
+        kind: "push-error",
+        detail: r.skipped
+          ? "התראת push דולגה — VAPID לא מוגדר או אחסון המנויים חסר"
+          : `התראת push לא נמסרה לאף אחד מ־${r.subs} המנויים (${payload.tag || "ללא תג"})`
+      });
+    }
+    return r;
+  };
   // פקיעה: רישום חולף פג כולו אחרי 24 שעות. שומר קבוע לא פג — רק חימוש
   // המשך־הפרימיום שבתוכו מתבטל אחרי 24 שעות, והשומר ממשיך כהתראות + אישור ראשון.
   if (!cfg.persistent && Date.now() - Number(cfg.armedAt || 0) > 24 * 3600 * 1000) {
@@ -401,7 +466,7 @@ async function handleTick(env, body) {
     await storeDelete(env, EVENTS_KEY);
     await pushLog(env, { kind: "expire", detail: "שומר כובה אוטומטית אחרי 24 שעות" });
     try {
-      await pushToAllSubscribers(env, {
+      await pushAndLog({
         title: "🛰️ שומר הפרימיום כובה",
         body: "השומר כובה אוטומטית אחרי 24 שעות. להפעלה מחדש — סמן שוב «המשך אוטומטי בפרימיום» באפליקציה.",
         tag: "ev-watch-expired"
@@ -479,7 +544,7 @@ async function handleTick(env, body) {
     };
     await pushLog(env, action);
     try {
-      await pushToAllSubscribers(env, {
+      await pushAndLog({
         title: "⚡ הטעינה ממשיכה בפרימיום",
         body: `השומר זיהה מעבר לתעריף פרימיום וחידש את הטעינה אוטומטית${cfg.clientName ? ` (${cfg.clientName})` : ""}`,
         tag: "ev-watch-premium"
@@ -502,7 +567,7 @@ async function handleTick(env, body) {
     };
     await pushLog(env, action);
     try {
-      await pushToAllSubscribers(env, {
+      await pushAndLog({
         title: "⚡ טעינה אושרה אוטומטית",
         body: `רכב חובר לעמדה והשומר אישר טעינה בתעריף רגיל${cfg.clientName ? ` (${cfg.clientName})` : ""}. לאישור המשך גם בפרימיום — הפעל «אישור מראש כולל פרימיום» באפליקציה.`,
         tag: "ev-watch-firstauth"
@@ -513,10 +578,16 @@ async function handleTick(env, body) {
   if (diff.plugIn || diff.chargeStart || diff.full || diff.chargeStop || diff.plugOut) {
     await recordWatchEvents(env, cfg, diff, Date.now());
   }
-  if (diff.plugIn) cfg.fullNotifiedKey = null;
+  if (diff.plugIn) {
+    cfg.fullNotifiedKey = null;
+    cfg.lastFullMs = null;
+  }
   if (diff.full) {
     cfg.fullNotifiedKey = diff.full.txnId;
     cfg.lastFullAtMs = Date.now();
+    // H7: lastFullMs הוא "חותמת הסיום האחרונה שכבר דווחה" — מתעדכן רק כאן,
+    // כשאירוע סיום עם חותמת אמיתית נורה (לא בכל טיק).
+    if (!diff.full.approx) cfg.lastFullMs = diff.full.atMs;
   }
   // חימוש־מחדש של שער הסיום: קטע זרם חדש ויציב (3+ דקות Charging רצוף) שזורם
   // 10+ דקות אחרי הסיום הקודם מאפשר דיווח סיום נוסף באותו חיבור (חידוש אחרי
@@ -543,7 +614,7 @@ async function handleTick(env, body) {
   const plugFresh = !st.plugInTime || Date.now() - Number(st.plugInTime) <= 5 * 60 * 1000;
   if (diff.plugIn && plugFresh) {
     try {
-      await pushToAllSubscribers(env, decide.notifyPeakPlug ? {
+      await pushAndLog(decide.notifyPeakPlug ? {
         title: "🔌 רכב חובר בשעות שיא",
         body: `${who}רכב חובר לעמדה בשעות תעריף שיא — השומר לא אישר אוטומטית. לאישור, פתחו את האפליקציה.`,
         tag: "ev-watch-peakplug"
@@ -556,7 +627,7 @@ async function handleTick(env, body) {
   }
   if (decide.notifyPeakStop && persistenceHealthy) {
     try {
-      await pushToAllSubscribers(env, {
+      await pushAndLog({
         title: "⏸️ הטעינה הופסקה במעבר לשיא",
         body: `${who}הטעינה הופסקה במעבר לתעריף שיא והשומר הקבוע לא מאשר פרימיום אוטומטית. לאישור המשך — הפעילו «אישור מראש כולל פרימיום» באפליקציה.`,
         tag: "ev-watch-peakstop"
@@ -565,7 +636,7 @@ async function handleTick(env, body) {
   }
   if (diff.full && fullPushAllowed(diff.full, st, Date.now(), persistenceHealthy)) {
     try {
-      await pushToAllSubscribers(env, {
+      await pushAndLog({
         title: "🔋 הטעינה הסתיימה",
         body: `${who}הטעינה הסתיימה ב־${hhmm(diff.full.atMs)}`,
         tag: "ev-watch-full"
@@ -580,7 +651,7 @@ async function handleTick(env, body) {
       cfg.lastStopPushKey = stopKey;
       cfg.lastStopPushAtMs = Date.now();
       try {
-        await pushToAllSubscribers(env, {
+        await pushAndLog({
           title: "⏸️ הטעינה הופסקה",
           body: `${who}הטעינה הופסקה מצד העמדה — ככל הנראה מעבר לתעריף שיא`,
           tag: "ev-watch-stop"
@@ -603,7 +674,7 @@ async function handleTick(env, body) {
     } catch {}
     if (!staleReplay) {
       try {
-        await pushToAllSubscribers(env, {
+        await pushAndLog({
           title: "🔌 הכבל נותק",
           body: `${who}הכבל נותק מהעמדה`,
           tag: "ev-watch-unplug"
@@ -625,10 +696,14 @@ async function handleTick(env, body) {
   }
   const evKey = watchEventKey(st);
   if (evKey) cfg.lastEventKey = evKey;
-  if (stTxnId) {
-    if (cfg.lastTxnId !== stTxnId) cfg.lastFullMs = stFullMs;
-    else if (stFullMs != null) cfg.lastFullMs = stFullMs;
+  // H7 (ביקורת 30.10): lastFullSeenMs הוא החותמת שנצפתה בטיק זה (תשמש כ"דגימה
+  // קודמת" בטיק הבא), ו־lastFullMs הוא חותמת שכבר דווחה (מתעדכן רק ביריית
+  // אירוע full, למעלה). בעבר שוקפו שניהם לאותו ערך בכל טיק — ושער "חותמת
+  // יציבה שתי דגימות" ב־eventsFromStateDiff (fullMs !== lastFullMs וגם
+  // fullMs === lastFullSeenMs) היה סתירה מתמטית שלא יכלה לירות לעולם.
+  if (stTxnId && cfg.lastTxnId !== stTxnId) {
     cfg.lastTxnId = stTxnId;
+    cfg.lastFullMs = null;
   }
   cfg.lastFullSeenMs = stFullMs || null;
 

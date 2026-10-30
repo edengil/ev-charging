@@ -33,6 +33,15 @@ function Dashboard({
     return () => window.removeEventListener(WEVO_AUTH_INTENT_EVENT, sync);
   }, []);
   useEffect(() => {
+    // M20 (ביקורת 30.10): הדגל _alertedUnclosed נקרא כאן שנים אבל שום קוד לא
+    // כתב אותו — ההתראה נורתה מחדש בכל כניסה לדשבורד. כעת כותבים אותו
+    // כשההתראה נורית, ומנקים אותו מרשומה שכבר אינה מוכנה (שתהיה זכאית
+    // להתראה מחודשת אם תהפוך מוכנה שוב).
+    if (typeof onUpsertOpen === "function") {
+      for (const o of openSess || []) {
+        if (o._alertedUnclosed && !o.readyToComplete) onUpsertOpen({ ...o, _alertedUnclosed: false });
+      }
+    }
     const liveNow = findChargeStillOnStation(openSess, readLiveStation(), sessions);
     const ready = (openSess || []).filter(o => o.readyToComplete && !o._alertedUnclosed && (!liveNow || o.id !== liveNow.id));
     if (!ready.length) return;
@@ -40,6 +49,7 @@ function Dashboard({
     const cl = clients.find(c => c.id === first.clientId);
     const name = cl && cl.name || "לקוח";
     appAlert(`טעינה של ${name} ממתינה לאישור — לוחצים ״השלם טעינה״ בכרטיס למעלה. לא חוסם טעינה חדשה.`, "info", 6500);
+    if (typeof onUpsertOpen === "function") onUpsertOpen({ ...first, _alertedUnclosed: true });
   }, []);
   // רק חובות חיוביים — יתרות זכות לא מקזזות את סיכום החובות הפתוחים
   const totBal = stats.reduce((a, c) => a + (c.isSelf ? 0 : Math.max(0, c.balance)), 0);

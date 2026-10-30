@@ -168,11 +168,13 @@ export async function sendWebPush(env, subscription, payloadObj, opts = {}) {
 }
 
 // שליחה לכל המנויים ב־KV (push:subs) + ניקוי מנויים מתים. לא זורק לעולם.
+// מחזיר גם subs (כמה מנויים קיימים) כדי שהקורא יבחין בין "אין מנויים" לבין
+// "יש מנויים ואף אחד לא קיבל" (M8, ביקורת 30.10).
 export async function pushToAllSubscribers(env, payloadObj) {
   try {
-    if (!loadVapidJwk(env) || !env.EV_BACKUP) return { sent: 0, skipped: true };
+    if (!loadVapidJwk(env) || !env.EV_BACKUP) return { sent: 0, skipped: true, subs: 0 };
     const subs = (await env.EV_BACKUP.get("push:subs", { type: "json" })) || [];
-    if (!Array.isArray(subs) || !subs.length) return { sent: 0 };
+    if (!Array.isArray(subs) || !subs.length) return { sent: 0, subs: 0 };
     let sent = 0;
     const alive = [];
     for (const sub of subs) {
@@ -187,8 +189,8 @@ export async function pushToAllSubscribers(env, payloadObj) {
     if (alive.length !== subs.length) {
       await env.EV_BACKUP.put("push:subs", JSON.stringify(alive));
     }
-    return { sent };
+    return { sent, subs: subs.length };
   } catch {
-    return { sent: 0 };
+    return { sent: 0, subs: 0 };
   }
 }

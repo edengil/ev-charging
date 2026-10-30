@@ -233,6 +233,27 @@ describe("ב3 — mergeWatchEvents (מיזוג חותמות שרת לרשומה 
     assert.equal(mergeWatchEvents({ id: "o1" }, { txnId: "777" }), null);
     assert.equal(mergeWatchEvents(null, ev), null);
   });
+
+  it("H8: אירוע endApprox ממלא chargeEndedAt ומסמן endApprox — בלי verifiedEndAt ובלי chargingFullTime", () => {
+    const approxEv = { ...ev, chargingFullTime: null, endApprox: true };
+    const patch = mergeWatchEvents({ id: "o1", wevoTxnId: "777" }, approxEv);
+    assert.equal(patch.chargeEndedAt, "2026-01-15T20:20");
+    assert.equal(patch.endApprox, true);
+    assert.equal(patch.verifiedEndAt, undefined);
+    assert.equal(patch.chargingFullTime, undefined);
+  });
+
+  it("H8: אירוע endApprox לא מסמן endApprox על רשומה שכבר יש לה סיום מאומת", () => {
+    const approxEv = { ...ev, chargingFullTime: null, endApprox: true };
+    const patch = mergeWatchEvents({ id: "o1", wevoTxnId: "777", verifiedEndAt: "2026-01-15T20:20" }, approxEv);
+    assert.equal(patch.endApprox, undefined);
+  });
+
+  it("B9: chargeStartApprox מהאירוע עובר כדגל לרשומה עם חותמת ההתחלה", () => {
+    const patch = mergeWatchEvents({ id: "o1", wevoTxnId: "777" }, { ...ev, chargeStartApprox: true });
+    assert.equal(patch.chargeStartedAt, "2026-01-15T14:59");
+    assert.equal(patch.chargeStartApprox, true);
+  });
 });
 
 describe("ב3 — חיווט הבאנדל (שומר רגרסיה)", () => {

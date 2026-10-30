@@ -380,6 +380,25 @@ describe("שומר התראות — notifyOnly (גם ללקוח עצמי)", () =
     assert.equal(st2.body.notifyOnly, false);
   });
 
+  it("H6/M6: חימוש notifyOnly מעל שומר קבוע — persistent ומצב הדה־דופ נשמרים", async () => {
+    const env = makeEnv();
+    await call(env, { ...REGISTER, persistent: true, autoApprove: true, clientId: null, clientName: "שומר קבוע" });
+    const key = "watch:cfg";
+    const cfg1 = JSON.parse(env.EV_BACKUP._map.get(key));
+    cfg1.fullNotifiedKey = "777";
+    cfg1.lastFullSeenMs = 123456;
+    cfg1.wasConnected = true;
+    env.EV_BACKUP._map.set(key, JSON.stringify(cfg1));
+    const r = await call(env, { ...REGISTER, notifyOnly: true });
+    assert.equal(r.status, 200);
+    const cfg2 = JSON.parse(env.EV_BACKUP._map.get(key));
+    assert.equal(cfg2.persistent, true, "שומר קבוע לא נדרס לחולף");
+    assert.equal(cfg2.notifyOnly, true);
+    assert.equal(cfg2.fullNotifiedKey, "777", "שער כבר־הותרע לא אופס");
+    assert.equal(cfg2.lastFullSeenMs, 123456);
+    assert.equal(cfg2.wasConnected, true);
+  });
+
   it("שומרים: שערי האישור בטיק וההתראות מחווטים", () => {
     const src = readFileSync(join(root, "functions/api/wevo-watch.js"), "utf8");
     assert.match(src, /decideGuardActions\(cfg/, "הטיק עובד דרך פונקציית ההחלטה");

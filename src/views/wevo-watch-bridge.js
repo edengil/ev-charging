@@ -42,8 +42,13 @@ function createWatchBridge(deps) {
           setWatchInfo(null);
         }
       } catch (e) {
+        // M9 (ביקורת 30.10): גם כשל בכיבוי השומר נרשם — בעבר נבלע בשקט.
+        // NO_CREDS מוחרג: בלי פרטי Wevo אין שומר לכבות, וזו לא תקלה.
+        if (e && e.message === "NO_CREDS") return;
         if (intent && intent.premiumContinue) {
           pushWevoLog("preauth", `שומר שרת לא הופעל: ${e && e.message || "שגיאה"}`, false);
+        } else {
+          pushWevoLog("preauth", `כיבוי שומר השרת נכשל: ${e && e.message || "שגיאה"}`, false);
         }
       }
     })();
@@ -96,11 +101,23 @@ function createWatchBridge(deps) {
 
   const refreshWatchInfo = () => {
     (async () => {
+      // H9 (ביקורת 30.10): ה־catch הישן בלע כל כשל בשקט (setWatchInfo(null)
+      // בלבד) — כך באג ב3 הסתתר 12 יום. כעת: שלב הרשת ושלב המיזוג נפרדים,
+      // וכל כשל נרשם ליומן. NO_CREDS מוחרג — מצב רגיל בלי פרטי Wevo.
+      let data = null;
       try {
-        const data = await watchApi("status");
-        setWatchInfo(data && data.armed ? data : null);
-        // ב3: מיזוג חותמות שומר השרת לרשומות הפתוחות (מילוי שדות ריקים בלבד)
-        if (data && data.events) {
+        data = await watchApi("status");
+      } catch (e) {
+        if (!e || e.message !== "NO_CREDS") {
+          pushWevoLog("sync", `סטטוס שומר השרת נכשל: ${e && e.message || "שגיאה"}`, false);
+        }
+        setWatchInfo(null);
+        return;
+      }
+      setWatchInfo(data && data.armed ? data : null);
+      // ב3: מיזוג חותמות שומר השרת לרשומות הפתוחות (מילוי שדות ריקים בלבד)
+      if (data && data.events) {
+        try {
           const patches = [];
           for (const o of openRef.current || []) {
             let ev = o && o.wevoTxnId ? data.events[String(o.wevoTxnId)] : null;
@@ -118,9 +135,9 @@ function createWatchBridge(deps) {
             for (const p of patches) onUpsertOpen(p);
             pushWevoLog("sync", "התקבלו חותמות טעינה משומר השרת", true);
           }
+        } catch (e) {
+          pushWevoLog("sync", `מיזוג חותמות שומר השרת נכשל: ${e && e.message || "שגיאה"}`, false);
         }
-      } catch {
-        setWatchInfo(null);
       }
     })();
   };
