@@ -7,22 +7,45 @@ export const COGNITO_URL = "https://cognito-idp.eu-central-1.amazonaws.com/";
 export const CLIENT_ID = "2amm11et52j39kubdekse641b6";
 export const API_BASE = "https://api.wevo.energy/mobileapp";
 
+// M21 (ביקורת 30.10): CORS מוגבל לדומיין האפליקציה (כולל תתי־דומיין של
+// תצוגות Pages) ול־localhost לפיתוח — בעבר היה "*" לכל האינטרנט, גם על
+// נקודות קצה שמקבלות סיסמאות ו־PIN.
+const ALLOWED_ORIGIN_RE = /^https:\/\/([a-z0-9-]+\.)?eden-ev-charge\.pages\.dev$/;
+const LOCAL_ORIGIN_RE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+export function requestOrigin(context) {
+  try {
+    return context.request.headers.get("Origin");
+  } catch {
+    return null;
+  }
+}
+
+export function corsFor(origin) {
+  const o = origin && (ALLOWED_ORIGIN_RE.test(origin) || LOCAL_ORIGIN_RE.test(origin))
+    ? origin
+    : "https://eden-ev-charge.pages.dev";
+  return {
+    "Access-Control-Allow-Origin": o,
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin"
+  };
+}
+
 export const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  ...corsFor(null),
   "Content-Type": "application/json; charset=utf-8"
 };
 
-export function json(status, body) {
+export function json(status, body, origin) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: corsHeaders
+    headers: { ...corsFor(origin), "Content-Type": "application/json; charset=utf-8" }
   });
 }
 
-export function optionsResponse() {
-  return new Response(null, { status: 204, headers: corsHeaders });
+export function optionsResponse(origin) {
+  return new Response(null, { status: 204, headers: corsFor(origin) });
 }
 
 export async function cognitoLogin(email, password) {

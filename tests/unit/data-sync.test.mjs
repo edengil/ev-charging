@@ -56,7 +56,7 @@ async function pinHash(pin) {
   return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-const PIN = "1234";
+const PIN = "123456";
 const DATA = {
   clients: [{ id: "c1", name: "שכן" }],
   sessions: [
@@ -180,5 +180,64 @@ describe("data-sync — ב5 אחסון מפוצל", () => {
     const load = await call(env, { action: "load", pin: PIN });
     const oct = load.body.data.sessions.find(s => s.id === "s-oct");
     assert.equal(oct.amount, 55, "השינוי נקרא בחזרה מהפיצול");
+  });
+});
+
+describe("data-sync — אבטחת PIN (H4+H5+M22, ביקורת 30.10)", () => {
+  it("setup שומר גיבוב PBKDF2, ו־load תקין עובד מולו", async () => {
+    const env = makeEnv();
+    const r = await call(env, { action: "setup", pin: PIN, data: DATA });
+    assert.equal(r.status, 200);
+    const meta = JSON.parse(env.EV_BACKUP._map.get("meta"));
+    assert.ok(meta.pinHash.startsWith("pbkdf2$"), "פורמט הגיבוב החדש");
+    const load = await call(env, { action: "load", pin: PIN });
+    assert.equal(load.status, 200);
+  });
+
+  it("setup עם PIN קצר מ־6 תווים נדחה ב־400", async () => {
+    const env = makeEnv();
+    const r = await call(env, { action: "setup", pin: "12345", data: DATA });
+    assert.equal(r.status, 400);
+  });
+
+  it("גיבוב מורשת (SHA-256) מאומת ומשודרג ל־PBKDF2 בכניסה ראשונה", async () => {
+    const env = makeEnv();
+    const kv = env.EV_BACKUP;
+    kv._map.set("meta", JSON.stringify({ pinHash: await pinHash(PIN), updatedAt: 111 }));
+    kv._map.set("data", JSON.stringify({ ...DATA, updatedAt: 111 }));
+    const load = await call(env, { action: "load", pin: PIN });
+    assert.equal(load.status, 200);
+    const meta = JSON.parse(kv._map.get("meta"));
+    assert.ok(meta.pinHash.startsWith("pbkdf2$"), "הגיבוב שודרג בשקיפות");
+    const load2 = await call(env, { action: "load", pin: PIN });
+    assert.equal(load2.status, 200);
+  });
+
+  it("H4: אחרי 5 ניסיונות שגויים רצופים — נעילה (429) גם ל־PIN הנכון", async () => {
+    const env = makeEnv();
+    await call(env, { action: "setup", pin: PIN, data: DATA });
+    for (let i = 0; i < 5; i++) {
+      const r = await call(env, { action: "load", pin: "000000" });
+      assert.equal(r.status, 401);
+    }
+    const locked = await call(env, { action: "load", pin: PIN });
+    assert.equal(locked.status, 429);
+  });
+
+  it("H4: התחברות מוצלחת מאפסת את מונה הכשלונות", async () => {
+    const env = makeEnv();
+    await call(env, { action: "setup", pin: PIN, data: DATA });
+    for (let i = 0; i < 4; i++) await call(env, { action: "load", pin: "000000" });
+    const ok = await call(env, { action: "load", pin: PIN });
+    assert.equal(ok.status, 200);
+    assert.equal(env.EV_BACKUP._map.has("pin:guard"), false);
+  });
+
+  it("M22: status לא חושף updatedAt ללקוח לא־מאומת", async () => {
+    const env = makeEnv();
+    await call(env, { action: "setup", pin: PIN, data: DATA });
+    const st = await call(env, { action: "status" });
+    assert.equal(st.body.configured, true);
+    assert.equal("updatedAt" in st.body, false);
   });
 });

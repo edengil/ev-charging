@@ -1,9 +1,50 @@
-import { corsHeaders, json, optionsResponse } from "../_shared/wevo.js";
+import { corsHeaders, json, optionsResponse, requestOrigin } from "../_shared/wevo.js";
 
 async function hashPin(pin) {
   const data = new TextEncoder().encode(String(pin) + "|eden-ev-charge-v1");
   const hash = await crypto.subtle.digest("SHA-256", data);
   return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// H5 (ביקורת 30.10): גיבוב PIN חזק — PBKDF2-HMAC-SHA256 (100k סיבובים) עם מלח
+// אקראי פר־התקנה. פורמט: pbkdf2$<iterations>$<salt base64>$<hash hex>.
+// hashPin הישן (SHA-256 מהיר + מלח קבוע בקוד) נשאר לאימות התקנות מורשת בלבד,
+// ומשודרג ל־PBKDF2 בהתחברות מוצלחת ראשונה (ראו verifyPin והשדרוג בזרימה).
+const PBKDF2_ITERATIONS = 100000;
+function timingSafeEqualStr(a, b) {
+  const x = String(a || ""), y = String(b || "");
+  if (x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  return diff === 0;
+}
+async function pbkdf2Hex(pin, saltBytes, iterations) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(pin)), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations }, key, 256);
+  return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+async function hashPinV2(pin) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await pbkdf2Hex(pin, salt, PBKDF2_ITERATIONS);
+  const saltB64 = btoa(String.fromCharCode(...salt));
+  return `pbkdf2$${PBKDF2_ITERATIONS}$${saltB64}$${hash}`;
+}
+async function verifyPin(pin, stored) {
+  if (!stored) return false;
+  if (String(stored).startsWith("pbkdf2$")) {
+    const parts = String(stored).split("$");
+    if (parts.length !== 4) return false;
+    const iterations = parseInt(parts[1], 10) || PBKDF2_ITERATIONS;
+    let salt;
+    try {
+      salt = Uint8Array.from(atob(parts[2]), c => c.charCodeAt(0));
+    } catch {
+      return false;
+    }
+    const actual = await pbkdf2Hex(pin, salt, iterations);
+    return timingSafeEqualStr(actual, parts[3]);
+  }
+  return timingSafeEqualStr(await hashPin(pin), stored);
 }
 
 // --- ב5: אחסון מפוצל (שלב 1 — כתיבה כפולה + קריאה מפוצלת עם נפילה לבלוב הישן) ---
@@ -104,10 +145,11 @@ async function handleDataSync(env, body) {
   }
 
   if (action === "status") {
+    // M22 (ביקורת 30.10): בלי updatedAt — נקודת קצה לא־מאומתת לא חושפת
+    // חותמת פעילות של ההתקנה. הלקוח צורך רק את configured.
     return {
       ok: true,
       configured: !!(meta && meta.pinHash),
-      updatedAt: (meta && meta.updatedAt) || null,
       provider: "cloudflare"
     };
   }
@@ -118,8 +160,9 @@ async function handleDataSync(env, body) {
       err.status = 400;
       throw err;
     }
-    if (pin.length < 4) {
-      const err = new Error("בחר PIN באורך 4 ספרות לפחות");
+    if (pin.length < 6) {
+      // H4: מינימום 6 תווים ל־PIN חדש (PIN קיים קצר יותר ממשיך לעבוד באימות)
+      const err = new Error("בחר PIN באורך 6 תווים לפחות");
       err.status = 400;
       throw err;
     }
@@ -138,7 +181,7 @@ async function handleDataSync(env, body) {
       splitError = String((e && e.message) || e);
     }
     await kv.put("meta", JSON.stringify({
-      pinHash: await hashPin(pin), updatedAt: now,
+      pinHash: await hashPinV2(pin), updatedAt: now,
       ...(splitVersion ? { splitVersion } : {}),
       ...(splitError ? { splitError } : {})
     }));
@@ -150,10 +193,43 @@ async function handleDataSync(env, body) {
     err.status = 400;
     throw err;
   }
-  if (pin.length < 4 || (await hashPin(pin)) !== meta.pinHash) {
+  // H4 (ביקורת 30.10): הגבלת קצב לניסיונות PIN — אחרי 5 כשלונות רצופים,
+  // נעילה ל־15 דקות. בעבר אפשר היה לנחש PIN של 4 ספרות מקוון בלי שום מחסום.
+  let pinGuard = null;
+  try {
+    pinGuard = await kv.get("pin:guard", { type: "json" });
+  } catch {
+    pinGuard = null;
+  }
+  if (pinGuard && pinGuard.lockedUntil && Date.now() < pinGuard.lockedUntil) {
+    const err = new Error("יותר מדי ניסיונות PIN שגויים — נסו שוב בעוד כמה דקות");
+    err.status = 429;
+    throw err;
+  }
+  if (pin.length < 4 || !(await verifyPin(pin, meta.pinHash))) {
+    const fails = (pinGuard && pinGuard.fails ? pinGuard.fails : 0) + 1;
+    const next = fails >= 5
+      ? { fails: 0, lockedUntil: Date.now() + 15 * 60 * 1000 }
+      : { fails, lockedUntil: 0 };
+    try {
+      await kv.put("pin:guard", JSON.stringify(next));
+    } catch {}
     const err = new Error("PIN שגוי");
     err.status = 401;
     throw err;
+  }
+  if (pinGuard && (pinGuard.fails || pinGuard.lockedUntil)) {
+    try {
+      await kv.delete("pin:guard");
+    } catch {}
+  }
+  // H5: שדרוג גיבוב מורשת ל־PBKDF2 בהתחברות מוצלחת ראשונה. ה־meta המקומי
+  // מתעדכן גם הוא, כדי שכתיבת meta מאוחרת באותה בקשה (save) לא תדרוס חזרה.
+  if (!String(meta.pinHash).startsWith("pbkdf2$")) {
+    meta = { ...meta, pinHash: await hashPinV2(pin) };
+    try {
+      await kv.put("meta", JSON.stringify(meta));
+    } catch {}
   }
 
   if (action === "load") {
@@ -211,22 +287,22 @@ async function handleDataSync(env, body) {
   throw err;
 }
 
-export async function onRequestOptions() {
-  return optionsResponse();
+export async function onRequestOptions(context) {
+  return optionsResponse(requestOrigin(context));
 }
 
 export async function onRequestPost(context) {
   try {
     const body = await context.request.json().catch(() => ({}));
     const result = await handleDataSync(context.env, body);
-    return json(200, result);
+    return json(200, result, requestOrigin(context));
   } catch (e) {
-    return json(e.status || 500, { error: e.message || "שגיאה לא צפויה", ok: false });
+    return json(e.status || 500, { error: e.message || "שגיאה לא צפויה", ok: false }, requestOrigin(context));
   }
 }
 
 export async function onRequest(context) {
-  if (context.request.method === "OPTIONS") return optionsResponse();
+  if (context.request.method === "OPTIONS") return optionsResponse(requestOrigin(context));
   if (context.request.method === "POST") return onRequestPost(context);
-  return json(405, { error: "Method not allowed", ok: false });
+  return json(405, { error: "Method not allowed", ok: false }, requestOrigin(context));
 }

@@ -1,4 +1,4 @@
-import { json, optionsResponse, cognitoLogin } from "../_shared/wevo.js";
+import { json, optionsResponse, cognitoLogin, requestOrigin } from "../_shared/wevo.js";
 import { loadVapidJwk, vapidPublicKey } from "../_shared/push.js";
 
 // מנויי Web Push — התראות כשהאפליקציה סגורה.
@@ -11,13 +11,13 @@ const SUBS_KEY = "push:subs";
 export async function onRequestGet(context) {
   const jwk = loadVapidJwk(context.env);
   if (!jwk) {
-    return json(503, { ok: false, error: "התראות שרת לא מוגדרות (חסר VAPID_PRIVATE_JWK)" });
+    return json(503, { ok: false, error: "התראות שרת לא מוגדרות (חסר VAPID_PRIVATE_JWK)" }, requestOrigin(context));
   }
-  return json(200, { ok: true, publicKey: vapidPublicKey(jwk) });
+  return json(200, { ok: true, publicKey: vapidPublicKey(jwk) }, requestOrigin(context));
 }
 
-export function onRequestOptions() {
-  return optionsResponse();
+export function onRequestOptions(context) {
+  return optionsResponse(requestOrigin(context));
 }
 
 async function verifyCreds(email, password) {
@@ -89,9 +89,9 @@ export async function onRequestPost(context) {
       err.status = 400;
       throw err;
     }
-    return json(200, result);
+    return json(200, result, requestOrigin(context));
   } catch (e) {
     const status = e.status || 500;
-    return json(status, { error: e.message || "שגיאה לא צפויה", ok: false });
+    return json(status, { error: e.message || "שגיאה לא צפויה", ok: false }, requestOrigin(context));
   }
 }

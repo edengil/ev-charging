@@ -1,4 +1,4 @@
-import { json, optionsResponse, handleWevoRequest, cognitoLogin } from "../_shared/wevo.js";
+import { json, optionsResponse, handleWevoRequest, cognitoLogin, requestOrigin } from "../_shared/wevo.js";
 import { pushToAllSubscribers } from "../_shared/push.js";
 import { storeGetJson, storePutJson, storeDelete } from "../_shared/watch-store.js";
 
@@ -755,15 +755,15 @@ export async function onRequestPost(context) {
       err.status = 400;
       throw err;
     }
-    return json(200, result);
+    return json(200, result, requestOrigin(context));
   } catch (e) {
     const status = e.status || 500;
-    return json(status, { error: e.message || "שגיאה לא צפויה", ok: false });
+    return json(status, { error: e.message || "שגיאה לא צפויה", ok: false }, requestOrigin(context));
   }
 }
 
 export async function onRequest(context) {
-  if (context.request.method === "OPTIONS") return optionsResponse();
+  if (context.request.method === "OPTIONS") return optionsResponse(requestOrigin(context));
   if (context.request.method === "POST") return onRequestPost(context);
-  return json(405, { error: "Method not allowed", ok: false });
+  return json(405, { error: "Method not allowed", ok: false }, requestOrigin(context));
 }
