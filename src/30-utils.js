@@ -233,13 +233,15 @@ function pointAt(tl, key) {
 
 /**
  * בוחר צירוף התחלה/סיום עם הסכום הגבוה ביותר (פרימיום וכו').
- * startKeys / endKeys אופציונליים — ברירת מחדל כל הנקודות הזמינות.
+ * H2 (ביקורת 30.10): ברירת המחדל היא ארבעת חלונות החיוב הקנוניים בלבד —
+ * התחלה ∈ {plugIn, chargeStart} × סיום ∈ {chargeEnd, plugOut} — אותם חלונות
+ * שמוצגים למשתמש מתומחרים באשף. startKeys / endKeys אופציונליים לחריגה מפורשת.
  */
 function pickMaxBillWindow(kwh, tl, opts = {}) {
   const points = timelinePoints(tl);
   if (!points.length || !(kwh > 0)) return null;
-  const startKeys = opts.startKeys || points.map(p => p.key);
-  const endKeys = opts.endKeys || points.map(p => p.key);
+  const startKeys = opts.startKeys || ["plugIn", "chargeStart"];
+  const endKeys = opts.endKeys || ["chargeEnd", "plugOut"];
   const forceReg = !!opts.forceReg;
   const forcePrem = !!opts.forcePrem;
   const customRate = opts.customRate || null;

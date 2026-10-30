@@ -804,12 +804,18 @@ function mergeWevoTransactions(clients, sessions, transactions, openSess = []) {
     const tag = `txn#${tx.transactionId}`;
     const notes = s.notes ? `${s.notes} | ${tag}` : tag;
     const cost = Math.round(Number(tx.totalCost) * 100) / 100;
+    // M2 (ביקורת 30.10): costToOwner מוקפא ביצירת הרשומה. גם שיוך שמצא עסקה
+    // בענף הרופף (זמן+אנרגיה בלבד) לא דורס אותו — דריסה רק כשהעלות הרשמית
+    // קרובה לשמורה (אותו תנאי כמו בענף ההתאמה המחמיר).
+    const savedCost = Number(s.costToOwner);
+    const costClose = Number.isFinite(cost) && Number.isFinite(savedCost) && Math.abs(cost - savedCost) <= 0.05;
+    const finalCost = costClose ? cost : s.costToOwner;
     return {
       ...s,
       notes,
       wevoTxnId: String(tx.transactionId),
-      costToOwner: cost || s.costToOwner,
-      profit: Math.round((s.amountBilled - (cost || s.costToOwner)) * 100) / 100
+      costToOwner: finalCost,
+      profit: costClose ? Math.round((s.amountBilled - finalCost) * 100) / 100 : s.profit
     };
   });
 

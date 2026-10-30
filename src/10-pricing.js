@@ -6,16 +6,16 @@
  */
 // ── תמחור: ברירות מחדל — ניתנות לשינוי בהגדרות ⚙️ ──────────────────────────
 const DEFAULT_CONFIG = {
-  ratePremium: 2.98,
   // גבייה 16:00–23:00
-  rateRegular: 1.47,
+  ratePremium: 2.98,
   // גבייה שאר הזמן
-  ownerPeak: 2.08,
+  rateRegular: 1.47,
   // עלות בעלים בשעות הפיק (החלון עצמו נמשך מ־Wevo, שדה ownerPeak*Min למטה)
-  ownerOff: 0.87,
+  ownerPeak: 2.08,
   // עלות בעלים שאר הזמן + שישי/שבת
-  ownerPeakStartMin: 17 * 60,
+  ownerOff: 0.87,
   // חלון פיק ברירת מחדל 17:00–23:00 — מתעדכן אוטומטית מלוח Wevo בכל סנכרון
+  ownerPeakStartMin: 17 * 60,
   ownerPeakEndMin: 23 * 60,
   inflation: 1.21 // ניפוח קוט״ש לגבייה (1.21 = +21%)
 };
@@ -39,6 +39,10 @@ function persistConfig(cfg) {
   _configCache = { ..._configCache, ...cfg };
   _configListeners.forEach(fn => fn(_configCache));
   try { localStorage.setItem("ev_config", JSON.stringify(_configCache)); } catch {}
+  // M12+M13 (ביקורת 30.10): שינוי תעריפים מגובה לענן כמו כל שינוי נתונים,
+  // ומטמון הענן מתעדכן לאותו ערך — שלא ישמור config ישן על חדש.
+  if (typeof rememberCloudCache === "function") rememberCloudCache({ config: _configCache });
+  if (typeof scheduleCloudSave === "function") scheduleCloudSave();
 }
 async function loadConfigFromStorage() {
   try {
@@ -46,6 +50,7 @@ async function loadConfigFromStorage() {
     if (v) {
       _configCache = { ...DEFAULT_CONFIG, ...JSON.parse(v) };
       _configListeners.forEach(fn => fn(_configCache));
+      if (typeof rememberCloudCache === "function") rememberCloudCache({ config: _configCache });
     }
   } catch {}
 }
@@ -93,25 +98,21 @@ function calcSession(kwhRaw, startDt, endDt = null, forceReg = false, forcePrem 
     rate = cfg.ratePremium;
     premiumRatio = 1;
   } else {
-    const sh = start.getHours() + start.getMinutes() / 60;
-    const eh = end.getHours() + end.getMinutes() / 60;
     const totalMin = Math.max((end - start) / 60000, 1);
-    // Handle midnight crossing
-    let premH = 0;
-    if (sh < eh) {
-      premH = Math.max(0, Math.min(eh, PREM_E) - Math.max(sh, PREM_S));
-    } else {
-      const premBefore = Math.max(0, PREM_E - Math.max(sh, PREM_S));
-      const premAfter = Math.max(0, Math.min(eh, PREM_E) - PREM_S);
-      premH = premBefore + premAfter;
-    }
-    premiumRatio = Math.min(1, premH * 60 / totalMin);
+    // H3 (ביקורת 30.10): חפיפת פרימיום אמיתית על פני כל הימים — כמו צד עלות
+    // הבעלים. הלוגיקה הקודמת עבדה על שעות־יום בלבד ומחקה את שעות השיא של
+    // היום הראשון בכל טעינה שחצתה חצות והסתיימה בשעה מאוחרת מההתחלה.
+    const premMin = peakOverlapMinutes(start, end, PREM_S * 60, PREM_E * 60);
+    premiumRatio = Math.min(1, premMin / totalMin);
     if (premiumRatio > 0 && premiumRatio < 1) {
       isMixed = true;
       rate = Math.round((cfg.ratePremium * premiumRatio + cfg.rateRegular * (1 - premiumRatio)) * 1000) / 1000;
     } else if (premiumRatio >= 1) {
       rate = cfg.ratePremium;
+    } else if (end > start) {
+      rate = cfg.rateRegular;
     } else {
+      // משך אפס/שלילי — סיווג לפי שעת ההתחלה (ההתנהגות ההיסטורית למקרה הקצה)
       const h = start.getHours();
       if (h >= PREM_S && h < PREM_E) {
         rate = cfg.ratePremium;

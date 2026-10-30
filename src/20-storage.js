@@ -22,6 +22,19 @@ let _cloudDataCache = {
   config: undefined
 };
 let _lastUploadedCounts = null;
+// H1 (ביקורת 30.10): שער אתחול — עד שמיזוג האתחול מול הענן מסתיים, שמירות
+// ענן נדחות. בלי השער, DB.set של תיקוני האתחול מתזמן שמירה אחרי 1.2 שנ׳ עם
+// תמונה מקומית בלבד; אם ה־load אורך יותר, התמונה החלקית דורסת את הענן
+// ו־writeSplit בשרת מוחק חודשים/רשומות שקיימים רק בענן.
+let _cloudBootDone = false;
+let _cloudSaveDeferred = false;
+function markCloudBootDone() {
+  _cloudBootDone = true;
+  if (_cloudSaveDeferred) {
+    _cloudSaveDeferred = false;
+    scheduleCloudSave();
+  }
+}
 
 function rememberCloudCache(partial = {}) {
   if (partial.clients != null) _cloudDataCache.clients = partial.clients;
@@ -275,6 +288,10 @@ function wevoOriginHe(o) {
 
 function scheduleCloudSave() {
   if (!getCloudPin()) return;
+  if (!_cloudBootDone) {
+    _cloudSaveDeferred = true;
+    return;
+  }
   clearTimeout(_cloudSaveTimer);
   _cloudSaveTimer = setTimeout(async () => {
     try {
