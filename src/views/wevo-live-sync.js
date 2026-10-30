@@ -4,6 +4,105 @@
  * מחובר בסדר קבוע ע״י scripts/inject-app.mjs (ראה src/manifest.json).
  * אין import/export — שמות ברמה העליונה משותפים לכל הבאנדל (ארכיטקטורת סקריפט יחיד).
  */
+// ── M3 (ביקורת 30.10): כותבי המעברים המשותפים לשני מנועי הלכידה ──────────
+// הפאנל (wevo-live-panel) ומנוע הרקע (WevoOpenLiveSync למטה) דוגמים את אותה
+// תחנה ובעבר כל אחד החזיק עותק פרטי של כתיבת שדות הסיום/הכסף לרשומות
+// פתוחות — מרוץ כתיבות וסיכון שתיקון יגיע רק לאחד. כעת גוף הכתיבה אחד;
+// כל מנוע שומר את הטריגרים, הקצב והתצוגה שלו וקורא לאותם כותבים.
+
+/** מעבר ממתין→טוען: חותמת chargeStartedAt על הרשומה הפתוחה הפעילה. */
+function stampChargeStartedOnOpen(prev, st, opens, onUpsertOpen, buildPayload) {
+  const wasWaiting = prev && !stationStillCharging(prev);
+  const nowCharging = st && stationStillCharging(st);
+  if (!wasWaiting || !nowCharging) return;
+  const existing = findActiveWevoOpen(opens, st);
+  if (existing && existing.clientId && !existing.chargeStartedAt) {
+    onUpsertOpen({
+      ...buildPayload(st, existing.clientId, existing),
+      chargeStartedAt: toLocalDT(new Date())
+    }, {
+      silent: true
+    });
+  }
+}
+
+/** מעבר טוען→Finishing: חותמת סיום מאומתת (verifiedEndAt) לפני ניתוק הכבל. */
+function stampVerifiedEndOnOpen(prev, st, opens, onUpsertOpen, buildPayload) {
+  const wasCharging = prev && stationStillCharging(prev);
+  const nowFinishing = st && String(st.state || "") === "Finishing";
+  if (!wasCharging || !nowFinishing) return;
+  const existing = findActiveWevoOpen(opens, st);
+  if (existing && existing.clientId && !existing.chargeEndedAt) {
+    const fullMs = toMs(st.chargingFullTime);
+    const plugMs = toMs(existing.plugInAt || existing.startDate || st.plugInTime);
+    const endedAt = fullMs && (!plugMs || fullMs >= plugMs) ? toLocalDT(fullMs) : toLocalDT(new Date());
+    onUpsertOpen({
+      ...buildPayload(st, existing.clientId, existing),
+      chargeEndedAt: endedAt,
+      endDate: endedAt,
+      verifiedEndAt: endedAt,
+      chargingFullTime: toMs(st.chargingFullTime) || Date.now()
+    }, {
+      silent: true
+    });
+  }
+}
+
+/**
+ * סגירת טעינה שהסתיימה: שליפת הסיום הסופי מ־Wevo (fetchWevoFinalForOpen),
+ * כתיבת כל שדות הסיום/הכסף לרשומה והתראת "מוכן לאישור".
+ * snap = הדגימה האחרונה הידועה ({ plugInTime, chargingFullTime, ... }).
+ * מחזיר true אם הרשומה נסגרה. שערי הבטיחות זהים לשני המנועים: לא סוגרים
+ * רשומה לפח, לא סוגרים אם התחנה עדיין טוענת, ולא בלי שליפה שיכולה לסגור.
+ */
+async function finalizeOpenFromSnap(existing, snap, txn, { sessions, onUpsertOpen, buildPayload, notifyReady }) {
+  if (!existing || !existing.clientId) return false;
+  if (shouldDiscardOpen(existing, sessions)) return false;
+  let fetched = null;
+  try {
+    fetched = await fetchWevoFinalForOpen({
+      ...existing,
+      wevoTxnId: txn != null ? txn : existing.wevoTxnId,
+      chargingFullTime: existing.chargingFullTime || (snap && snap.chargingFullTime) || null
+    }, {
+      retries: 4,
+      gapMs: 1200
+    });
+  } catch {
+    fetched = null;
+  }
+  if (stationStillCharging(readLiveStation())) return false;
+  if (!finalWevoFetchCanClose(fetched)) return false;
+  const payload = buildPayload({
+    totalEnergyKwh: fetched.kwh,
+    totalCost: fetched.cost,
+    electricityCost: fetched.elec,
+    plugInTime: (snap && snap.plugInTime) || existing.startDate,
+    transactionId: fetched.wevoTxnId || txn
+  }, existing.clientId, existing);
+  onUpsertOpen({
+    ...payload,
+    liveKwh: fetched.kwh,
+    liveWevoCost: fetched.cost,
+    liveElecCost: fetched.elec,
+    endDate: fetched.end,
+    startDate: fetched.start || payload.startDate,
+    plugInAt: payload.plugInAt || fetched.plugInAt || payload.startDate,
+    chargingFullTime: fetched.chargingFullTime || payload.chargingFullTime || null,
+    endApprox: !!fetched.endApprox,
+    chargeStartedAt: fetched.chargeStartAt || existing.chargeStartedAt || null,
+    chargeEndedAt: fetched.chargeEndAt || fetched.end || existing.chargeEndedAt,
+    plugOutAt: fetched.plugOutEnd || fetched.plugOutAt || null,
+    wevoTxnId: fetched.wevoTxnId || payload.wevoTxnId,
+    readyToComplete: true,
+    wevoEnded: true
+  }, {
+    silent: true
+  });
+  if (notifyReady) notifyReady(existing, fetched.kwh);
+  return true;
+}
+
 // ── WevoOpenLiveSync: מעדכן טעינות פתוחות גם מחוץ לדשבורד ─────────────────
 function WevoOpenLiveSync({
   openSess,
@@ -80,59 +179,14 @@ function WevoOpenLiveSync({
 
   const buildPayload = (st, clientId, existing) => buildLiveOpenPayload(st, clientId, existing, clientsRef.current || []);
 
+  // M3: גוף הסגירה חי ב־finalizeOpenFromSnap המשותף (בראש הקובץ).
   const markEnded = async (existing, snap, txn) => {
-    if (shouldDiscardOpen(existing, sessionsRefLive.current)) return;
-    let fields = {
-      kwh: snap.totalEnergyKwh != null ? Number(snap.totalEnergyKwh) : Number(existing.liveKwh) || 0,
-      cost: snap.totalCost != null ? Number(snap.totalCost) : existing.liveWevoCost,
-      elec: snap.electricityCost != null ? Number(snap.electricityCost) : existing.liveElecCost,
-      end: toLocalDT(new Date()),
-      start: existing.startDate,
-      wevoTxnId: txn != null ? String(txn) : existing.wevoTxnId
-    };
-    let fetched = null;
-    try {
-      fetched = await fetchWevoFinalForOpen({
-        ...existing,
-        wevoTxnId: txn != null ? txn : existing.wevoTxnId,
-        chargingFullTime: existing.chargingFullTime || snap.chargingFullTime || null
-      }, {
-        retries: 4,
-        gapMs: 1200
-      });
-    } catch {
-      fetched = null;
-    }
-    if (stationStillCharging(readLiveStation())) return;
-    if (!finalWevoFetchCanClose(fetched)) return;
-    fields = fetched;
-    const payload = buildPayload({
-      totalEnergyKwh: fields.kwh,
-      totalCost: fields.cost,
-      electricityCost: fields.elec,
-      plugInTime: snap.plugInTime || existing.startDate,
-      transactionId: fields.wevoTxnId || txn
-    }, existing.clientId, existing);
-    onUpsertOpen({
-      ...payload,
-      liveKwh: fields.kwh,
-      liveWevoCost: fields.cost,
-      liveElecCost: fields.elec,
-      endDate: fields.end,
-      startDate: fields.start || payload.startDate,
-      plugInAt: payload.plugInAt || fields.plugInAt || payload.startDate,
-      chargingFullTime: fields.chargingFullTime || payload.chargingFullTime || null,
-      endApprox: !!fields.endApprox,
-      chargeStartedAt: fields.chargeStartAt || existing.chargeStartedAt || null,
-      chargeEndedAt: fields.chargeEndAt || fields.end,
-      plugOutAt: fields.plugOutEnd || fields.plugOutAt || null,
-      wevoTxnId: fields.wevoTxnId || payload.wevoTxnId,
-      readyToComplete: true,
-      wevoEnded: true
-    }, {
-      silent: true
+    await finalizeOpenFromSnap(existing, snap, txn, {
+      sessions: sessionsRefLive.current,
+      onUpsertOpen,
+      buildPayload,
+      notifyReady
     });
-    notifyReady(existing, fields.kwh);
   };
 
   useEffect(() => {
@@ -189,38 +243,10 @@ function WevoOpenLiveSync({
             }
           }
         }
-        const wasWaiting = prev && !isActuallyCharging(prev);
-        const nowCharging = st && isActuallyCharging(st);
-        if (wasWaiting && nowCharging) {
-          const existing = findActiveWevoOpen(opens, st);
-          if (existing && existing.clientId && !existing.chargeStartedAt) {
-            onUpsertOpen({
-              ...buildPayload(st, existing.clientId, existing),
-              chargeStartedAt: toLocalDT(new Date())
-            }, {
-              silent: true
-            });
-          }
-        }
-        const wasCharging = prev && isActuallyCharging(prev);
-        const nowFinishing = st && String(st.state || "") === "Finishing";
-        if (wasCharging && nowFinishing) {
-          const existing = findActiveWevoOpen(opens, st);
-          if (existing && existing.clientId && !existing.readyToComplete && !existing.chargeEndedAt) {
-            const fullMs = toMs(st.chargingFullTime);
-            const plugMs = toMs(existing.plugInAt || existing.startDate || st.plugInTime);
-            const endedAt = fullMs && (!plugMs || fullMs >= plugMs) ? toLocalDT(fullMs) : toLocalDT(new Date());
-            onUpsertOpen({
-              ...buildPayload(st, existing.clientId, existing),
-              chargeEndedAt: endedAt,
-              endDate: endedAt,
-              verifiedEndAt: endedAt,
-              chargingFullTime: toMs(st.chargingFullTime) || Date.now()
-            }, {
-              silent: true
-            });
-          }
-        }
+        // M3: חותמות המעבר נכתבות מהכותבים המשותפים (בראש הקובץ) — אותם
+        // כותבים בדיוק משמשים גם את הפאנל.
+        stampChargeStartedOnOpen(prev, st, opens, onUpsertOpen, buildPayload);
+        stampVerifiedEndOnOpen(prev, st, opens, onUpsertOpen, buildPayload);
         const wasActive = prev && (isActuallyCharging(prev) || isWaitingForAuthorize(prev));
         const nowIdle = st && !isActuallyCharging(st) && !isWaitingForAuthorize(st) && !chargerReportsVehicle(st, sessionsRefLive.current);
         if (wasActive && nowIdle) {

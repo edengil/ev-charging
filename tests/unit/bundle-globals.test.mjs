@@ -71,6 +71,21 @@ test("כל export של lib שנקרא מ־src חשוף כגלובל בבאנדל
   assert.deepEqual(missing, []);
 });
 
+test("M3: כותבי המעברים חיים רק ב־wevo-live-sync — הפאנל רק קורא להם", () => {
+  const panel = read("src/views/wevo-live-panel.js");
+  const sync = read("src/views/wevo-live-sync.js");
+  // גופי הכתיבה מוגדרים פעם אחת, במנוע הרקע
+  assert.match(sync, /function stampChargeStartedOnOpen/);
+  assert.match(sync, /function stampVerifiedEndOnOpen/);
+  assert.match(sync, /async function finalizeOpenFromSnap/);
+  // הפאנל משתמש בהם ולא מחזיק עותקי כתיבה משלו
+  assert.match(panel, /stampChargeStartedOnOpen\(prev, st, openRef\.current/);
+  assert.match(panel, /stampVerifiedEndOnOpen\(prev, st, openRef.current/);
+  assert.match(panel, /finalizeOpenFromSnap\(existing/);
+  assert.doesNotMatch(panel, /fetchWevoFinalForOpen\(/);
+  assert.doesNotMatch(panel, /verifiedEndAt: endedAt/);
+});
+
 test("M37: כל קובץ במניפסט נפתח בבלוק הערה תקין שהחיתוך מסיר במלואו", () => {
   const manifest = JSON.parse(read("src/manifest.json"));
   const bad = [];

@@ -249,40 +249,12 @@ function WevoLivePanel({
       }
       // לוג רק במעברים חשובים — לא בכל רענון (delayCharge נשאר true גם בזמן טעינה רגילה)
 
-      // מעבר לטעינה פעילה: שומרים התחלת זרם בפועל
-      const wasWaitingLive = prev && !isActuallyCharging(prev);
-      const nowChargingLive = st && isActuallyCharging(st);
-      if (wasWaitingLive && nowChargingLive) {
-        const existing = findActiveWevoOpen(openRef.current, st);
-        if (existing && existing.clientId && !existing.chargeStartedAt) {
-          onUpsertOpen({
-            ...buildOpenPayload(st, existing.clientId, existing),
-            chargeStartedAt: toLocalDT(new Date())
-          }, {
-            silent: true
-          });
-        }
-      }
-      // מעבר ל-Finishing: שומרים סיום טעינה (לפני ניתוק כבל)
+      // מעבר לטעינה פעילה + מעבר ל-Finishing: חותמות המעבר נכתבות מהכותבים
+      // המשותפים ב־wevo-live-sync.js (M3, ביקורת 30.10) — אותו גוף כתיבה
+      // בדיוק כמו מנוע הרקע, שלא ייווצר פער בין שני המנועים.
+      stampChargeStartedOnOpen(prev, st, openRef.current, onUpsertOpen, buildOpenPayload);
+      stampVerifiedEndOnOpen(prev, st, openRef.current, onUpsertOpen, buildOpenPayload);
       const wasCharging = prev && isActuallyCharging(prev);
-      const nowFinishing = st && String(st.state || "") === "Finishing";
-      if (wasCharging && nowFinishing) {
-        const existing = findActiveWevoOpen(openRef.current, st);
-        if (existing && existing.clientId && !existing.chargeEndedAt) {
-          const fullMs = toMs(st.chargingFullTime);
-          const plugMs = toMs(existing.plugInAt || existing.startDate || st.plugInTime);
-          const endedAt = fullMs && (!plugMs || fullMs >= plugMs) ? toLocalDT(fullMs) : toLocalDT(new Date());
-          onUpsertOpen({
-            ...buildOpenPayload(st, existing.clientId, existing),
-            chargeEndedAt: endedAt,
-            endDate: endedAt,
-            verifiedEndAt: endedAt,
-            chargingFullTime: toMs(st.chargingFullTime) || Date.now()
-          }, {
-            silent: true
-          });
-        }
-      }
 
       if (st && chargerReportsVehicle(st, sessions) && (isActuallyCharging(st) || isWaitingForAuthorize(st))) {
         const existing = isActuallyCharging(st)
@@ -313,66 +285,25 @@ function WevoLivePanel({
         const txn = prev.transactionId || st && st.transactionId;
         const existing = findActiveWevoOpen(openRef.current, txn || prev);
         if (existing && existing.clientId && !existing.readyToComplete) {
-          let fields = {
-            kwh: prev.totalEnergyKwh != null ? Number(prev.totalEnergyKwh) : Number(existing.liveKwh) || 0,
-            cost: prev.totalCost != null ? Number(prev.totalCost) : existing.liveWevoCost,
-            elec: prev.electricityCost != null ? Number(prev.electricityCost) : existing.liveElecCost,
-            end: existing.chargeEndedAt || toLocalDT(new Date()),
-            start: existing.startDate,
-            wevoTxnId: txn != null ? String(txn) : existing.wevoTxnId
-          };
-          let fetched = null;
-          try {
-            fetched = await fetchWevoFinalForOpen({
-              ...existing,
-              wevoTxnId: txn != null ? txn : existing.wevoTxnId,
-              chargeEndedAt: existing.chargeEndedAt,
-              chargingFullTime: existing.chargingFullTime || prev.chargingFullTime
-            }, {
-              retries: 4,
-              gapMs: 1200
-            });
-          } catch {
-            fetched = null;
-          }
-          if (!stationStillCharging(readLiveStation()) && finalWevoFetchCanClose(fetched)) {
-          fields = fetched;
-          const snap = {
-            totalEnergyKwh: fields.kwh,
-            totalCost: fields.cost,
-            electricityCost: fields.elec,
+          // M3: גוף הסגירה (שליפת סיום + כתיבת שדות + התראה) חי ב־
+          // finalizeOpenFromSnap המשותף ב־wevo-live-sync.js — אותו גוף בדיוק
+          // כמו מנוע הרקע. כאן נשארים רק הטריגר ונוסח ההתראה של הפאנל.
+          await finalizeOpenFromSnap(existing, {
             plugInTime: prev.plugInTime || existing.startDate,
-            chargingFullTime: prev.chargingFullTime || existing.chargingFullTime,
-            transactionId: fields.wevoTxnId || txn
-          };
-          const payload = buildOpenPayload(snap, existing.clientId, existing);
-          onUpsertOpen({
-            ...payload,
-            liveKwh: fields.kwh,
-            liveWevoCost: fields.cost,
-            liveElecCost: fields.elec,
-            endDate: fields.end,
-            startDate: fields.start || payload.startDate,
-            plugInAt: payload.plugInAt || fields.plugInAt || payload.startDate,
-            chargingFullTime: fields.chargingFullTime || payload.chargingFullTime || null,
-            endApprox: !!fields.endApprox,
-            chargeStartedAt: fields.chargeStartAt || existing.chargeStartedAt || null,
-            chargeEndedAt: fields.chargeEndAt || fields.end || existing.chargeEndedAt,
-            plugOutAt: fields.plugOutEnd || fields.plugOutAt || null,
-            wevoTxnId: fields.wevoTxnId || payload.wevoTxnId,
-            readyToComplete: true,
-            wevoEnded: true
-          }, {
-            silent: true
+            chargingFullTime: prev.chargingFullTime || existing.chargingFullTime
+          }, txn, {
+            sessions,
+            onUpsertOpen,
+            buildPayload: buildOpenPayload,
+            notifyReady: ex => {
+              if (alertedReadyRef.current.has(ex.id)) return;
+              alertedReadyRef.current.add(ex.id);
+              const cl = (clientsRef.current || []).find(c => c.id === ex.clientId);
+              pushWevoLog("ready", `${cl && cl.name || "לקוח"}: מוכן לאישור`, true);
+              appAlert(`טעינה הסתיימה — מוכן לאישור (${cl && cl.name || "לקוח"})`, "ok", 6000);
+              notifyPhone("הטעינה נגמרה", cl && cl.name || "לקוח", `ev-end-${ex.id}`);
+            }
           });
-          if (!alertedReadyRef.current.has(existing.id)) {
-            alertedReadyRef.current.add(existing.id);
-            const cl = (clientsRef.current || []).find(c => c.id === existing.clientId);
-            pushWevoLog("ready", `${cl && cl.name || "לקוח"}: מוכן לאישור`, true);
-            appAlert(`טעינה הסתיימה — מוכן לאישור (${cl && cl.name || "לקוח"})`, "ok", 6000);
-            notifyPhone("הטעינה נגמרה", cl && cl.name || "לקוח", `ev-end-${existing.id}`);
-          }
-          }
         }
       }
       prevStateRef.current = st;

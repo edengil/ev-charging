@@ -847,7 +847,8 @@ describe("app-source drift guards", () => {
     const src = readAppBundle();
     // כותבי הסגירה לא שמים את תחילת חלון החיוב היקר (fields.start) בתוך plugInAt
     assert.doesNotMatch(src, /plugInAt: (fields|fetched)\.start \|\|/);
-    assert.match(src, /plugInAt: payload\.plugInAt \|\| fields\.plugInAt/);
+    // M3 (ביקורת 30.10): כותב הסגירה אחד משותף — שדות השליפה נקראים fetched
+    assert.match(src, /plugInAt: payload\.plugInAt \|\| fetched\.plugInAt/);
     assert.match(src, /plugInAt: o\.plugInAt \|\| fetched\.plugInAt/);
     // סיום שנלכד לרכב מלא לא נמחק בזמן SuspendedEV, והדגל נשמר על הרשומה
     assert.match(src, /st\.didCompleteFull\) return payload/);
@@ -861,8 +862,10 @@ describe("app-source drift guards", () => {
     // הבונה החי שומר סיום מאומת מהלכידה החיה, ומחיקת "עדיין טוען" מאפסת גם אותו
     assert.match(src, /verifiedEndAt: chargeEndedAt \|\| \(existing && existing\.verifiedEndAt\)/);
     assert.match(src, /verifiedEndAt: null,/);
-    // שני מטפלי מעבר ה־Finishing (מנוע + פאנל) חותמים סיום מאומת
-    assert.equal((src.match(/verifiedEndAt: endedAt/g) || []).length, 2);
+    // M3 (ביקורת 30.10): חותם הסיום המאומת אחד משותף, ושני המנועים קוראים לו
+    assert.equal((src.match(/verifiedEndAt: endedAt/g) || []).length, 1);
+    assert.match(src, /stampVerifiedEndOnOpen\(prev, st, opens, onUpsertOpen, buildPayload\)/);
+    assert.match(src, /stampVerifiedEndOnOpen\(prev, st, openRef\.current, onUpsertOpen, buildOpenPayload\)/);
     // הגזירה נותנת עדיפות לסיום המאומת; endDate נשאר גיבוי לרשומות ישנות בלבד
     assert.match(src, /finalEndAt: fallback\.verifiedEndAt \|\| \(fallback\.wevoEnded/);
     assert.equal((src.match(/verifiedEndAt \|\| \(openSession\.wevoEnded/g) || []).length, 2);

@@ -92,8 +92,10 @@ describe("ב2 — דגל סיום מקורב בשדות הסגירה (שומר �
     const src = readFileSync(join(root, "src/40-wevo-sync.js"), "utf8");
     assert.match(src, /endApprox: !\(fallback\.verifiedEndAt \|\| fallback\.chargeEndedAt/);
     const sync = readFileSync(join(root, "src/views/wevo-live-sync.js"), "utf8");
-    assert.match(sync, /endApprox: !!fields\.endApprox/);
-    assert.match(sync, /endApprox: !!fetched\.endApprox/);
+    // M3 (ביקורת 30.10): כותב הסגירה המשותף ומעגל השחזור — שניהם מעבירים את
+    // דגל endApprox משדות השליפה לרשומה
+    assert.match(sync, /async function finalizeOpenFromSnap/);
+    assert.equal((sync.match(/endApprox: !!fetched\.endApprox/g) || []).length, 2);
   });
 
   it("באנר המוכנות מציג אזהרת סיום מקורב", () => {
