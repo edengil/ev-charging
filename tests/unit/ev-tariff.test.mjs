@@ -1,10 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   tariffTimeToMinutes,
   extractTariffRanges,
   normalizeWevoTariff
 } from "../../lib/ev-tariff.mjs";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("נרמול תעריף Wevo — המרת זמנים", () => {
   it("שניות־מיום כמו של Wevo (82800 = 23:00)", () => {
@@ -134,5 +139,14 @@ describe("נרמול תעריף Wevo — טווחים", () => {
     assert.equal(empty.ownerOff, null);
     assert.equal(normalizeWevoTariff(null).ok, false);
     assert.equal(normalizeWevoTariff({}).ok, false);
+  });
+
+  it("ברירות מחדל של עלות הבעלים מיושרות לספר הרשמי (תעריף ביתי אחיד, 1.7.2026)", () => {
+    // ספר חח״י מהדורת יולי 2026: ביתי אחיד 53.83 אג׳ לפני מע״מ = 0.6352 ₪
+    // כולל מע״מ בכל שעה. בייצור לוח Wevo דורס בכל סנכרון; ברירת המחדל היא
+    // רק גיבוי למצב שלפני סנכרון ראשון. מהדורת הספר הבאה: 1.1.2027.
+    const src = readFileSync(join(root, "src/10-pricing.js"), "utf8");
+    assert.match(src, /ownerPeak: 0\.6352,/);
+    assert.match(src, /ownerOff: 0\.6352,/);
   });
 });
