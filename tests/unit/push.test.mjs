@@ -13,7 +13,7 @@ writeFileSync(dest, src);
 const push = await import(pathToFileURL(dest).href);
 rmSync(dir, { recursive: true, force: true });
 
-const { b64urlToBytes, bytesToB64url, encryptPushBody, vapidAuthHeader, vapidPublicKey, loadVapidJwk } = push;
+const { b64urlToBytes, bytesToB64url, encryptPushBody, vapidAuthHeader, vapidPublicKey, loadVapidJwk, buildPushPayload, APP_ORIGIN } = push;
 
 // וקטור רשמי — RFC 8291 סעיף 5
 const RFC = {
@@ -119,5 +119,36 @@ describe("VAPID", () => {
   it("בלי מפתח מוגדר — loadVapidJwk מחזיר null", () => {
     assert.equal(loadVapidJwk({}), null);
     assert.equal(loadVapidJwk({ VAPID_PRIVATE_JWK: "not-json" }), null);
+  });
+});
+
+describe("מטען הצהרתי (תוכנית שיפורים 12.11)", () => {
+  it("עוטף בפורמט web_push 8030 ושומר את השדות השטוחים לתאימות לאחור", () => {
+    const out = buildPushPayload({ title: "🔋 הטעינה הסתיימה", body: "הטעינה הסתיימה ב־14:32", tag: "ev-watch-full" });
+    assert.equal(out.web_push, 8030);
+    assert.equal(out.title, "🔋 הטעינה הסתיימה");
+    assert.equal(out.body, "הטעינה הסתיימה ב־14:32");
+    assert.equal(out.tag, "ev-watch-full");
+    assert.equal(out.notification.title, out.title);
+    assert.equal(out.notification.body, out.body);
+    assert.equal(out.notification.tag, "ev-watch-full");
+    assert.equal(out.notification.lang, "he");
+    assert.equal(out.notification.dir, "rtl");
+    assert.equal(out.notification.navigate, `${APP_ORIGIN}/?notify=ev-watch-full`);
+  });
+
+  it("ברירות מחדל זהות לאלה של עובד הרקע, וניווט מקודד לפי התג", () => {
+    const out = buildPushPayload({});
+    assert.equal(out.title, "🔔 עדכון טעינה");
+    assert.equal(out.body, "");
+    assert.equal(out.tag, "ev-push");
+    assert.equal(out.notification.navigate, `${APP_ORIGIN}/?notify=ev-push`);
+    const spaced = buildPushPayload({ tag: "a b&c" });
+    assert.equal(spaced.notification.navigate, `${APP_ORIGIN}/?notify=a%20b%26c`);
+  });
+
+  it("מקור מותאם אישית נכנס לכתובת הניווט", () => {
+    const out = buildPushPayload({ tag: "x" }, "https://example.com");
+    assert.equal(out.notification.navigate, "https://example.com/?notify=x");
   });
 });

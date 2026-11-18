@@ -1,4 +1,4 @@
-const SW_VERSION = "2026-09-26-live-once";
+const SW_VERSION = "2026-11-18-declarative";
 
 self.addEventListener("install", event => {
   event.waitUntil(self.skipWaiting());
@@ -39,11 +39,22 @@ self.addEventListener("push", event => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {}
-  const title = data.title || "🔔 עדכון טעינה";
-  const tag = data.tag ? String(data.tag) : "ev-push";
+  // תוכנית שיפורים 12.11: מטען הצהרתי (web_push 8030) — בפלטפורמות אפל
+  // הדפדפן כבר הציג את ההתראה מהשדה notification, גם אם עובד הרקע התעורר
+  // באיחור; הצגה נוספת כאן הייתה כפילות. בשאר הדפדפנים מציגים כרגיל
+  // מהשדה notification או מהשדות השטוחים (מטענים ישנים).
+  const decl = data && data.web_push === 8030 && data.notification ? data.notification : null;
+  if (decl) {
+    const ua = (self.navigator && self.navigator.userAgent) || "";
+    const appleDeclarative = /AppleWebKit/.test(ua) && !/Chrome|Chromium|Android|CriOS|FxiOS|Edg/.test(ua);
+    if (appleDeclarative) return;
+  }
+  const src = decl || data;
+  const title = src.title || "🔔 עדכון טעינה";
+  const tag = src.tag ? String(src.tag) : "ev-push";
   event.waitUntil(
     self.registration.showNotification(title, {
-      body: data.body || "",
+      body: src.body || "",
       tag,
       lang: "he",
       dir: "rtl",

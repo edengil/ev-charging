@@ -170,6 +170,34 @@ export async function sendWebPush(env, subscription, payloadObj, opts = {}) {
 // B2 (ביקורת 30.10): מפתח מנויי ה־push מוגדר פעם אחת — גם api/push.js משתמש בו.
 export const PUSH_SUBS_KEY = "push:subs";
 
+// מקור האפליקציה לכתובת הניווט בהתראה הצהרתית (זהה לברירת המחדל ב־corsFor).
+export const APP_ORIGIN = "https://eden-ev-charge.pages.dev";
+
+// תוכנית שיפורים 12.11: עטיפת המטען בפורמט הצהרתי (Declarative Web Push,
+// ‏web_push 8030) לצד השדות השטוחים. בפלטפורמות אפל (Safari/iOS 18.4+) הדפדפן
+// מציג את ההתראה מהשדה notification גם אם עובד הרקע לא רץ או נכשל; שאר
+// הדפדפנים מתעלמים מהעטיפה ועובד הרקע מציג מהשדות השטוחים כרגיל.
+export function buildPushPayload(payloadObj, origin = APP_ORIGIN) {
+  const p = payloadObj || {};
+  const title = p.title || "🔔 עדכון טעינה";
+  const body = p.body || "";
+  const tag = p.tag ? String(p.tag) : "ev-push";
+  return {
+    web_push: 8030,
+    notification: {
+      title,
+      body,
+      tag,
+      lang: "he",
+      dir: "rtl",
+      navigate: `${origin}/?notify=${encodeURIComponent(tag)}`
+    },
+    title,
+    body,
+    tag
+  };
+}
+
 // שליחה לכל המנויים ב־KV (push:subs) + ניקוי מנויים מתים. לא זורק לעולם.
 // מחזיר גם subs (כמה מנויים קיימים) כדי שהקורא יבחין בין "אין מנויים" לבין
 // "יש מנויים ואף אחד לא קיבל" (M8, ביקורת 30.10).
@@ -178,11 +206,12 @@ export async function pushToAllSubscribers(env, payloadObj) {
     if (!loadVapidJwk(env) || !env.EV_BACKUP) return { sent: 0, skipped: true, subs: 0 };
     const subs = (await env.EV_BACKUP.get(PUSH_SUBS_KEY, { type: "json" })) || [];
     if (!Array.isArray(subs) || !subs.length) return { sent: 0, subs: 0 };
+    const wirePayload = buildPushPayload(payloadObj);
     let sent = 0;
     const alive = [];
     for (const sub of subs) {
       try {
-        const r = await sendWebPush(env, sub, payloadObj);
+        const r = await sendWebPush(env, sub, wirePayload);
         if (r.status >= 200 && r.status < 300) sent++;
         if (!r.gone) alive.push(sub);
       } catch {
