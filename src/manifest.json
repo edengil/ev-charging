@@ -14,6 +14,7 @@
     "src/73-app-debts.js",
     "src/74-push-client.js",
     "src/views/dashboard.js",
+    "src/views/dashboard-cards.js",
     "src/views/stats.js",
     "src/views/cloud-gate.js",
     "src/views/wevo-live-sync.js",
